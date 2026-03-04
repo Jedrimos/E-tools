@@ -1,160 +1,131 @@
-# ⚡ SVP Verteilersplan – Der smarte Belegungsplaner für Elektroinstallationen
+# ⚡ SVP Verteilerplaner
 
-> Schluss mit handgezeichneten Skizzen und Excel-Tabellen. Plane deine Unterverteilung professionell – direkt im Browser, ohne Installation, ohne Einarbeitung.
+**Professionelle Planung und Dokumentation von Elektroverteiler-Belegungen — direkt im Browser. Keine Installation, keine Cloud, keine Kompromisse.**
 
----
-
-## Was ist SVP Sicherungsplan?
-
-SVP Sicherungsplan ist ein webbasiertes Tool für Elektriker, Elektrotechniker und versierte Heimwerker, das den gesamten Planungsprozess einer Unterverteilung in einem einzigen, durchdachten Workflow abbildet – von der ersten Kabelerfassung bis zur fertigen Stückliste.
-
-Kein Backend. Keine Cloud. Keine monatlichen Kosten. Einfach öffnen und loslegen.
+[![Version](https://img.shields.io/badge/version-1.5.0-2196C9?style=flat-square)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
+[![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
 ---
 
-## Features auf einen Blick
+## Was ist der SVP Verteilerplaner?
 
-### 📋 Geführter 5-Schritte-Workflow
-Von Projektdaten bis zum fertigen Belegungsplan – strukturiert, übersichtlich, fehlerfrei.
+Der SVP Verteilerplaner ist ein schlankes, browserbasiertes Werkzeug für Elektrotechniker und Planer. In fünf geführten Schritten entsteht aus einer einfachen Kabelliste ein vollständiger Belegungsplan mit Stückliste, Beschriftungsplan und Klemmenleisten-Visualisierung — lokal, schnell, ohne Anmeldung.
 
-### 🔌 Intelligente Kabelerfassung
-Erfasse Kabel mit Typ, Querschnitt, Adernzahl, Raum und Stockwerk. Drag & Drop Sortierung inklusive. Oder überspring die Tipparbeit komplett:
+Entwickelt für den Alltag auf der Baustelle und im Büro. Funktioniert auf Desktop, Tablet und Mobilgerät.
 
-### 📸 KI-gestützter Foto-Import
-Fotografiere deine handgeschriebene Kabelliste – die KI erkennt automatisch alle Einträge und überführt sie ins System. Kompatibel mit Anthropic Claude, OpenAI GPT-4o und lokalen Modellen via Ollama oder LM Studio.
+---
 
-### ⚡ Automatische FI-Planung
-Das Tool berechnet selbstständig, wie viele FI-Schutzschalter du benötigst und verteilt die Sicherungsgruppen optimal auf die verfügbaren Teilungseinheiten.
+## Features
 
-### 🎯 Drag & Drop Belegungsplan
-Verschiebe Sicherungen zwischen FI-Gruppen per Drag & Drop. Visuell oder als Tabelle – du entscheidest.
+### 🏗️ Schritt 1 – Projektdaten
+Projektname, Adresse, Stockwerke mit Farbcodierung und Räume definieren. Warnungen wenn die Konfiguration unvollständig ist, bevor es weitergeht.
 
-### 🔧 FILS-Unterstützung
-FI/LS-Kombinationsschalter werden vollständig unterstützt und separat ausgewiesen.
+### 🔌 Schritt 2 – Kabelerfassung
+Kabel mit Bezeichnung, Raum, Stockwerk, Kabeltyp (NYM-J, NYY-J, H07V-K, LIYY), Adernanzahl und Querschnitt erfassen. Duplikate per Knopfdruck, Reihenfolge per Drag & Drop. KI-Import per Foto oder Scan über die Anthropic API.
 
-### 🔩 Klemmenleisten-Visualisierung
-Sieh auf einen Blick, wie deine Reihenklemmenleiste aufgebaut sein wird – inklusive PE-Einspeiseklemmen, N-Klemmen, Abdeckkappen und optionaler KNX-Reserveklemme.
+### ⚡ Schritt 3 – Sicherungen planen
+Kabel per Drag & Drop auf Sicherungsgruppen (LSS) verteilen. Unterstützt 1-phasige und 3-phasige Leitungsschutzschalter, FILS-Konfiguration sowie Touch-Drag auf Mobilgeräten.
 
-### 📊 Automatische Stückliste
-Alle benötigten Bauteile werden automatisch gezählt und als Stückliste ausgegeben – inklusive Querverbinder und N-Brücken. Export per WhatsApp-Clipboard oder Druck.
+### 🔒 Schritt 4 – FI-Konfiguration
+FI-Schutzschalter (RCD) nach Bemessungsstrom, Typ (AC/A/F/B), Fehlerstrom und Polzahl konfigurieren. Automatische TE-Berechnung und Kapazitätsanzeige pro Gruppe.
+
+### 📊 Schritt 5 – Belegungsplan
+- **Visuell:** Maßstabsgetreue Darstellung des Verteilers mit richtiger TE-Breite pro FI und LSS. Drag & Drop zum Verschieben von Sicherungen zwischen FI-Gruppen.
+- **Tabellarisch:** Übersichtliche Tabelle aller Stromkreise.
+- **Klemmenleiste:** Vollständige Visualisierung der Reihenklemmen-Belegung pro FI-Block inkl. PE-Einspeisung, N-Einspeisung/-Endklemme, Abdeckkappen und optionaler KNX-Reserveklemme.
+
+### 📦 Stückliste
+Automatisch berechnete Materialliste: FI-Schutzschalter, Leitungsschutzschalter, FILS, Phasenschienen, Reihenklemmen, Querverbinder, N-Brücken. Export per Copy-to-Clipboard für WhatsApp oder Druck.
 
 ### 🏷️ Beschriftungsplan
-Generiere sofort einen druckfertigen Beschriftungsplan mit Q- und F-Nummern für jede Sicherung.
+Vollständiger Beschriftungsplan im Q1F1-Schema, exportierbar als WhatsApp-Text oder Druckversion.
 
-### 💾 Projekte speichern & laden
-Alle Projekte werden lokal gespeichert. Kein Account, kein Login, keine Datenweitergabe.
-
-### ↩️ Undo-Funktion
-Kabel oder Sicherungen versehentlich gelöscht? Strg+Z macht es rückgängig.
+### 💾 Projektverwaltung
+Projekte werden lokal im Browser gespeichert (localStorage). Laden, Speichern, Löschen — alles ohne Server.
 
 ---
 
-## Unterstützte Sicherungstypen
+## Screenshots
 
-| Typ | Beschreibung |
-|-----|-------------|
-| B6 – B32 | Standard-LSS 1-polig |
-| C16 – C25 | C-Charakteristik 1-polig |
-| B16 3P – B63 3P | Drehstrom-LSS 3-polig |
-| FILS | FI/LS-Kombination mit konfigurierbarem FI |
-
-### FI-Schutzschalter
-- Bemessungsströme: 25A, 40A, 63A
-- Typen: AC, A, F, B
-- Fehlerströme: 10, 30, 100, 300, 500 mA
-- 2-polig und 4-polig
+> *(Screenshots hier einfügen)*
 
 ---
 
-## Kabeltypen & Querschnitte
+## Self-Hosting mit Coolify
 
-**Typen:** NYM-J · NYY-J · H07V-K · LIYY
+Der Verteilerplaner lässt sich in wenigen Minuten auf jeder eigenen Infrastruktur betreiben.
 
-**Querschnitte:** 1,5 · 2,5 · 4 · 6 · 10 · 16 mm²
+### Voraussetzungen
+- [Coolify](https://coolify.io) Instanz (v4+)
+- GitHub/GitLab Repository mit diesem Code
 
-**Adernzahlen:** 3, 5, 7, 10 (und custom)
+### Deployment
 
----
+1. **Coolify öffnen** → *New Resource* → *Public Repository* (oder dein privates Repo verbinden)
+2. Repository-URL eintragen
+3. Build-Einstellungen:
+   - **Build Pack:** Nixpacks
+   - **Build Command:** `npm run build`
+   - **Publish Directory:** `dist`
+   - **Port:** `80`
+4. *Deploy* klicken — fertig.
 
-## Schnellstart
+Coolify erkennt das Vite-Projekt automatisch via Nixpacks. Bei jedem Push auf den konfigurierten Branch wird automatisch neu gebaut und deployed.
+
+### Manuelle Installation (ohne Coolify)
 
 ```bash
-# Repository klonen
-git clone https://github.com/Jedrimos/sicherungsplaner.git
-cd sicherungsplaner
-
-# Abhängigkeiten installieren
+git clone https://github.com/DEIN-USERNAME/svp-verteilerplaner.git
+cd svp-verteilerplaner
 npm install
-
-# Entwicklungsserver starten
-npm run dev
-
-# Produktions-Build erstellen
 npm run build
+# dist/ Ordner auf beliebigen Webserver deployen
 ```
 
-Öffne dann `http://localhost:5173` im Browser.
+Für lokale Entwicklung:
+
+```bash
+npm run dev
+```
 
 ---
 
-## Tech Stack
+## Technologie
 
-- **React** mit Hooks
-- **Vite** als Build-Tool
-- **Reines CSS-in-JS** – keine externen UI-Bibliotheken, keine Abhängigkeiten außer React
-- **localStorage** für Projektpersistenz
-- **Anthropic Claude API** (optional) für KI-Foto-Import – auch kompatibel mit OpenAI und lokalen Modellen
+| | |
+|---|---|
+| Framework | React 18 |
+| Build Tool | Vite 5 |
+| Styling | Inline CSS + CSS-in-JS |
+| Datenspeicherung | Browser localStorage |
+| KI-Import | Anthropic Claude API (optional) |
+| Deployment | Static Build / Nixpacks |
 
----
-
-## KI-Foto-Import einrichten (optional)
-
-Unter dem ⚙️-Symbol in der Kopfzeile kannst du die API konfigurieren:
-
-| Anbieter | Endpoint | Modell |
-|----------|----------|--------|
-| Anthropic Claude | `https://api.anthropic.com/v1/messages` | `claude-sonnet-4-20250514` |
-| OpenAI | `https://api.openai.com/v1/chat/completions` | `gpt-4o` |
-| Ollama (lokal) | `http://localhost:11434/v1/chat/completions` | `llava` |
-| LM Studio | `http://localhost:1234/v1/chat/completions` | `llava` |
-
-Für die lokale Nutzung ohne API-Key ist Ollama mit LLaVA empfohlen.
+Keine externen CSS-Frameworks, keine UI-Bibliotheken, keine Abhängigkeiten außer React. Die gesamte Anwendung besteht aus einer einzigen Komponenten-Datei — bewusst einfach gehalten für maximale Portabilität.
 
 ---
 
-## Roadmap
+## KI-Import konfigurieren (optional)
 
-- [ ] PDF-Export des Belegungsplans
-- [ ] Mehrsprachigkeit (EN)
-- [ ] Klemmensystem wählbar (Phoenix Contact / Weidmüller / WAGO)
-- [ ] N-Brückenlängenberechnung
-- [ ] Projektversionierung / Änderungshistorie
-- [ ] Mehrbenutzerfähigkeit für Teams
+Der Foto-Import von Kabellisten nutzt die Anthropic Claude API. Zum Aktivieren:
+
+1. [Anthropic API Key](https://console.anthropic.com) erstellen
+2. In der App: ⚙️ → API-Einstellungen → Key eintragen
+3. Der Key wird ausschließlich lokal im Browser gespeichert und nie an eigene Server übertragen.
 
 ---
 
-## Mitmachen
+## Changelog
 
-Pull Requests sind willkommen. Für größere Änderungen bitte zuerst ein Issue öffnen.
-
-1. Fork erstellen
-2. Feature-Branch anlegen (`git checkout -b feature/mein-feature`)
-3. Committen (`git commit -m 'Add: mein Feature'`)
-4. Pushen (`git push origin feature/mein-feature`)
-5. Pull Request öffnen
+Alle Änderungen sind in [CHANGELOG.md](CHANGELOG.md) dokumentiert.
 
 ---
 
 ## Lizenz
 
-MIT License – mach damit was du willst, aber behalte den Copyright-Hinweis.
+MIT License — frei verwendbar, anpassbar, verteilbar.
 
 ---
 
-## Über SVP Elektrotechnik
-
-Dieses Tool entstand aus dem Bedarf heraus, die tägliche Planungsarbeit im Elektrohandwerk zu vereinfachen. Kein Papier, kein Excel, kein Herumrechnen – sondern ein Tool, das mitdenkt.
-
----
-
-*Gebaut mit ❤️ für alle, die Strom respektieren.*
+*Entwickelt von Jedrimos · SVP Elektrotechnik · © 2025*
