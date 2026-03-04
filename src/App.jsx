@@ -44,6 +44,14 @@ const Toast = ({toasts}) => (
   </div>
 );
 
+// ── Custom Tooltip ──
+const Tip = ({text, children, pos="bottom"}) => (
+  <div style={{position:"relative",display:"inline-flex"}} className="tip-wrap">
+    {children}
+    <div className={`tip tip-${pos}`}>{text}</div>
+  </div>
+);
+
 const STD_STOCKWERKE = ["KG","EG","OG","OG1","OG2","DG","Außen","Technik"];
 const STD_RAEUME = ["Küche","Wohnzimmer","Esszimmer","Schlafzimmer","Kinderzimmer","Bad","WC","Gäste-WC","Flur","Diele","Keller","Garage","Hauswirtschaft","Büro","Technikraum","Sauna","Terrasse","Carport"];
 const PHASEN = ["Auto","L1","L2","L3"];
@@ -508,7 +516,7 @@ NUR JSON, keine Backticks, kein Text davor/danach.`;
 export default function App() {
   const [step, setStep] = useState(1);
   const [projekt, setProjekt]     = useState({ name:"", adresse:"" });
-  const [kabel, setKabel]         = useState([mkKabel()]);          // Step 2: Kabel
+  const [kabel, setKabel]         = useState([]);          // Step 2: Kabel
   const [sicherungen, setSicherungen] = useState([]);               // Step 3: Sicherungsgruppen
   const [fiKonfigs, setFiKonfigs] = useState([mkFI(), mkFI()]);     // Step 4: FI-Planung
   const [plan, setPlan]           = useState(null);                  // Step 5: Plan
@@ -516,7 +524,7 @@ export default function App() {
   const [raeume, setRaeume]       = useState([]);
   const [planTyp, setPlanTyp]     = useState("visuell");
   const [activeTab, setActiveTab] = useState("plan");
-  const [mitRK, setMitRK]         = useState(null);
+  const [mitRK, setMitRK]         = useState(false);
   const [istKNX, setIstKNX]         = useState(false);
   const [showKlemmen, setShowKlemmen] = useState(false);
   const [mitQV, setMitQV]           = useState(false);
@@ -575,18 +583,40 @@ export default function App() {
   // Touch Drag
   const touchKabelId = useRef(null);
   const touchLastZone = useRef(null);
-  const onTouchStartKabel = (e,kId) => { touchKabelId.current=kId; };
+  const touchGhost = useRef(null);
+  const onTouchStartKabel = (e,kId) => {
+    // Prevent text selection immediately
+    e.preventDefault();
+    touchKabelId.current=kId;
+    // Create a ghost element for visual feedback
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const ghost = el.cloneNode(true);
+    ghost.className = "drag-ghost";
+    ghost.style.width = rect.width + "px";
+    ghost.style.left = rect.left + "px";
+    ghost.style.top = rect.top + "px";
+    document.body.appendChild(ghost);
+    touchGhost.current = ghost;
+  };
   const onTouchMoveKabel = useCallback((e) => {
     if(!touchKabelId.current) return;
     e.preventDefault();
     const t=e.touches[0];
+    // Move ghost
+    if(touchGhost.current){
+      touchGhost.current.style.left = (t.clientX - 40) + "px";
+      touchGhost.current.style.top  = (t.clientY - 20) + "px";
+    }
     if(touchLastZone.current) touchLastZone.current.classList.remove('touch-over');
     const zone=document.elementFromPoint(t.clientX,t.clientY)?.closest?.('[data-sichid]');
     if(zone){ zone.classList.add('touch-over'); touchLastZone.current=zone; }
   }, []);
   const onTouchEndKabel = (e) => {
     if(!touchKabelId.current) return;
+    e.preventDefault();
     if(touchLastZone.current) touchLastZone.current.classList.remove('touch-over');
+    if(touchGhost.current){ document.body.removeChild(touchGhost.current); touchGhost.current=null; }
     const t=e.changedTouches[0];
     const zone=document.elementFromPoint(t.clientX,t.clientY)?.closest?.('[data-sichid]');
     if(zone){ weiseKabelZu(touchKabelId.current, zone.dataset.sichid); }
@@ -709,10 +739,10 @@ export default function App() {
 
   // Speichern/Laden
   const speichere = () => {
-    if(!saveName.trim())return;
-    const entry={id:uid(),name:saveName.trim(),datum:new Date().toLocaleDateString("de-DE"),projekt,fiKonfigs,kabel,sicherungen,stockwerke,raeume,swColorMap};
-    const neu=[entry,...projekte.filter(p=>p.name!==saveName.trim())];
-    setProjekte(neu); saveProjekte(neu); setShowSave(false); setSaveName("");
+    const nameToSave = saveName.trim() || `Projekt ${new Date().toLocaleDateString("de-DE")}`;
+    const entry={id:uid(),name:nameToSave,datum:new Date().toLocaleDateString("de-DE"),projekt,fiKonfigs,kabel,sicherungen,stockwerke,raeume,swColorMap};
+    const neu=[entry,...projekte.filter(p=>p.name!==nameToSave)];
+    setProjekte(neu); saveProjekte(neu); setShowSave(false); setSaveName(""); showToast(`"${nameToSave}" gespeichert ✓`);
   };
   const lade = p => {
     setProjekt(p.projekt||{name:"",adresse:""});
@@ -737,7 +767,7 @@ export default function App() {
     setStockwerke(p.stockwerke||[]);
     if(p.swColorMap) setSwColorMap({...SW_COLOR_DEFAULT,...p.swColorMap});
     setRaeume(p.raeume||[]);
-    setPlan(null); setMitRK(null); setStep(1); setShowLoad(false);
+    setPlan(null); setMitRK(false); setStep(1); setShowLoad(false);
   };
 
   // ── WhatsApp Clipboard Export ──
@@ -871,7 +901,7 @@ export default function App() {
   const generiere = () => { showToast("Plan erfolgreich generiert ⚡");
     const sichFuerPlan = buildSicherungenFuerPlan();
     setPlan(verteile(sichFuerPlan, fiKonfigs));
-    setStep(5); setActiveTab("plan"); setMitRK(null);
+    setStep(5); setActiveTab("plan"); setMitRK(false);
   };
 
   // Aufklapp-Status für Sicherungs-Karten (Step 3)
@@ -1022,7 +1052,7 @@ export default function App() {
     return Object.entries(counts).map(([p,n])=>({ports:Number(p),anzahl:n})).sort((a,b)=>a.ports-b.ports);
   })();
 const stueckliste = (() => {
-    if(mitRK===null||!plan) return [];
+    if(!plan) return [];
     const base = berechneStueckliste(plan,mitRK,kabel,istKNX);
     if(!mitRK) return base;
     // Querverbinder hinzufügen wenn aktiviert
@@ -1101,13 +1131,45 @@ const stueckliste = (() => {
         button{transition:all 0.15s;}
         button:active{transform:scale(0.97);}
         .step-indicator{display:flex;align-items:center;gap:0;}
+        /* Custom Tooltip */
+        .tip-wrap{position:relative;}
+        .tip{
+          position:absolute;left:50%;transform:translateX(-50%);
+          background:#0d1114;border:1px solid var(--border2);
+          color:var(--text2);font-size:11px;font-weight:500;line-height:1.4;
+          white-space:nowrap;padding:6px 10px;border-radius:7px;
+          pointer-events:none;opacity:0;transition:opacity 0.15s,transform 0.15s;
+          z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.5);
+          font-family:'Outfit',sans-serif;letter-spacing:0;
+        }
+        .tip::before{
+          content:"";position:absolute;left:50%;transform:translateX(-50%);
+          border:5px solid transparent;
+        }
+        .tip-bottom{top:calc(100% + 7px);}
+        .tip-bottom::before{bottom:100%;border-bottom-color:#0d1114;}
+        .tip-top{bottom:calc(100% + 7px);}
+        .tip-top::before{top:100%;border-top-color:#0d1114;}
+        .tip-wrap:hover .tip{opacity:1;}
+        /* Touch drag: prevent text selection while dragging */
+        .draggable{-webkit-user-select:none;user-select:none;touch-action:none;}
+        .draggable:active{cursor:grabbing;}
+        /* Touch drag visual feedback */
+        .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:0.85;transform:scale(1.05);box-shadow:0 8px 32px rgba(0,0,0,0.5);}
         @media(max-width:640px){
           .step3-grid{grid-template-columns:1fr;}
           .header-nav button{padding:5px 8px!important;font-size:10px!important;}
           .nav-label-long{display:none;}
           .nav-label-short{display:inline!important;}
-          .main-wrap{padding:12px 10px;}
+          .main-wrap{padding:10px 8px;}
           .header-actions .btn-label{display:none;}
+          /* Mobile: larger touch targets */
+          select{min-height:40px;font-size:14px!important;}
+          .mobile-stack{flex-direction:column!important;}
+          .mobile-full{width:100%!important;flex:1 1 100%!important;}
+          .mobile-hide{display:none!important;}
+          /* Mobile step bar: hide labels */
+          .step-label{display:none;}
         }
         @media(min-width:641px){
           .nav-label-short{display:none;}
@@ -1124,7 +1186,7 @@ const stueckliste = (() => {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div className="no-print" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 16px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
+      <div className="no-print" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
 
         {/* LEFT: Logo + Version */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
@@ -1139,19 +1201,31 @@ const stueckliste = (() => {
             <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>SVP</div>
             <div style={{fontSize:7.5,color:"var(--text3)",letterSpacing:"1.5px",fontWeight:500,textTransform:"uppercase",lineHeight:1,marginTop:2}}>Verteilerplaner</div>
           </div>
-          <span style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v1.4.0</span>
+          <span style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v1.5.0</span>
         </div>
 
         {/* CENTER: Step Navigation */}
         <div className="header-nav" style={{flex:1,justifyContent:"center",maxWidth:520}}>
           {[["1","Projekt","Proj"],["2","Kabel","Kabel"],["3","Sicherungen","Sich"],["4","FI","FI"],["5","Plan","Plan"]].map(([n,l,s])=>{
             const ni=Number(n); const active=step===ni; const done=step>ni;
-            return <button key={n} onClick={()=>{if(ni<=2||(ni===3&&kabel.some(k=>k.bezeichnung||k.raum))||(ni===4)||(ni===5&&plan))setStep(ni);}}
-              style={{background:active?"var(--svp)":done?"rgba(33,150,201,0.08)":"transparent",border:`1px solid ${active?"var(--svp)":done?"rgba(33,150,201,0.25)":"var(--border)"}`,color:active?"#fff":done?"var(--svp)":"var(--text3)",borderRadius:6,padding:"5px 11px",cursor:"pointer",fontSize:11,fontWeight:active?700:done?600:400,transition:"all 0.15s",display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap"}}>
-              {done&&!active&&<span style={{fontSize:8,opacity:0.8}}>✓</span>}
-              <span className="nav-label-long">{l}</span>
-              <span className="nav-label-short">{s}</span>
-            </button>;
+            const erreichbar = ni<=2 || ni<=step || (ni===3&&kabel.length>0) || (ni===4&&kabel.length>0) || (ni===5&&!!plan);
+            const grundNav = !erreichbar ? (
+              ni===3&&kabel.length===0 ? "Erst Kabel in Schritt 2 anlegen" :
+              ni===4&&kabel.length===0 ? "Erst Kabel in Schritt 2 anlegen" :
+              ni===5&&!plan            ? "Erst Plan in Schritt 4 generieren" : ""
+            ) : "";
+            const btn = (
+              <button key={n} onClick={()=>{ if(erreichbar) setStep(ni); }}
+                style={{background:active?"var(--svp)":done?"rgba(33,150,201,0.08)":"transparent",border:`1px solid ${active?"var(--svp)":done?"rgba(33,150,201,0.25)":"var(--border)"}`,color:active?"#fff":done?"var(--svp)":erreichbar?"var(--text3)":"var(--border2)",borderRadius:6,padding:"5px 11px",cursor:erreichbar?"pointer":"not-allowed",fontSize:11,fontWeight:active?700:done?600:400,transition:"all 0.15s",display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap",opacity:erreichbar?1:0.45}}>
+                {done&&!active&&<span style={{fontSize:8,opacity:0.8}}>✓</span>}
+                {!erreichbar&&<span style={{fontSize:9}}>🔒</span>}
+                <span className="nav-label-long">{l}</span>
+                <span className="nav-label-short">{s}</span>
+              </button>
+            );
+            return !erreichbar && grundNav
+              ? <Tip key={n} text={grundNav} pos="bottom">{btn}</Tip>
+              : <React.Fragment key={n}>{btn}</React.Fragment>;
           })}
         </div>
 
@@ -1197,14 +1271,25 @@ const stueckliste = (() => {
           {[1,2,3,4,5].map((n,i)=>{
             const active=step===n; const done=step>n;
             const labels=["Projekt","Kabel","Sicherungen","FI-Planung","Belegungsplan"];
-            return <div key={n} style={{display:"flex",alignItems:"center",flex:n<5?1:"none"}}>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:done||active?"pointer":"default"}}
-                onClick={()=>{if(n<=2||(n===3&&kabel.some(k=>k.bezeichnung||k.raum))||(n===4)||(n===5&&plan))setStep(n);}}>
-                <div style={{width:28,height:28,borderRadius:"50%",background:active?"var(--svp)":done?"rgba(33,150,201,0.15)":"var(--bg3)",border:`2px solid ${active?"var(--svp)":done?"rgba(33,150,201,0.4)":"var(--border)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:active?"#fff":done?"var(--svp)":"var(--text3)",transition:"all 0.2s",flexShrink:0}}>
-                  {done?<span style={{fontSize:10}}>✓</span>:n}
+            const erreichbar2 = n<=2 || n<=step || (n===3&&kabel.length>0) || (n===4&&kabel.length>0) || (n===5&&!!plan);
+            const grund2 = !erreichbar2 ? (
+              n===3&&kabel.length===0 ? "🔒 Erst Kabel anlegen" :
+              n===4&&kabel.length===0 ? "🔒 Erst Kabel anlegen" :
+              n===5&&!plan            ? "🔒 Erst Plan generieren" : ""
+            ) : "";
+            const dot = (
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:erreichbar2?"pointer":"not-allowed",opacity:erreichbar2?1:0.5}}
+                onClick={()=>{ if(erreichbar2) setStep(n); }}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:active?"var(--svp)":done?"rgba(33,150,201,0.15)":erreichbar2?"var(--bg3)":"var(--bg2)",border:`2px solid ${active?"var(--svp)":done?"rgba(33,150,201,0.4)":erreichbar2?"var(--border)":"#2a3035"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:active?"#fff":done?"var(--svp)":erreichbar2?"var(--text3)":"var(--border2)",transition:"all 0.2s",flexShrink:0}}>
+                  {done?<span style={{fontSize:10}}>✓</span>:erreichbar2?n:<span style={{fontSize:10}}>🔒</span>}
                 </div>
-                <div style={{fontSize:9,color:active?"var(--svp)":done?"var(--svp)":"var(--text3)",fontWeight:active?700:done?500:400,whiteSpace:"nowrap",letterSpacing:"0.3px",transition:"color 0.2s"}} className="nav-label-long">{labels[i]}</div>
+                <div style={{fontSize:9,color:active?"var(--svp)":done?"var(--svp)":erreichbar2?"var(--text3)":"var(--border2)",fontWeight:active?700:done?500:400,whiteSpace:"nowrap",letterSpacing:"0.3px",transition:"color 0.2s"}} className="nav-label-long">{labels[i]}</div>
               </div>
+            );
+            return <div key={n} style={{display:"flex",alignItems:"center",flex:n<5?1:"none"}}>
+              {!erreichbar2 && grund2
+                ? <Tip text={grund2.replace("🔒 ","")} pos="bottom">{dot}</Tip>
+                : dot}
               {n<5&&<div style={{flex:1,height:2,background:done?"rgba(33,150,201,0.3)":"var(--border)",margin:"0 4px",marginBottom:16,borderRadius:2,transition:"background 0.3s"}}/>}
             </div>;
           })}
@@ -1297,11 +1382,33 @@ const stueckliste = (() => {
               📷 Kabelliste aus Foto / Scan importieren
             </button>
           </div>
-          {/* Completion hint */}
-          {projekt.name&&stockwerke.length>0&&(
+          {/* Warnungen / Completion hint */}
+          {(stockwerke.length===0||raeume.length===0)&&(
+            <div style={{background:"rgba(240,165,0,0.07)",border:"1px solid rgba(240,165,0,0.3)",borderRadius:10,padding:"12px 16px",marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:stockwerke.length===0&&raeume.length===0?6:0}}>
+                <span style={{fontSize:15}}>⚠️</span>
+                <span style={{fontSize:13,color:"#f0a500",fontWeight:700}}>Hinweis – fehlende Konfiguration</span>
+              </div>
+              <div style={{paddingLeft:23,display:"flex",flexDirection:"column",gap:3,marginTop:4}}>
+                {stockwerke.length===0&&(
+                  <div style={{fontSize:12,color:"var(--text2)"}}>
+                    <span style={{color:"#f0a500",fontWeight:600}}>Keine Stockwerke gewählt</span>
+                    {" – Kabel können keinem Stockwerk zugeordnet werden."}
+                  </div>
+                )}
+                {raeume.length===0&&(
+                  <div style={{fontSize:12,color:"var(--text2)"}}>
+                    <span style={{color:"#f0a500",fontWeight:600}}>Keine Räume gewählt</span>
+                    {" – Kabel können keinem Raum zugeordnet werden."}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {projekt.name&&stockwerke.length>0&&raeume.length>0&&(
             <div style={{background:"rgba(82,217,138,0.06)",border:"1px solid rgba(82,217,138,0.2)",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:16}}>✓</span>
-              <span style={{fontSize:13,color:"var(--green)",fontWeight:600}}>Projekt "{projekt.name}" · {stockwerke.length} Stockwerk{stockwerke.length!==1?"e":""} konfiguriert</span>
+              <span style={{fontSize:13,color:"var(--green)",fontWeight:600}}>Projekt "{projekt.name}" · {stockwerke.length} Stockwerk{stockwerke.length!==1?"e":""} · {raeume.length} Räume</span>
             </div>
           )}
           <button onClick={()=>setStep(2)} style={bPrimary}>Weiter → Kabel erfassen</button>
@@ -1471,6 +1578,7 @@ const stueckliste = (() => {
                           </div>
                         ):(
                           <div
+                            className="draggable"
                             draggable
                             onDragStart={e=>{dragKabelId.current=k.id; dragFromSich.current=null; e.dataTransfer.effectAllowed="move"; e.currentTarget.style.opacity="0.5";}}
                             onDragEnd={e=>e.currentTarget.style.opacity="1"}
@@ -1501,13 +1609,16 @@ const stueckliste = (() => {
                 <div style={{marginTop:10}}>
                   <div style={{fontSize:9,color:"var(--border2)",textTransform:"uppercase",letterSpacing:"1px",marginBottom:6}}>Bereits zugewiesen</div>
                   {kabel.filter(k=>sicherungen.some(s=>s.kabelIds.includes(k.id))).map(k=>(
-                    <div key={k.id} draggable
+                    <div key={k.id} className="draggable" draggable
                       onDragStart={e=>{
                         dragKabelId.current=k.id;
                         dragFromSich.current=sicherungen.find(s=>s.kabelIds.includes(k.id))?.id||null;
                         e.dataTransfer.effectAllowed="move"; e.currentTarget.style.opacity="0.5";
                       }}
                       onDragEnd={e=>e.currentTarget.style.opacity="1"}
+                      onTouchStart={e=>onTouchStartKabel(e,k.id)}
+                      onTouchMove={onTouchMoveKabel}
+                      onTouchEnd={onTouchEndKabel}
                       style={{background:"var(--bg)",border:"1px solid #1a1a1a",borderRadius:7,padding:"5px 10px",marginBottom:4,cursor:"grab",display:"flex",alignItems:"center",gap:6,opacity:0.6}}>
                       <div style={{color:"var(--border)",fontSize:11}}>⠿</div>
                       <div style={{flex:1,fontSize:11,color:"var(--text3)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{k.bezeichnung||k.raum||"–"}</div>
@@ -1601,6 +1712,7 @@ const stueckliste = (() => {
                               const swC=swColor(k.stockwerk);
                               return(
                                 <div key={k.id}
+                                  className="draggable"
                                   draggable
                                   onDragStart={e=>{dragKabelId.current=k.id;dragFromSich.current=si.id;e.dataTransfer.effectAllowed="move";e.currentTarget.style.opacity="0.5";}}
                                   onDragEnd={e=>e.currentTarget.style.opacity="1"}
@@ -1757,7 +1869,7 @@ const stueckliste = (() => {
                 {id:"plan",    icon:"📊", label:"Belegungsplan"},
                 {id:"klemmen", icon:"🔌", label:"Klemmenleiste"},
               ].map(tab=>(
-                <button key={tab.id} onClick={()=>{setActiveTab(tab.id); if(tab.id==="klemmen"&&mitRK===null)setMitRK(true);}}
+                <button key={tab.id} onClick={()=>{setActiveTab(tab.id);}}
                   style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:7,border:"none",
                     background:activeTab===tab.id?"var(--bg2)":"transparent",
                     color:activeTab===tab.id?"var(--text)":"var(--text3)",
@@ -1840,7 +1952,7 @@ const stueckliste = (() => {
                       {/* FI-Kästchen */}
                       <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginRight:8}}>
                         <div onClick={()=>openPlanEditFI(fi.id)}
-                          style={{width:52,background:"#1a7abf10",border:"2px solid #1a7abf55",borderRadius:6,height:90,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,cursor:"pointer",transition:"border-color 0.15s"}}
+                          style={{width:(fi.pole||4)*28+((fi.pole||4)-1)*4,background:"#1a7abf10",border:"2px solid #1a7abf55",borderRadius:6,height:90,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,cursor:"pointer",transition:"border-color 0.15s"}}
                           onMouseEnter={e=>e.currentTarget.style.borderColor="var(--blue)"}
                           onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(33,150,201,0.25)"}>
                           <div style={{fontSize:10,color:"var(--blue)",fontWeight:900,fontFamily:"var(--mono)"}}>Q{qNr}</div>
@@ -2281,9 +2393,6 @@ const stueckliste = (() => {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
             <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>📦 Stückliste</div>
             <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-              <span style={{fontSize:11,color:"var(--text3)"}}>Reihenklemmen:</span>
-              <button onClick={()=>setMitRK(v=>v===true?false:true)} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${mitRK?"rgba(82,217,138,0.3)":"var(--border2)"}`,background:mitRK?"rgba(82,217,138,0.1)":"transparent",color:mitRK?"var(--green)":"var(--text3)",cursor:"pointer",fontSize:11,fontWeight:700}}>{mitRK===true?"✓ Ja":"Nein"}</button>
-              {mitRK&&<button onClick={()=>setIstKNX(v=>!v)} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${istKNX?"rgba(167,139,250,0.3)":"var(--border2)"}`,background:istKNX?"rgba(167,139,250,0.1)":"transparent",color:istKNX?"var(--purple)":"var(--text3)",cursor:"pointer",fontSize:11,fontWeight:700}}>KNX</button>}
               <button onClick={()=>kopiereInZwischenablage(buildStuecklisteText(),"stueckliste")}
                 style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${kopiert==="stueckliste"?"rgba(82,217,138,0.4)":"var(--border2)"}`,background:kopiert==="stueckliste"?"rgba(82,217,138,0.1)":"var(--bg3)",color:kopiert==="stueckliste"?"var(--green)":"var(--text2)",cursor:"pointer",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:5,transition:"all 0.2s"}}>
                 {kopiert==="stueckliste"?"✓ Kopiert!":"📋 WhatsApp"}
@@ -2293,23 +2402,8 @@ const stueckliste = (() => {
             </div>
           </div>
           {<>
-            {mitRK===null?(
-              <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:14,padding:28,textAlign:"center",marginTop:8}}>
-                <div style={{fontSize:16,fontWeight:700,color:"var(--blue)",marginBottom:8}}>Verteiler mit Reihenklemmen?</div>
-                <div style={{fontSize:13,color:"var(--text3)",marginBottom:24,lineHeight:1.6}}>Klemmen werden nach Adernanzahl berechnet. Pro FI-Block: N-Einspeisung → Kabelklemmen → Abdeckkappe → N-Endklemme</div>
-                <div style={{display:"flex",gap:12,justifyContent:"center"}}>
-                  <button onClick={()=>setMitRK(true)} style={{background:"var(--green)",border:"none",color:"#fff",borderRadius:10,padding:"12px 28px",cursor:"pointer",fontSize:14,fontWeight:800}}>✓ Ja</button>
-                  <button onClick={()=>setMitRK(false)} style={{background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text2)",borderRadius:10,padding:"12px 28px",cursor:"pointer",fontSize:14}}>Nein</button>
-                </div>
-              </div>
-            ):(
+            {(
               <>
-                <div className="no-print" style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"10px 14px",background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:12,color:"var(--text3)"}}>Reihenklemmen:</span>
-                  <span style={{fontSize:13,fontWeight:700,color:mitRK?"var(--green)":"var(--text2)"}}>{mitRK?"✓ Ja":"Nein"}</span>
-                  <button onClick={()=>setMitRK(null)} style={{...bSec,fontSize:11,padding:"4px 10px",marginLeft:8}}>Ändern</button>
-
-                </div>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                   <thead><tr style={{background:"var(--bg3)"}}>
                     <th style={{padding:"10px 14px",textAlign:"left",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:700,borderBottom:"2px solid var(--border)"}}>Artikel</th>
@@ -2347,7 +2441,7 @@ const stueckliste = (() => {
               onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--text)";}}>
               🏷️ Beschriftungsplan erstellen
             </button>
-            <button onClick={()=>{if(mitRK===null)setMitRK(true);setShowStueckliste(true);}}
+            <button onClick={()=>{setShowStueckliste(true);}}
               style={{flex:1,background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text)",borderRadius:10,padding:"13px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.15s"}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--svp)";e.currentTarget.style.color="var(--svp)";}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--text)";}}>
@@ -2495,7 +2589,7 @@ const stueckliste = (() => {
               <div style={{width:48,height:48,borderRadius:12,background:"rgba(33,150,201,0.12)",border:"1px solid rgba(33,150,201,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>⚡</div>
               <div>
                 <div style={{fontSize:20,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px"}}>SVP Verteilerplaner</div>
-                <div style={{fontSize:12,color:"var(--svp)",fontFamily:"var(--mono)",fontWeight:600,marginTop:2}}>Version 1.4.0 · by Jedrimos</div>
+                <div style={{fontSize:12,color:"var(--svp)",fontFamily:"var(--mono)",fontWeight:600,marginTop:2}}>Version 1.5.0 · by Jedrimos</div>
               </div>
             </div>
 
