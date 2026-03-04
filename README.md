@@ -1,4 +1,4 @@
-# ⚡ SVP Sicherungsplan – Der smarte Belegungsplaner für Elektroinstallationen
+# ⚡ SVP Verteilersplan – Der smarte Belegungsplaner für Elektroinstallationen
 
 > Schluss mit handgezeichneten Skizzen und Excel-Tabellen. Plane deine Unterverteilung professionell – direkt im Browser, ohne Installation, ohne Einarbeitung.
 
