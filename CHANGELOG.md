@@ -1,116 +1,198 @@
 # Changelog
 
-Alle nennenswerten Änderungen am SVP Verteilerplaner werden hier dokumentiert.  
+Alle nennenswerten Änderungen an den Elektronikertools werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
+Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
-## [1.6.0] – 2026-03-05
+## [2026.3.4] – 2026-03-05
+
+### Neues Tool: Wissensdatenbank + docs/ Ordner + CLAUDE.md
 
 ### ✨ Neu
-- **Startfenster** — Beim App-Start erscheint ein Modal mit "Neues Projekt anlegen" oder "Vorhandenes Projekt laden". Neues Projekt fragt direkt nach Kunde/Adresse/Ersteller/Standort Verteiler.
-- **Einstellungsseite (⚙️)** — Neues kombiniertes Einstellungs-Modal: Firmenname, Standard-Ersteller (Vorausfüllung bei neuen Projekten) und KI-API-Konfiguration in einem Dialog.
-- **Supabase-Datenbankanbindung** — Projekte können optional in einer Supabase-PostgreSQL-Datenbank gespeichert werden (self-hosted oder Cloud). Fällt automatisch auf localStorage zurück wenn kein Supabase konfiguriert ist.
-- **Selbst-Hosting der Datenbank** — Supabase lässt sich über Coolify als One-Click-Service deployen. Vollständiges SQL-Schema unter `supabase-schema.sql`.
-- **Auto-Save** — Nach jeder Plan-Generierung wird das Projekt automatisch lokal und in Supabase gespeichert.
-- **Ersteller & Standort** — Neues Projektmetadaten-Feld "Ersteller" und "Standort Verteiler" in Schritt 1. Beide erscheinen im Belegungsplan-Kopf und in der Export-Fußzeile.
-- **Dynamischer Firmenname** — Stückliste, Beschriftungsplan und Belegungsplan-Kopf verwenden den konfigurierten Firmennamen statt des fest kodierten Textes.
-
-### 🐛 Behoben
-- **Steckbrückenlogik (Querverbinder)** — Querverbinder und Steckbrücken wurden nie berechnet, weil der interne `showKlemmen`-State immer `false` war und kein `setShowKlemmen(true)` existierte. Fix: überflüssige Abhängigkeit entfernt, Querverbinder werden jetzt korrekt berechnet sobald `mitQV` aktiviert ist.
+- **Tool: Wissensdatenbank** — Firmeninternes Wissen für das Team.
+  - Artikel mit Titel, Kategorie (10 Voreinstellungen), Tags, Autor und Markdown-Inhalt
+  - Volltextsuche (Titel, Inhalt, Tags, Autor) + Kategoriefilter in Echtzeit
+  - Artikel-Karten-Übersicht + Detailansicht mit gerendertem Markdown
+  - Markdown-Renderer: `# Überschriften`, `**fett**`, `*kursiv*`, `` `code` ``, `- Listen`, `1. nummeriert`, `> Blockquote`, ` ``` Codeblöcke ``` `
+  - Live-Vorschau im Editor
+  - Team-Sharing via Supabase (`☁ Geteilt im Team`-Indikator)
+  - Warnung wenn Supabase nicht konfiguriert
+  - Farbthema: Teal `#06b6d4`
+- **`src/lib/db_wissen.js`** — Supabase CRUD für `wissensdatenbank`-Tabelle
+- **`docs/`** — Vollständige Projektdokumentation:
+  - `docs/index.md` — Übersicht & Navigation
+  - `docs/setup.md` — Installation, Coolify, Supabase-Setup
+  - `docs/supabase.sql` — Vollständiges SQL-Schema aller 4 Tabellen mit Trigger
+  - `docs/development.md` — Neue App anlegen, CSS-Konventionen, Supabase-Muster
+  - `docs/apps/verteilerplaner.md` — Verteilerplaner-Dokumentation
+  - `docs/apps/stundenbuch.md` — Stundenbuch-Dokumentation
+  - `docs/apps/pruefprotokoll.md` — Prüfprotokoll + VDE-Grenzwerte-Tabelle
+  - `docs/apps/wissensdatenbank.md` — Wissensdatenbank + Markdown-Syntax-Referenz
+- **`CLAUDE.md`** — Projektregeln für Claude Code: Pflichtaufgaben nach jeder Änderung, Checkliste neue App, CSS-Konventionen, App-Farben
 
 ### 🔧 Geändert
-- **⚙️-Button** öffnet jetzt das neue kombinierte Einstellungs-Modal statt des separaten API-Einstellungs-Dialogs.
-- Toten Code entfernt: `kabelId`, `kabelLabel`, `kabelInfoFromId`, `resolveKabeltyp`, `KABEL_LEGACY`, `zKabel`, `showKlemmen`
+- Dashboard: Wissensdatenbank als App #4 registriert (teal, `#001a1f` Hintergrund)
+- README: Wissensdatenbank-Sektion, docs/-Link, vollständiges SQL für alle 4 Tabellen, aktualisierte Projektstruktur
+- ROADMAP: Wissensdatenbank als erledigt markiert
 
 ---
 
-## [1.5.0] – 2025
+## [2026.3.3] – 2026-03-05
+
+### Gemeinsame Datenbank + Verteilerplaner-Import im Prüfprotokoll
 
 ### ✨ Neu
-- **Custom Tooltips** — Gesperrte Navigationsschritte zeigen beim Hover einen dezenten Darkmode-Tooltip mit dem genauen Sperrgrund, z.B. *„Erst Kabel in Schritt 2 anlegen"* oder *„Erst Plan in Schritt 4 generieren"*
-- **Warnung bei unvollständiger Projektkonfiguration** — Schritt 1 zeigt jetzt einen Hinweis wenn keine Stockwerke oder Räume ausgewählt wurden, bevor man mit der Kabelerfassung beginnt
-- **Grüne Bestätigung** auf Schritt 1 zeigt jetzt auch die Raumanzahl an
+- **Prüfprotokoll → Supabase-Sync:** Beim Start automatisch aus Supabase laden, nach jedem Speichern/Löschen async synchronisieren. `☁ Datenbank`-Indikator wenn aktiv.
+- **Stundenbuch → Supabase-Sync:** Gleicher Mechanismus wie Prüfprotokoll. `db_id` pro Eintrag für sicheres Update/Delete.
+- **Import aus Verteilerplaner:** Im Prüfprotokoll können gespeicherte Verteiler-Projekte direkt importiert werden. Übernommen werden: Auftraggeber, Anlagenstandort, Prüfer sowie alle Stromkreise (Bezeichnung aus Kabel-Namen, Nennstrom + Sicherungstyp aus LSS z.B. "B16", 3-phasig-Flag).
+- **`src/lib/db_pruefprotokoll.js`:** DB-Layer für `pruefprotokolle`-Tabelle (CRUD + `loadProjekteForImport` mit Supabase→localStorage-Fallback).
+- **`src/lib/db_stundenbuch.js`:** DB-Layer für `stunden`-Tabelle (CRUD).
+- SQL-Migrationsskripte als Kommentare in den jeweiligen DB-Layer-Dateien.
 
-### 🐛 Behoben
-- **Navigation gesperrt / in Leere klickend** — Schritte 3, 4 und 5 waren unter bestimmten Bedingungen nicht anklickbar obwohl sie es sein sollten. Schritt 2 war fälschlicherweise gesperrt. Die Erreichbarkeits-Logik wurde vollständig überarbeitet: Schritte 1 und 2 sind immer zugänglich, Schritt 3 und 4 sobald Kabel vorhanden sind, Schritt 5 sobald ein Plan generiert wurde
-- **Kein vordefiniertes leeres Kabel mehr** beim App-Start — der Anfangszustand ist jetzt konsistent leer, Schritt 3 ist korrekt gesperrt bis das erste Kabel angelegt wird
-- **Speichern-Button (💾)** funktionierte nicht wenn kein Projektname eingetragen war — es wird jetzt automatisch ein Fallback-Name mit Datum verwendet
-- **FI-Größe im Belegungsplan** — 2-polige FI-Schutzschalter haben jetzt die korrekte Breite von 2 TE (56px), 4-polige 4 TE (112px). Vorher hatten alle FIs immer dieselbe fixe Breite
-- **Reihenklemmen-Button** in der Stückliste entfernt (Einstellung verbleibt in der Klemmenansicht)
-- **KNX-Button** aus der Stückliste entfernt (KNX wird in der Klemmenansicht konfiguriert)
+---
+
+## [2026.3.2] – 2026-03-05
+
+### Neues Tool: Prüfprotokoll
+
+### ✨ Neu
+- **Tool: Prüfprotokoll** — VDE-konforme Messprotokollierung nach VDE 0100-600.
+  - Protokoll-Liste mit Gesamtbewertung je Protokoll
+  - Kopfdaten: Auftraggeber, Standort, Anlagenart, Nennspannung, Prüfer, Datum, nächste Prüfung, Auftragsnummer
+  - Stromkreis-Tabelle mit aufklappbaren Detailformularen
+  - **PE-Durchgangswiderstand** R_PE (Ω)
+  - **Isolationswiderstand** Riso L1/L2/L3/N-PE (MΩ) — 1- und 3-phasig
+  - **Schleifenimpedanz** Zs (Ω) + Kurzschlussstrom Ik (A)
+  - **FI/RCD-Prüfung:** IΔN (10–500 mA), Typ (AC/A/F/B/S), t@IΔN, t@5×IΔN, t@½×IΔN, UB
+  - Automatische Ampel-Bewertung nach VDE-Grenzwerten pro Messwert und Stromkreis
+  - Speicherung in localStorage
+- **Dashboard:** Prüfprotokoll als App #3 mit amber/gold Farbschema registriert.
+
+---
+
+## [2026.3.1] – 2026-03-05
+
+### Code-Qualität: Globale CSS-Variablen, gemeinsamer Toast, Aufräumen
+
+### ✨ Neu
+- **`src/components/Toast.jsx`:** Gemeinsame Toast-Komponente + `useToasts`-Hook für alle Apps. Stundenbuch und Verteilerplaner importieren daraus statt eigene Implementierung zu führen.
+- **CSS-Design-Tokens global:** `:root`-Variablen (`--bg`, `--green`, `--red`, `--svp` …), Font-Import, globale Resets, Keyframes und Print-Stile in `index.css` ausgelagert. Alle Apps haben die Variablen verfügbar, ohne dass Verteilerplaner zuerst geladen werden muss.
+
+### 🗑 Entfernt
+- `src/App.jsx` — Vite-Template-Überrest (tote Datei)
+- `src/App.css` — Vite-Template-Überrest (leere Datei)
+- `src/assets/react.svg` — Vite-Template-Überrest
+- Doppelter CSS-Block in `Verteilerplaner.jsx` (`:root`, Font, Resets, Keyframes, Print) — jetzt in `index.css`
+- Lokale `Toast`-Implementierung in `Stundenbuch.jsx` — ersetzt durch gemeinsame Komponente
 
 ### 🔧 Geändert
-- **Reihenklemmen-Toggle** in der Klemmenansicht startet jetzt standardmäßig auf **Aus** statt Ein
-- **Touch Drag & Drop** auf Mobilgeräten und Tablets komplett überarbeitet: `e.preventDefault()` direkt im `touchstart`-Event verhindert Textmarkierung während des Ziehens; visuelle Ghost-Kopie folgt dem Finger
-- **Mobile UI** verbessert: kleinere Abstände, größere Touch-Targets für Select-Felder, `user-select: none` auf allen draggbaren Elementen
-- Gesperrte Navigations-Icons zeigen 🔒 statt der Schrittzahl
+- `index.html`: Sprache `en` → `de`, Titel `mein-sicherungsplaner` → `Elektronikertools`, Meta-Description ergänzt
+- `index.css`: Background-Farbe auf `var(--bg)` vereinheitlicht (war `#0f172a` ≠ `--bg`)
+- `Dashboard.jsx`: Alle hardcodierten Hex-Farben durch CSS-Variablen ersetzt
+- `Stundenbuch.jsx`: Alle hardcodierten Hex-Farben durch CSS-Variablen ersetzt
 
 ---
 
-## [1.4.0] – 2025
+## [2026.3.0] – 2026-03-05
+
+### 🎉 Elektronikertools – Neustart
+
+Das Projekt wurde von "SVP Verteilerplaner" zu **Elektronikertools** umstrukturiert und erweitert.
 
 ### ✨ Neu
-- **Undo-Funktion** (Ctrl+Z / ⌘Z) für das Löschen von Kabeln und Sicherungen
-- **Kabel-Pool Ansicht** in Schritt 3 zeigt auch bereits zugewiesene Kabel (kleiner, ausgegraut) für einfaches Umverteilen
-- **Plan-Edit-Modal** — FI-Schutzschalter und Leitungsschutzschalter direkt im Belegungsplan bearbeiten ohne zurück zu navigieren
-- **Querverbinder-Berechnung** — automatische Berechnung benötigter Klemmbrücken wenn mehrere Kabel auf einer Sicherung liegen
-- **N-Brücken-Kalkulation** — genaue Längenberechnung der Brücken zwischen N-Einspeisung und N-Endklemme
-- **FILS-Unterstützung** — Leitungsschutzschalter können als separat abgesicherte FILS-Kreise markiert werden
-- **KNX-Reserveklemme** als optionale Position in der Klemmenleiste
-- **Autocomplete** für Raumnamen in der Kabelerfassung
-
-### 🐛 Behoben
-- Phasenlast-Berechnung bei 3-phasigen Sicherungen beim Verschieben im Plan
-- Legacy-Projekt-Migration beim Laden alter Dateiformate
+- **Dashboard** — Neue Startseite zur Tool-Auswahl. Alle Tools auf einen Blick, direkt anwählbar.
+- **Globale Konfiguration** — Einstellungsmodal mit Firmenname, Mitarbeiter, Ort, Datenbank-Name und Supabase-Credentials. Einstellungen gelten für alle Tools.
+- **Stundenbuch** — Neues Tool zur Zeiterfassung: Einträge mit Datum, Von/Bis, Pause, Projekt/Baustelle, Tätigkeit und Notiz. Monatsfilter, Projektfilter, CSV-Export als Stundennachweis.
+- **Verteilerplaner** — Der bisherige SVP Verteilerplaner ist als eigenständiges Tool integriert (keine Funktionsänderungen gegenüber 1.6.0).
 
 ### 🔧 Geändert
-- TE-Berechnung für FI-Schutzschalter: 4-polig = 8 TE Kapazität, 2-polig = 10 TE
-- Sicherungstyp wird automatisch angepasst wenn Kabel zugewiesen oder 3P-Modus geändert wird
+- Paketname: `mein-sicherungsplaner` → `elektronikertools`
+- Einstiegspunkt: `App.jsx` → `Dashboard.jsx` (App-Logik in `Verteilerplaner.jsx` ausgelagert)
+- Versionierungsschema: Semver → `JAHR.MONAT.PATCH`
 
 ---
 
-## [1.3.0] – 2025
+## Ältere Versionen (SVP Verteilerplaner, Semver)
 
-### ✨ Neu
-- **KI-Import via Foto** — Kabellisten aus Fotos oder Scans per Anthropic Claude API einlesen
-- **API-Einstellungen** — konfigurierbarer API-Key und Endpunkt für den KI-Import
-- **Beschriftungsplan** — vollständiger Beschriftungsplan im Q1F1-Schema mit WhatsApp-Export
-- **Stockwerk-Farbcodierung** — jedes Stockwerk erhält eine eigene Farbe, sichtbar im Belegungsplan und der Klemmenleiste
+### [1.6.0] – 2026-03-05
 
-### 🔧 Geändert
-- Kabeltyp-System vollständig überarbeitet: kombinierter Schlüssel aus Typ + Adern + Querschnitt
-- Legacy-Kabelttyp-IDs werden automatisch migriert
+#### ✨ Neu
+- **Startfenster** — Modal beim App-Start mit "Neues Projekt anlegen" oder "Vorhandenes Projekt laden"
+- **Einstellungsseite (⚙️)** — Firmenname, Standard-Ersteller und KI-API-Konfiguration in einem Dialog
+- **Supabase-Datenbankanbindung** — Projekte optional in Supabase PostgreSQL speichern (self-hosted oder Cloud)
+- **Auto-Save** — Nach jeder Plan-Generierung automatisches Speichern lokal und in Supabase
+- **Ersteller & Standort** — Neue Felder in Schritt 1, erscheinen im Belegungsplan-Kopf
 
----
+#### 🐛 Behoben
+- Steckbrückenlogik (Querverbinder): Querverbinder wurden nie berechnet wegen fehlendem `setShowKlemmen`. Fix: überflüssige Abhängigkeit entfernt
 
-## [1.2.0] – 2025
-
-### ✨ Neu
-- **Klemmenleiste-Visualisierung** — grafische Darstellung der Reihenklemmen-Belegung pro FI-Block
-- **Stückliste** — automatische Materialliste aus dem generierten Plan
-- **WhatsApp-Export** für Stückliste und Beschriftungsplan
-- **Projekt speichern / laden** — mehrere Projekte parallel im Browser verwalten
-- **Druckansicht** optimiert
+#### 🔧 Geändert
+- ⚙️-Button öffnet jetzt das neue kombinierte Einstellungs-Modal
+- Toten Code entfernt: `kabelId`, `kabelLabel`, `showKlemmen` u.a.
 
 ---
 
-## [1.1.0] – 2025
+### [1.5.0] – 2025
 
-### ✨ Neu
-- **Drag & Drop** in Schritt 3 zum Zuweisen von Kabeln auf Sicherungen
-- **Touch-Drag** für Tablet-Nutzung
-- **Automatische Sicherungsempfehlung** basierend auf dem Kabelquerschnitt
-- **3-phasige Leitungsschutzschalter** (B16 3P bis B63 3P)
-- **FILS-Konfiguration** pro Sicherung
+#### ✨ Neu
+- Custom Tooltips bei gesperrten Navigationsschritten
+- Warnung bei unvollständiger Projektkonfiguration in Schritt 1
+
+#### 🐛 Behoben
+- Navigation gesperrt / nicht anklickbar unter bestimmten Bedingungen (Erreichbarkeits-Logik überarbeitet)
+- Kein vordefiniertes leeres Kabel beim App-Start
+- Speichern-Button ohne Projektname
+
+#### 🔧 Geändert
+- Touch Drag & Drop vollständig überarbeitet
+- Mobile UI verbessert
 
 ---
 
-## [1.0.0] – 2025
+### [1.4.0] – 2025
 
-### 🎉 Erstveröffentlichung
+#### ✨ Neu
+- Undo-Funktion (Ctrl+Z) für gelöschte Kabel und Sicherungen
+- Plan-Edit-Modal — FI und LSS direkt im Belegungsplan bearbeiten
+- Querverbinder-Berechnung
+- N-Brücken-Kalkulation
+- FILS-Unterstützung
+- KNX-Reserveklemme
+
+---
+
+### [1.3.0] – 2025
+
+#### ✨ Neu
+- KI-Import via Foto (Anthropic Claude API)
+- Beschriftungsplan im Q1F1-Schema
+- Stockwerk-Farbcodierung
+
+---
+
+### [1.2.0] – 2025
+
+#### ✨ Neu
+- Klemmenleiste-Visualisierung
+- Stückliste mit WhatsApp-Export
+- Projekt speichern / laden
+
+---
+
+### [1.1.0] – 2025
+
+#### ✨ Neu
+- Drag & Drop für Kabelzuweisung
+- 3-phasige Leitungsschutzschalter
+- FILS-Konfiguration
+
+---
+
+### [1.0.0] – 2025
+
+#### 🎉 Erstveröffentlichung
 - Geführter 5-Schritte-Workflow: Projekt → Kabel → Sicherungen → FI → Plan
-- Automatische Verteilung von Sicherungen auf FI-Gruppen mit TE-Kapazitätsprüfung
+- Automatische Verteilung auf FI-Gruppen mit TE-Kapazitätsprüfung
 - Visuelle und tabellarische Plan-Ansicht
-- Phasenlast-Anzeige pro FI-Gruppe
-- Stockwerk- und Raum-Verwaltung

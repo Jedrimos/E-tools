@@ -1,11 +1,65 @@
-/* Verhindert den weißen Rand durch den Browser */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+/* ── Design Tokens ── */
+:root {
+  --bg:      #111416;
+  --bg2:     #181c1f;
+  --bg3:     #1e2327;
+  --border:  #2a3035;
+  --border2: #333b42;
+  --svp:     #2196C9;
+  --svp2:    #1a82b4;
+  --blue:    #2196C9;
+  --green:   #52d98a;
+  --red:     #ff6b6b;
+  --purple:  #a78bfa;
+  --text:    #e8e4de;
+  --text2:   #9aa3ad;
+  --text3:   #5a6370;
+  --mono:    'JetBrains Mono', monospace;
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; }
+
 html, body {
   margin: 0;
   padding: 0;
-  background-color: #0f172a; /* Entspricht slate-900 */
+  background-color: var(--bg);
   overflow-x: hidden;
+  font-family: 'Outfit', system-ui, sans-serif;
+  color: var(--text);
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* ── Inputs ── */
+input, select {
+  font-family: 'Outfit', sans-serif !important;
+}
+input:focus, select:focus {
+  outline: none !important;
+  border-color: var(--svp) !important;
+  box-shadow: 0 0 0 2px rgba(33, 150, 201, 0.12) !important;
+}
+input::placeholder { color: var(--text3); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* ── Animations ── */
+@keyframes spin    { from { transform: rotate(0deg)  } to { transform: rotate(360deg) } }
+@keyframes fadeIn  { from { opacity: 0; transform: translateY(6px)  } to { opacity: 1; transform: none } }
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px) } to { opacity: 1; transform: none } }
+.fade-in { animation: fadeIn 0.2s ease forwards; }
+
+/* ── Print ── */
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .no-print { display: none !important; }
+  body { background: #fff !important; color: #000 !important; margin: 0; }
 }
