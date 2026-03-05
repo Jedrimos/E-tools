@@ -1,5 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Toast, { useToasts } from "./components/Toast.jsx";
+import {
+  loadProtokolleDB, saveProtokollDB, deleteProtokollDB,
+  loadProjekteForImport,
+} from "./lib/db_pruefprotokoll.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function uid() { return Math.random().toString(36).slice(2, 9); }
@@ -82,6 +86,8 @@ const mkStromkreis = () => ({
 
 const mkProtokoll = () => ({
   id: uid(),
+  db_id:             null,
+  verteiler_id:      null,
   datum:             new Date().toISOString().slice(0, 10),
   naechste_pruefung: "",
   auftraggeber:      "",
@@ -93,6 +99,105 @@ const mkProtokoll = () => ({
   stromkreise:       [mkStromkreis()],
   notiz:             "",
 });
+
+// ── Verteilerplaner → Prüfprotokoll Import ────────────────────────────────────
+function importAusVerteiler(projekt) {
+  const kabelById = Object.fromEntries((projekt.kabel || []).map(k => [k.id, k]));
+  const stromkreise = (projekt.sicherungen || [])
+    .filter(si => si.kabelIds && si.kabelIds.length > 0)
+    .map(si => {
+      const bezeichnung = si.kabelIds
+        .map(id => kabelById[id])
+        .filter(Boolean)
+        .map(k => k.bezeichnung || k.raum || "Kabel")
+        .join(" + ");
+      const match = (si.sicherung || "B16").match(/([A-Z]+)(\d+)/);
+      return {
+        ...mkStromkreis(),
+        bezeichnung,
+        nennstrom:     match ? match[2] : "16",
+        sicherungstyp: match ? match[1] : "B",
+        dreipolig:     !!si.dreipolig,
+      };
+    });
+  return {
+    ...mkProtokoll(),
+    auftraggeber:    projekt.projekt?.name || projekt.name || "",
+    anlagenstandort: [projekt.projekt?.adresse, projekt.projekt?.standort].filter(Boolean).join(", "),
+    pruefer:         projekt.projekt?.ersteller || "",
+    verteiler_id:    projekt.db_id || null,
+    stromkreise:     stromkreise.length > 0 ? stromkreise : [mkStromkreis()],
+  };
+}
+
+// ── Verteilerplaner-Import-Modal ──────────────────────────────────────────────
+function ImportModal({ onSelect, onClose }) {
+  const [projekte, setProjekte] = useState([]);
+  const [laden, setLaden] = useState(true);
+
+  useEffect(() => {
+    loadProjekteForImport()
+      .then(setProjekte)
+      .catch(() => setProjekte([]))
+      .finally(() => setLaden(false));
+  }, []);
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 16,
+        padding: 24, width: "100%", maxWidth: 520, maxHeight: "80vh", display: "flex", flexDirection: "column",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>⚡ Aus Verteilerplaner importieren</div>
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 20 }}>✕</button>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 14 }}>
+          Stromkreise werden aus dem gespeicherten Verteiler übernommen. Messwerte müssen noch eingetragen werden.
+        </div>
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {laden ? (
+            <div style={{ textAlign: "center", color: "var(--text3)", padding: "32px 0" }}>Lade Projekte …</div>
+          ) : projekte.length === 0 ? (
+            <div style={{ textAlign: "center", color: "var(--text3)", padding: "32px 0" }}>
+              Keine gespeicherten Verteiler gefunden.
+            </div>
+          ) : (
+            projekte.map(p => (
+              <button
+                key={p.id || p.db_id}
+                onClick={() => onSelect(importAusVerteiler(p))}
+                style={{
+                  display: "block", width: "100%", textAlign: "left",
+                  background: "var(--bg3)", border: "1px solid var(--border)",
+                  borderRadius: 10, padding: "12px 14px", marginBottom: 8,
+                  cursor: "pointer", transition: "border-color 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = AMBER + "80"}
+                onMouseLeave={e => e.currentTarget.style.borderColor = "var(--border)"}
+              >
+                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 4 }}>
+                  ⚡ {p.projekt?.name || p.name || "Unbenannt"}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text3)", display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  {p.projekt?.adresse && <span>📍 {p.projekt.adresse}</span>}
+                  {p.datum && <span>📅 {p.datum}</span>}
+                  {(p.sicherungen || []).length > 0 && (
+                    <span>⚡ {(p.sicherungen || []).filter(s => s.kabelIds?.length > 0).length} Stromkreise</span>
+                  )}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const AMBER = "#f59e0b";
@@ -481,15 +586,17 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
 }
 
 // ── Protokoll-Liste ───────────────────────────────────────────────────────────
-function ProtokollListe({ protokolle, onOpen, onNew, onDelete }) {
+function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync }) {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 24, gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 24, gap: 10, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 20 }}>Prüfprotokolle</div>
           <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>VDE-Messungen & Prüfberichte</div>
         </div>
         <div style={{ flex: 1 }} />
+        {dbSync && <span style={{ fontSize: 11, color: "var(--text3)", background: "var(--bg3)", borderRadius: 6, padding: "3px 8px" }}>☁ Datenbank</span>}
+        <button style={{ ...bSec }} onClick={onImport}>⚡ Aus Verteilerplaner</button>
         <button style={bPrim} onClick={onNew}>+ Neues Protokoll</button>
       </div>
 
@@ -499,8 +606,11 @@ function ProtokollListe({ protokolle, onOpen, onNew, onDelete }) {
           padding: "48px 24px", textAlign: "center",
         }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-          <div style={{ color: "var(--text3)", fontSize: 14 }}>Noch keine Protokolle</div>
-          <button style={{ ...bPrim, marginTop: 16 }} onClick={onNew}>Erstes Protokoll erstellen</button>
+          <div style={{ color: "var(--text3)", fontSize: 14, marginBottom: 12 }}>Noch keine Protokolle</div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <button style={bSec} onClick={onImport}>⚡ Aus Verteilerplaner importieren</button>
+            <button style={{ ...bPrim }} onClick={onNew}>Leeres Protokoll erstellen</button>
+          </div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -557,8 +667,19 @@ function ProtokollListe({ protokolle, onOpen, onNew, onDelete }) {
 // ── Haupt-Komponente ──────────────────────────────────────────────────────────
 export default function Pruefprotokoll({ config = {} }) {
   const [protokolle, setProtokolleLive] = useState(load);
-  const [aktiv, setAktiv] = useState(null); // null = Liste, sonst Protokoll-Objekt
+  const [aktiv, setAktiv]       = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [dbSync, setDbSync]     = useState(false);
   const { toasts, addToast } = useToasts();
+
+  // ── Beim Start: Supabase laden
+  useEffect(() => {
+    loadProtokolleDB()
+      .then(data => {
+        if (data) { setProtokolleLive(data); save(data); setDbSync(true); }
+      })
+      .catch(() => {});
+  }, []);
 
   function setProtokolle(fn) {
     setProtokolleLive(prev => {
@@ -570,26 +691,46 @@ export default function Pruefprotokoll({ config = {} }) {
 
   function handleNew() {
     const p = mkProtokoll();
-    if (config?.pruefer) p.pruefer = config.pruefer;
+    if (config?.mitarbeiter) p.pruefer = config.mitarbeiter;
     setAktiv(p);
   }
 
-  function handleSave(p) {
+  async function handleSave(p) {
+    // Sofort lokal speichern
     setProtokolle(prev => {
       const exists = prev.find(x => x.id === p.id);
       return exists ? prev.map(x => x.id === p.id ? p : x) : [p, ...prev];
     });
     addToast("Protokoll gespeichert ✓");
     setAktiv(null);
+    // Async Supabase-Sync
+    try {
+      const saved = await saveProtokollDB(p);
+      if (saved) {
+        setProtokolle(prev => prev.map(x => x.id === p.id ? { ...x, db_id: saved.db_id } : x));
+      }
+    } catch (e) {
+      addToast("Datenbank-Sync fehlgeschlagen: " + e.message, "error");
+    }
   }
 
-  function handleDelete(id) {
+  async function handleDelete(id) {
+    const proto = protokolle.find(x => x.id === id);
     setProtokolle(prev => prev.filter(x => x.id !== id));
     addToast("Protokoll gelöscht", "error");
+    if (proto?.db_id) {
+      try { await deleteProtokollDB(proto.db_id); } catch (_) {}
+    }
   }
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      {showImport && (
+        <ImportModal
+          onSelect={p => { setShowImport(false); setAktiv(p); }}
+          onClose={() => setShowImport(false)}
+        />
+      )}
       {aktiv ? (
         <ProtokollEditor
           protokoll={aktiv}
@@ -602,7 +743,9 @@ export default function Pruefprotokoll({ config = {} }) {
           protokolle={protokolle}
           onOpen={setAktiv}
           onNew={handleNew}
+          onImport={() => setShowImport(true)}
           onDelete={handleDelete}
+          dbSync={dbSync}
         />
       )}
       <Toast toasts={toasts} />

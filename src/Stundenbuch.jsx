@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Toast, { useToasts } from "./components/Toast.jsx";
+import { loadStundenDB, saveEintragDB, deleteEintragDB } from "./lib/db_stundenbuch.js";
 
 // ── Helpers ──
 function uid() { return Math.random().toString(36).slice(2, 9); }
@@ -133,32 +134,59 @@ function EintragForm({ initial, onSave, onCancel, projekte }) {
 
 // ── Haupt-Komponente ──
 export default function Stundenbuch({ config = {} }) {
-  const [eintraege, setEintraege] = useState(loadData);
+  const [eintraege, setEintraegeLive] = useState(loadData);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [filter, setFilter] = useState({ monat: new Date().toISOString().slice(0, 7), projekt: "" });
   const { toasts, addToast } = useToasts();
 
-  useEffect(() => { saveData(eintraege); }, [eintraege]);
+  function setEintraege(fn) {
+    setEintraegeLive(prev => {
+      const next = typeof fn === "function" ? fn(prev) : fn;
+      saveData(next);
+      return next;
+    });
+  }
+
+  // Beim Start: Supabase laden
+  useEffect(() => {
+    loadStundenDB()
+      .then(data => { if (data) setEintraege(data); })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const projekte = [...new Set(eintraege.map(e => e.projekt).filter(Boolean))].sort();
 
-  function handleSave(form) {
+  async function handleSave(form) {
     if (editId) {
-      setEintraege(prev => prev.map(e => e.id === editId ? { ...form, id: editId } : e));
+      const alt = eintraege.find(e => e.id === editId);
+      const updated = { ...form, id: editId, db_id: alt?.db_id };
+      setEintraege(prev => prev.map(e => e.id === editId ? updated : e));
       addToast("Eintrag aktualisiert");
       setEditId(null);
+      try {
+        const saved = await saveEintragDB(updated);
+        if (saved) setEintraege(prev => prev.map(e => e.id === editId ? { ...e, db_id: saved.db_id } : e));
+      } catch (_) {}
     } else {
       setEintraege(prev => [form, ...prev]);
       addToast("Eintrag gespeichert");
+      try {
+        const saved = await saveEintragDB(form);
+        if (saved) setEintraege(prev => prev.map(e => e.id === form.id ? { ...e, db_id: saved.db_id } : e));
+      } catch (_) {}
     }
     setShowForm(false);
   }
 
-  function handleDelete(id) {
+  async function handleDelete(id) {
     if (!confirm("Eintrag wirklich löschen?")) return;
+    const eintrag = eintraege.find(e => e.id === id);
     setEintraege(prev => prev.filter(e => e.id !== id));
     addToast("Eintrag gelöscht");
+    if (eintrag?.db_id) {
+      try { await deleteEintragDB(eintrag.db_id); } catch (_) {}
+    }
   }
 
   function handleEdit(eintrag) {
