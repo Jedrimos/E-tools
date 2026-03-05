@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
+import Toast, { useToasts } from "./components/Toast.jsx";
 
 // ── Helpers ──
 function uid() { return Math.random().toString(36).slice(2, 9); }
@@ -56,34 +57,6 @@ function saveData(data) {
   localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
 
-// ── Toast ──
-const Toast = ({ toasts }) => (
-  <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
-    {toasts.map(t => (
-      <div key={t.id} style={{
-        background: t.type === "error" ? "#2a1515" : "#0f2a1a",
-        border: `1px solid ${t.type === "error" ? "var(--red,#e05)" : "var(--green,#2d8)"}`,
-        borderRadius: 10, padding: "10px 16px",
-        color: t.type === "error" ? "#e05555" : "#3dcc7e",
-        fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.4)", minWidth: 200, maxWidth: 320
-      }}>
-        <span>{t.type === "error" ? "⚠" : "✓"}</span>
-        <span>{t.msg}</span>
-      </div>
-    ))}
-  </div>
-);
-
-function useToasts() {
-  const [toasts, setToasts] = useState([]);
-  const addToast = useCallback((msg, type = "success") => {
-    const id = uid();
-    setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
-  }, []);
-  return { toasts, addToast };
-}
 
 // ── Eingabe-Formular ──
 function EintragForm({ initial, onSave, onCancel, projekte }) {
@@ -93,7 +66,7 @@ function EintragForm({ initial, onSave, onCancel, projekte }) {
   function set(key, val) { setForm(f => ({ ...f, [key]: val })); }
 
   return (
-    <div style={{ background: "var(--bg2,#1a1a2e)", border: "1px solid var(--border,#333)", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+    <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
         <label style={labelStyle}>
           Datum
@@ -148,11 +121,11 @@ function EintragForm({ initial, onSave, onCancel, projekte }) {
         />
       </label>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
-        <div style={{ flex: 1, color: "#aaa", fontSize: 14 }}>
-          Netto: <strong style={{ color: "#fff" }}>{formatDuration(netto)}</strong>
+        <div style={{ flex: 1, color: "var(--text2)", fontSize: 14 }}>
+          Netto: <strong style={{ color: "var(--text)" }}>{formatDuration(netto)}</strong>
         </div>
-        <button onClick={onCancel} style={btnStyle("#333", "#aaa")}>Abbrechen</button>
-        <button onClick={() => onSave(form)} style={btnStyle("#1a4a2e", "#3dcc7e")}>Speichern</button>
+        <button onClick={onCancel} style={btnStyle("var(--bg3)", "var(--text2)")}>Abbrechen</button>
+        <button onClick={() => onSave(form)} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>Speichern</button>
       </div>
     </div>
   );
@@ -223,18 +196,18 @@ export default function Stundenbuch({ config = {} }) {
   const editEintrag = editId ? eintraege.find(e => e.id === editId) : null;
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px", fontFamily: "system-ui, sans-serif", color: "#e0e0e0" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px", color: "var(--text)" }}>
       <Toast toasts={toasts} />
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>⏱ Stundenbuch</h2>
-          <div style={{ color: "#888", fontSize: 13 }}>Zeiterfassung{config.firma ? ` – ${config.firma}` : ""}{config.mitarbeiter ? ` | ${config.mitarbeiter}` : ""}</div>
+          <div style={{ color: "var(--text3)", fontSize: 13 }}>Zeiterfassung{config.firma ? ` – ${config.firma}` : ""}{config.mitarbeiter ? ` | ${config.mitarbeiter}` : ""}</div>
         </div>
         <div style={{ flex: 1 }} />
-        <button onClick={exportCSV} style={btnStyle("#1a3a4a", "#4bc8e8")}>↓ CSV Export</button>
-        <button onClick={() => { setEditId(null); setShowForm(s => !s); }} style={btnStyle("#1a4a2e", "#3dcc7e")}>
+        <button onClick={exportCSV} style={btnStyle("rgba(33,150,201,0.1)", "var(--blue)")}>↓ CSV Export</button>
+        <button onClick={() => { setEditId(null); setShowForm(s => !s); }} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>
           {showForm && !editId ? "✕ Schließen" : "+ Neuer Eintrag"}
         </button>
       </div>
@@ -264,15 +237,15 @@ export default function Stundenbuch({ config = {} }) {
             style={inputStyle}
           />
         </label>
-        <div style={{ alignSelf: "flex-end", paddingBottom: 2, color: "#aaa", fontSize: 13 }}>
-          {gefiltert.length} Einträge | Gesamt: <strong style={{ color: "#fff" }}>{formatDuration(gesamtMinuten)}</strong>{" "}
+        <div style={{ alignSelf: "flex-end", paddingBottom: 2, color: "var(--text2)", fontSize: 13 }}>
+          {gefiltert.length} Einträge | Gesamt: <strong style={{ color: "var(--text)" }}>{formatDuration(gesamtMinuten)}</strong>{" "}
           ({(gesamtMinuten / 60).toFixed(2)} h)
         </div>
       </div>
 
       {/* Tabelle */}
       {gefiltert.length === 0 ? (
-        <div style={{ textAlign: "center", color: "#666", padding: "60px 0", fontSize: 15 }}>
+        <div style={{ textAlign: "center", color: "var(--text3)", padding: "60px 0", fontSize: 15 }}>
           Noch keine Einträge. Klicke auf &quot;Neuer Eintrag&quot; um anzufangen.
         </div>
       ) : (
@@ -281,7 +254,7 @@ export default function Stundenbuch({ config = {} }) {
             const netto = calcNetto(e);
             return (
               <div key={e.id} style={{
-                background: "var(--bg2,#1a1a2e)", border: "1px solid #2a2a3e",
+                background: "var(--bg2)", border: "1px solid var(--border)",
                 borderRadius: 10, padding: "12px 16px",
                 display: "grid", gridTemplateColumns: "110px 80px 80px 70px 1fr auto",
                 gap: 12, alignItems: "center", fontSize: 14
@@ -289,17 +262,17 @@ export default function Stundenbuch({ config = {} }) {
                 <div>
                   <div style={{ fontWeight: 600 }}>{formatDate(e.datum)}</div>
                 </div>
-                <div style={{ color: "#aaa" }}>{e.von} – {e.bis}</div>
-                <div style={{ color: "#aaa" }}>-{e.pause}min Pause</div>
-                <div style={{ fontWeight: 700, color: "#3dcc7e" }}>{formatDuration(netto)}</div>
+                <div style={{ color: "var(--text2)" }}>{e.von} – {e.bis}</div>
+                <div style={{ color: "var(--text2)" }}>-{e.pause}min Pause</div>
+                <div style={{ fontWeight: 700, color: "var(--green)" }}>{formatDuration(netto)}</div>
                 <div>
-                  {e.projekt && <span style={{ background: "#1a3040", color: "#4bc8e8", borderRadius: 6, padding: "2px 8px", fontSize: 12, marginRight: 6 }}>{e.projekt}</span>}
-                  {e.taetigkeit && <span style={{ color: "#ccc" }}>{e.taetigkeit}</span>}
-                  {e.notiz && <span style={{ color: "#777", fontSize: 12, display: "block", marginTop: 2 }}>{e.notiz}</span>}
+                  {e.projekt && <span style={{ background: "var(--bg3)", color: "var(--blue)", borderRadius: 6, padding: "2px 8px", fontSize: 12, marginRight: 6 }}>{e.projekt}</span>}
+                  {e.taetigkeit && <span style={{ color: "var(--text2)" }}>{e.taetigkeit}</span>}
+                  {e.notiz && <span style={{ color: "var(--text3)", fontSize: 12, display: "block", marginTop: 2 }}>{e.notiz}</span>}
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => handleEdit(e)} style={iconBtn("#333")}>✎</button>
-                  <button onClick={() => handleDelete(e.id)} style={iconBtn("#3a1515")}>✕</button>
+                  <button onClick={() => handleEdit(e)} style={iconBtn("var(--bg3)")}>✎</button>
+                  <button onClick={() => handleDelete(e.id)} style={iconBtn("rgba(255,107,107,0.1)")}>✕</button>
                 </div>
               </div>
             );
@@ -313,12 +286,12 @@ export default function Stundenbuch({ config = {} }) {
 // ── Styles ──
 const labelStyle = {
   display: "flex", flexDirection: "column", gap: 4,
-  fontSize: 12, color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em"
+  fontSize: 12, color: "var(--text3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em"
 };
 
 const inputStyle = {
-  background: "#0e0e1a", border: "1px solid #2a2a3e", borderRadius: 8,
-  color: "#e0e0e0", padding: "7px 10px", fontSize: 14, outline: "none",
+  background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8,
+  color: "var(--text)", padding: "7px 10px", fontSize: 14, outline: "none",
   fontFamily: "inherit"
 };
 
@@ -332,7 +305,7 @@ function btnStyle(bg, color) {
 
 function iconBtn(bg) {
   return {
-    background: bg, color: "#aaa", border: "none",
+    background: bg, color: "var(--text2)", border: "none",
     borderRadius: 6, width: 30, height: 30, cursor: "pointer",
     fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center"
   };

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { isSupabaseConfigured } from "./lib/supabase.js";
 import { loadProjekteDB, saveProjektDB, deleteProjektDB } from "./lib/db.js";
+import Toast from "./components/Toast.jsx";
 
 // ── Stammdaten ──
 const STD_SICHERUNGEN = [
@@ -29,22 +30,6 @@ const FI_POLE        = [2, 4];
 const fiMaxTE         = (pole) => pole === 4 ? 8 : 10;
 const fiPhasenschiene = (pole) => pole === 4 ? "3-phasig" : "1-phasig";
 const fiBeschreibung  = (fi)   => `FI ${fi.bemessung}A Typ ${fi.fiTyp} ${fi.fehlerstrom}mA ${fi.pole}P`;
-
-// ── Toast Notification ──
-const Toast = ({toasts}) => (
-  <div style={{position:"fixed",bottom:24,right:24,zIndex:9999,display:"flex",flexDirection:"column",gap:8,pointerEvents:"none"}}>
-    {toasts.map(t=>(
-      <div key={t.id} style={{background:t.type==="error"?"#2a1515":t.type==="success"?"#0f2a1a":"var(--bg3)",
-        border:`1px solid ${t.type==="error"?"var(--red)":t.type==="success"?"var(--green)":"var(--border2)"}`,
-        borderRadius:10,padding:"10px 16px",color:t.type==="error"?"var(--red)":t.type==="success"?"var(--green)":"var(--text2)",
-        fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:8,
-        animation:"slideIn 0.2s ease",boxShadow:"0 4px 20px rgba(0,0,0,0.4)",minWidth:200,maxWidth:320}}>
-        <span>{t.type==="error"?"⚠":"✓"}</span>
-        <span>{t.msg}</span>
-      </div>
-    ))}
-  </div>
-);
 
 // ── Custom Tooltip ──
 const Tip = ({text, children, pos="bottom"}) => (
@@ -1422,38 +1407,9 @@ const stueckliste = (() => {
         />
       )}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
-        :root{
-          --bg: #111416;
-          --bg2: #181c1f;
-          --bg3: #1e2327;
-          --border: #2a3035;
-          --border2: #333b42;
-          --svp: #2196C9;
-          --svp2: #1a82b4;
-          --blue: #2196C9;
-          --green: #52d98a;
-          --red: #ff6b6b;
-          --purple: #a78bfa;
-          --text: #e8e4de;
-          --text2: #9aa3ad;
-          --text3: #5a6370;
-          --mono: 'JetBrains Mono', monospace;
-        }
-        *{box-sizing:border-box;}
-        input,select{font-family:'Outfit',sans-serif!important;}
-        input:focus,select:focus{outline:none!important;border-color:var(--svp)!important;box-shadow:0 0 0 2px rgba(33,150,201,0.12)!important;}
-        input::placeholder{color:var(--text3);}
         .sichzone{transition:background 0.15s,border-color 0.15s,box-shadow 0.15s;}
         .sichzone.dragover{background:rgba(33,150,201,0.05)!important;border-color:var(--svp)!important;box-shadow:0 0 0 2px rgba(33,150,201,0.15)!important;}
         .sichzone.touch-over{background:rgba(33,150,201,0.05)!important;border-color:var(--svp)!important;}
-        ::-webkit-scrollbar{width:4px;height:4px;}
-        ::-webkit-scrollbar-track{background:transparent;}
-        ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
-        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-        @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
-        .fade-in{animation:fadeIn 0.2s ease forwards;}
         .main-wrap{max-width:960px;margin:0 auto;padding:20px 16px;}
         .step3-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
         .header-nav{display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;}
@@ -1483,10 +1439,9 @@ const stueckliste = (() => {
         .tip-top{bottom:calc(100% + 7px);}
         .tip-top::before{top:100%;border-top-color:#0d1114;}
         .tip-wrap:hover .tip{opacity:1;}
-        /* Touch drag: prevent text selection while dragging */
+        /* Touch drag */
         .draggable{-webkit-user-select:none;user-select:none;touch-action:none;}
         .draggable:active{cursor:grabbing;}
-        /* Touch drag visual feedback */
         .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:0.85;transform:scale(1.05);box-shadow:0 8px 32px rgba(0,0,0,0.5);}
         @media(max-width:640px){
           .step3-grid{grid-template-columns:1fr;}
@@ -1495,12 +1450,10 @@ const stueckliste = (() => {
           .nav-label-short{display:inline!important;}
           .main-wrap{padding:10px 8px;}
           .header-actions .btn-label{display:none;}
-          /* Mobile: larger touch targets */
           select{min-height:40px;font-size:14px!important;}
           .mobile-stack{flex-direction:column!important;}
           .mobile-full{width:100%!important;flex:1 1 100%!important;}
           .mobile-hide{display:none!important;}
-          /* Mobile step bar: hide labels */
           .step-label{display:none;}
         }
         @media(min-width:641px){
@@ -1509,11 +1462,6 @@ const stueckliste = (() => {
         }
         @media(min-width:1024px){
           .main-wrap{max-width:1100px;padding:24px 28px;}
-        }
-        @media print{
-          *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
-          .no-print{display:none!important;}
-          body{background:#fff!important;color:#000!important;margin:0;}
         }
       `}</style>
 
