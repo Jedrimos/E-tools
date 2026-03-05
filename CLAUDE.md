@@ -4,7 +4,7 @@ Diese Datei enthält verbindliche Regeln die bei jeder Änderung am Projekt einz
 
 ---
 
-## Pflichtaufgaben nach jeder Änderung
+## Pflichtaufgaben nach jeder Änderung ##
 
 **Nach jeder inhaltlichen Änderung am Code immer:**
 
