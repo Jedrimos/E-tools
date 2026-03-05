@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Verteilerplaner from "./Verteilerplaner.jsx";
 import Stundenbuch from "./Stundenbuch.jsx";
 import Pruefprotokoll from "./Pruefprotokoll.jsx";
+import Wissensdatenbank from "./Wissensdatenbank.jsx";
 
 // ── Lokaler Speicher für Konfiguration ──
 const CONFIG_KEY = "elektronikertools_config";
@@ -38,6 +39,14 @@ const APPS = [
     beschreibung: "VDE-Messungen erfassen: Isolationswiderstand, Schleifenimpedanz, FI-Auslösezeit, PE-Widerstand. Automatische Grenzwertbewertung.",
     farbe: "#f59e0b",
     bg: "#1a1200",
+  },
+  {
+    id: "wissen",
+    name: "Wissensdatenbank",
+    icon: "📚",
+    beschreibung: "Firmeninternes Wissen teilen: Checklisten, Herstellerhinweise, Montagetipps, Normen. Für alle Techniker im Team verfügbar.",
+    farbe: "#06b6d4",
+    bg: "#001a1f",
   },
 ];
 
@@ -98,6 +107,16 @@ export default function Dashboard() {
         <TopBar label="Prüfprotokoll" icon="📋" farbe="#f59e0b" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Pruefprotokoll config={config} />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "wissen") {
+    return (
+      <div>
+        <TopBar label="Wissensdatenbank" icon="📚" farbe="#06b6d4" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <Wissensdatenbank config={config} />
       </div>
     );
   }

@@ -6,6 +6,39 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.4] – 2026-03-05
+
+### Neues Tool: Wissensdatenbank + docs/ Ordner + CLAUDE.md
+
+### ✨ Neu
+- **Tool: Wissensdatenbank** — Firmeninternes Wissen für das Team.
+  - Artikel mit Titel, Kategorie (10 Voreinstellungen), Tags, Autor und Markdown-Inhalt
+  - Volltextsuche (Titel, Inhalt, Tags, Autor) + Kategoriefilter in Echtzeit
+  - Artikel-Karten-Übersicht + Detailansicht mit gerendertem Markdown
+  - Markdown-Renderer: `# Überschriften`, `**fett**`, `*kursiv*`, `` `code` ``, `- Listen`, `1. nummeriert`, `> Blockquote`, ` ``` Codeblöcke ``` `
+  - Live-Vorschau im Editor
+  - Team-Sharing via Supabase (`☁ Geteilt im Team`-Indikator)
+  - Warnung wenn Supabase nicht konfiguriert
+  - Farbthema: Teal `#06b6d4`
+- **`src/lib/db_wissen.js`** — Supabase CRUD für `wissensdatenbank`-Tabelle
+- **`docs/`** — Vollständige Projektdokumentation:
+  - `docs/index.md` — Übersicht & Navigation
+  - `docs/setup.md` — Installation, Coolify, Supabase-Setup
+  - `docs/supabase.sql` — Vollständiges SQL-Schema aller 4 Tabellen mit Trigger
+  - `docs/development.md` — Neue App anlegen, CSS-Konventionen, Supabase-Muster
+  - `docs/apps/verteilerplaner.md` — Verteilerplaner-Dokumentation
+  - `docs/apps/stundenbuch.md` — Stundenbuch-Dokumentation
+  - `docs/apps/pruefprotokoll.md` — Prüfprotokoll + VDE-Grenzwerte-Tabelle
+  - `docs/apps/wissensdatenbank.md` — Wissensdatenbank + Markdown-Syntax-Referenz
+- **`CLAUDE.md`** — Projektregeln für Claude Code: Pflichtaufgaben nach jeder Änderung, Checkliste neue App, CSS-Konventionen, App-Farben
+
+### 🔧 Geändert
+- Dashboard: Wissensdatenbank als App #4 registriert (teal, `#001a1f` Hintergrund)
+- README: Wissensdatenbank-Sektion, docs/-Link, vollständiges SQL für alle 4 Tabellen, aktualisierte Projektstruktur
+- ROADMAP: Wissensdatenbank als erledigt markiert
+
+---
+
 ## [2026.3.3] – 2026-03-05
 
 ### Gemeinsame Datenbank + Verteilerplaner-Import im Prüfprotokoll

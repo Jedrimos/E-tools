@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.3.3-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.3.4-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -43,6 +43,22 @@ Einfache Zeiterfassung für Elektriker und Monteure.
 
 ---
 
+### 📚 Wissensdatenbank
+
+Firmeninternes Wissen strukturiert erfassen und im Team teilen.
+
+**Features:**
+- Artikel mit Titel, Kategorie, Tags, Autor und Markdown-Inhalt
+- Kategorien: Wechselrichter/PV, Verteiler, FI/RCD, VDE-Normen, Montagetipps, Hersteller, Werkzeuge, Recht, Sonstiges
+- Volltextsuche über Titel, Inhalt, Tags und Autor in Echtzeit
+- Kategoriefilter mit Artikelanzahl
+- Markdown-Editor mit Live-Vorschau (Überschriften, Listen, Code, fett, kursiv, Blockquote)
+- Artikel-Karten-Ansicht + Detailansicht mit gerendertem Markdown
+- Team-Sharing via Supabase: alle Techniker mit gleicher Datenbank sehen denselben Wissensstand
+- `☁ Geteilt im Team`-Indikator wenn Supabase aktiv
+
+---
+
 ### 📋 Prüfprotokoll
 
 VDE-konforme Messprotokollierung für Erst- und Wiederholungsprüfungen nach VDE 0100-600.
@@ -79,6 +95,8 @@ Beim Start erscheint das Dashboard zur Tool-Auswahl. Über **⚙ Einstellungen**
 | Datenbank-Name | Referenz für eigene DB |
 | Supabase URL | Datenbankverbindung für alle Tools |
 | Supabase Anon Key | Datenbankverbindung für alle Tools |
+
+> **Wichtig für die Wissensdatenbank:** Nur mit Supabase-Konfiguration ist das Team-Sharing aktiv. Ohne Supabase bleibt die Wissensdatenbank lokal im Browser.
 
 ---
 
@@ -140,6 +158,21 @@ CREATE TABLE pruefprotokolle (
 );
 ALTER TABLE pruefprotokolle ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON pruefprotokolle FOR ALL USING (true) WITH CHECK (true);
+
+-- Wissensdatenbank
+CREATE TABLE wissensdatenbank (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  titel       text NOT NULL DEFAULT '',
+  kategorie   text DEFAULT 'Allgemein',
+  inhalt      text DEFAULT '',
+  tags        text[] DEFAULT '{}',
+  autor       text DEFAULT '',
+  erstellt    date DEFAULT CURRENT_DATE,
+  created_at  timestamptz DEFAULT now(),
+  updated_at  timestamptz DEFAULT now()
+);
+ALTER TABLE wissensdatenbank ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON wissensdatenbank FOR ALL USING (true) WITH CHECK (true);
 
 -- Stundenbuch
 CREATE TABLE stunden (
@@ -207,17 +240,39 @@ src/
 ├── Stundenbuch.jsx        # Tool: Stundenbuch
 ├── Pruefprotokoll.jsx     # Tool: Prüfprotokoll
 ├── components/
-│   └── Toast.jsx          # Gemeinsame Toast-Komponente
+│   └── Toast.jsx              # Gemeinsame Toast-Komponente
 ├── lib/
-│   ├── supabase.js        # Supabase-Client
-│   ├── db.js              # DB-Layer: Verteilerplaner
-│   ├── db_pruefprotokoll.js # DB-Layer: Prüfprotokoll
-│   └── db_stundenbuch.js  # DB-Layer: Stundenbuch
-├── index.css              # Globale CSS-Variablen & Reset
-└── main.jsx               # Einstiegspunkt
+│   ├── supabase.js            # Supabase-Client
+│   ├── db.js                  # DB-Layer: Verteilerplaner
+│   ├── db_pruefprotokoll.js   # DB-Layer: Prüfprotokoll
+│   ├── db_stundenbuch.js      # DB-Layer: Stundenbuch
+│   └── db_wissen.js           # DB-Layer: Wissensdatenbank
+├── index.css                  # Globale CSS-Variablen & Reset
+└── main.jsx                   # Einstiegspunkt
+
+docs/
+├── index.md                   # Dokumentations-Übersicht
+├── setup.md                   # Installation & Deployment
+├── supabase.sql               # Vollständiges SQL-Schema
+├── development.md             # Entwickler-Guide
+└── apps/                      # Per-App Dokumentation
 ```
 
 ---
+
+## Dokumentation
+
+Vollständige Docs im Ordner [`docs/`](docs/index.md):
+
+| | |
+|---|---|
+| [Setup & Deployment](docs/setup.md) | Installation, Coolify, Supabase |
+| [SQL-Schema](docs/supabase.sql) | Alle Tabellen zum Copy-Paste |
+| [Entwickler-Guide](docs/development.md) | Neue App anlegen, Konventionen |
+| [Verteilerplaner](docs/apps/verteilerplaner.md) | Detaillierte App-Dokumentation |
+| [Stundenbuch](docs/apps/stundenbuch.md) | Detaillierte App-Dokumentation |
+| [Prüfprotokoll](docs/apps/pruefprotokoll.md) | VDE-Grenzwerte, Import-Feature |
+| [Wissensdatenbank](docs/apps/wissensdatenbank.md) | Team-Sharing, Markdown-Syntax |
 
 ## Roadmap
 
@@ -229,7 +284,7 @@ Geplante Features und Ideen: → [ROADMAP.md](ROADMAP.md)
 
 Die Elektronikertools verwenden ein Versionsschema analog zu Home Assistant: **`JAHR.MONAT.PATCH`**
 
-Beispiel: `2026.3.3` = März 2026, viertes Release dieses Monats.
+Beispiel: `2026.3.4` = März 2026, fünftes Release dieses Monats.
 
 ---
 
