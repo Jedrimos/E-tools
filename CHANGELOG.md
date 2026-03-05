@@ -6,6 +6,62 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.3] – 2026-03-05
+
+### Gemeinsame Datenbank + Verteilerplaner-Import im Prüfprotokoll
+
+### ✨ Neu
+- **Prüfprotokoll → Supabase-Sync:** Beim Start automatisch aus Supabase laden, nach jedem Speichern/Löschen async synchronisieren. `☁ Datenbank`-Indikator wenn aktiv.
+- **Stundenbuch → Supabase-Sync:** Gleicher Mechanismus wie Prüfprotokoll. `db_id` pro Eintrag für sicheres Update/Delete.
+- **Import aus Verteilerplaner:** Im Prüfprotokoll können gespeicherte Verteiler-Projekte direkt importiert werden. Übernommen werden: Auftraggeber, Anlagenstandort, Prüfer sowie alle Stromkreise (Bezeichnung aus Kabel-Namen, Nennstrom + Sicherungstyp aus LSS z.B. "B16", 3-phasig-Flag).
+- **`src/lib/db_pruefprotokoll.js`:** DB-Layer für `pruefprotokolle`-Tabelle (CRUD + `loadProjekteForImport` mit Supabase→localStorage-Fallback).
+- **`src/lib/db_stundenbuch.js`:** DB-Layer für `stunden`-Tabelle (CRUD).
+- SQL-Migrationsskripte als Kommentare in den jeweiligen DB-Layer-Dateien.
+
+---
+
+## [2026.3.2] – 2026-03-05
+
+### Neues Tool: Prüfprotokoll
+
+### ✨ Neu
+- **Tool: Prüfprotokoll** — VDE-konforme Messprotokollierung nach VDE 0100-600.
+  - Protokoll-Liste mit Gesamtbewertung je Protokoll
+  - Kopfdaten: Auftraggeber, Standort, Anlagenart, Nennspannung, Prüfer, Datum, nächste Prüfung, Auftragsnummer
+  - Stromkreis-Tabelle mit aufklappbaren Detailformularen
+  - **PE-Durchgangswiderstand** R_PE (Ω)
+  - **Isolationswiderstand** Riso L1/L2/L3/N-PE (MΩ) — 1- und 3-phasig
+  - **Schleifenimpedanz** Zs (Ω) + Kurzschlussstrom Ik (A)
+  - **FI/RCD-Prüfung:** IΔN (10–500 mA), Typ (AC/A/F/B/S), t@IΔN, t@5×IΔN, t@½×IΔN, UB
+  - Automatische Ampel-Bewertung nach VDE-Grenzwerten pro Messwert und Stromkreis
+  - Speicherung in localStorage
+- **Dashboard:** Prüfprotokoll als App #3 mit amber/gold Farbschema registriert.
+
+---
+
+## [2026.3.1] – 2026-03-05
+
+### Code-Qualität: Globale CSS-Variablen, gemeinsamer Toast, Aufräumen
+
+### ✨ Neu
+- **`src/components/Toast.jsx`:** Gemeinsame Toast-Komponente + `useToasts`-Hook für alle Apps. Stundenbuch und Verteilerplaner importieren daraus statt eigene Implementierung zu führen.
+- **CSS-Design-Tokens global:** `:root`-Variablen (`--bg`, `--green`, `--red`, `--svp` …), Font-Import, globale Resets, Keyframes und Print-Stile in `index.css` ausgelagert. Alle Apps haben die Variablen verfügbar, ohne dass Verteilerplaner zuerst geladen werden muss.
+
+### 🗑 Entfernt
+- `src/App.jsx` — Vite-Template-Überrest (tote Datei)
+- `src/App.css` — Vite-Template-Überrest (leere Datei)
+- `src/assets/react.svg` — Vite-Template-Überrest
+- Doppelter CSS-Block in `Verteilerplaner.jsx` (`:root`, Font, Resets, Keyframes, Print) — jetzt in `index.css`
+- Lokale `Toast`-Implementierung in `Stundenbuch.jsx` — ersetzt durch gemeinsame Komponente
+
+### 🔧 Geändert
+- `index.html`: Sprache `en` → `de`, Titel `mein-sicherungsplaner` → `Elektronikertools`, Meta-Description ergänzt
+- `index.css`: Background-Farbe auf `var(--bg)` vereinheitlicht (war `#0f172a` ≠ `--bg`)
+- `Dashboard.jsx`: Alle hardcodierten Hex-Farben durch CSS-Variablen ersetzt
+- `Stundenbuch.jsx`: Alle hardcodierten Hex-Farben durch CSS-Variablen ersetzt
+
+---
+
 ## [2026.3.0] – 2026-03-05
 
 ### 🎉 Elektronikertools – Neustart
