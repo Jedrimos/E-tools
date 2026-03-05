@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Verteilerplaner from "./Verteilerplaner.jsx";
 import Stundenbuch from "./Stundenbuch.jsx";
+import Pruefprotokoll from "./Pruefprotokoll.jsx";
 
 // ── Lokaler Speicher für Konfiguration ──
 const CONFIG_KEY = "elektronikertools_config";
@@ -29,6 +30,14 @@ const APPS = [
     beschreibung: "Arbeitszeiten erfassen, Projekte zuordnen, Stundennachweis als CSV exportieren.",
     farbe: "#3dcc7e",
     bg: "#0d2018",
+  },
+  {
+    id: "pruefprotokoll",
+    name: "Prüfprotokoll",
+    icon: "📋",
+    beschreibung: "VDE-Messungen erfassen: Isolationswiderstand, Schleifenimpedanz, FI-Auslösezeit, PE-Widerstand. Automatische Grenzwertbewertung.",
+    farbe: "#f59e0b",
+    bg: "#1a1200",
   },
 ];
 
@@ -79,6 +88,16 @@ export default function Dashboard() {
         <TopBar label="Stundenbuch" icon="⏱" farbe="#3dcc7e" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Stundenbuch config={config} />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "pruefprotokoll") {
+    return (
+      <div>
+        <TopBar label="Prüfprotokoll" icon="📋" farbe="#f59e0b" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <Pruefprotokoll config={config} />
       </div>
     );
   }
