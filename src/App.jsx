@@ -804,6 +804,16 @@ export default function App() {
   const touchKabelId = useRef(null);
   const touchLastZone = useRef(null);
   const touchGhost = useRef(null);
+  const kabelListRef = useRef(null);
+
+  // Nicht-passive touchstart auf der Kabel-Liste → verhindert Textmarkierung beim Wischen
+  useEffect(() => {
+    const el = kabelListRef.current;
+    if (!el) return;
+    const prevent = (e) => { if (e.target.closest("[data-kabelid]")) e.preventDefault(); };
+    el.addEventListener("touchstart", prevent, { passive: false });
+    return () => el.removeEventListener("touchstart", prevent);
+  }, []);
   const onTouchStartKabel = (e,kId) => {
     // Prevent text selection immediately
     e.preventDefault();
@@ -1752,6 +1762,7 @@ const stueckliste = (() => {
             </div>
           </div>
 
+          <div ref={kabelListRef}>
           {kabel.map((k,idx)=>{
             const swC=swColor(k.stockwerk);
             return(
@@ -1761,7 +1772,7 @@ const stueckliste = (() => {
                 onTouchStart={()=>{dragKabelId.current=k.id;}}
                 onTouchMove={e=>{e.preventDefault();const t=e.touches[0];const el=document.elementFromPoint(t.clientX,t.clientY)?.closest("[data-kabelid]");if(el)dragOverId.current=el.dataset.kabelid;}}
                 onTouchEnd={onKabelDrop}
-                style={{marginBottom:6,background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 12px",cursor:"grab"}}>
+                style={{marginBottom:6,background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 12px",cursor:"grab",userSelect:"none",WebkitUserSelect:"none"}}>
                 <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
                   <div style={{color:"var(--border2)",fontSize:14,userSelect:"none",flexShrink:0}}>⠿</div>
                   <div style={{flex:"0 0 24px",fontFamily:"var(--mono)",fontSize:10,color:"var(--text3)",fontWeight:700}}>{idx+1}</div>
@@ -1822,6 +1833,7 @@ const stueckliste = (() => {
               </div>
             );
           })}
+          </div>{/* /kabelListRef */}
 
           <div style={{display:"flex",gap:8,marginTop:10,alignItems:"center"}}>
             <button onClick={()=>addKabel()} style={{...bDash,flex:1}}>+ Kabel hinzufügen</button>
@@ -2339,6 +2351,25 @@ const stueckliste = (() => {
                         </div>
                       ))}
                     </div>
+                    {/* ── Phasenschiene ── */}
+                    {fi.phasenschiene&&(
+                      <div style={{marginTop:6,display:"flex",gap:3,alignItems:"center",minWidth:"max-content",padding:"5px 6px",background:"rgba(26,122,191,0.04)",borderRadius:6,border:"1px solid rgba(26,122,191,0.12)"}}>
+                        <span style={{fontSize:7,color:"var(--text3)",marginRight:4,flexShrink:0,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:700}}>Schiene</span>
+                        {(fi.pole>=4
+                          ? [{l:"L1",c:"#a05428"},{l:"L2",c:"#2d2d2d"},{l:"L3",c:"#6b7280"},{l:"N",c:"#1d6dbf"}]
+                          : [{l:"L1",c:"#a05428"},{l:"N",c:"#1d6dbf"}]
+                        ).map(({l,c})=>(
+                          <div key={l} style={{display:"flex",alignItems:"center",gap:3,background:c+"22",border:`1px solid ${c}55`,borderRadius:4,padding:"2px 6px 2px 4px"}}>
+                            <div style={{width:6,height:6,borderRadius:2,background:c,flexShrink:0}}/>
+                            <span style={{fontSize:8,color:c,fontFamily:"var(--mono)",fontWeight:800}}>{l}</span>
+                          </div>
+                        ))}
+                        {fi.pole>=4&&<div style={{display:"flex",alignItems:"center",gap:3,background:"#4ade8022",border:"1px solid #4ade8055",borderRadius:4,padding:"2px 6px 2px 4px"}}>
+                          <div style={{width:6,height:6,borderRadius:2,background:"#22c55e",flexShrink:0}}/>
+                          <span style={{fontSize:8,color:"#4ade80",fontFamily:"var(--mono)",fontWeight:800}}>PE</span>
+                        </div>}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
