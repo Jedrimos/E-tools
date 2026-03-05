@@ -5,6 +5,26 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
 ---
 
+## [1.6.0] – 2026-03-05
+
+### ✨ Neu
+- **Startfenster** — Beim App-Start erscheint ein Modal mit "Neues Projekt anlegen" oder "Vorhandenes Projekt laden". Neues Projekt fragt direkt nach Kunde/Adresse/Ersteller/Standort Verteiler.
+- **Einstellungsseite (⚙️)** — Neues kombiniertes Einstellungs-Modal: Firmenname, Standard-Ersteller (Vorausfüllung bei neuen Projekten) und KI-API-Konfiguration in einem Dialog.
+- **Supabase-Datenbankanbindung** — Projekte können optional in einer Supabase-PostgreSQL-Datenbank gespeichert werden (self-hosted oder Cloud). Fällt automatisch auf localStorage zurück wenn kein Supabase konfiguriert ist.
+- **Selbst-Hosting der Datenbank** — Supabase lässt sich über Coolify als One-Click-Service deployen. Vollständiges SQL-Schema unter `supabase-schema.sql`.
+- **Auto-Save** — Nach jeder Plan-Generierung wird das Projekt automatisch lokal und in Supabase gespeichert.
+- **Ersteller & Standort** — Neues Projektmetadaten-Feld "Ersteller" und "Standort Verteiler" in Schritt 1. Beide erscheinen im Belegungsplan-Kopf und in der Export-Fußzeile.
+- **Dynamischer Firmenname** — Stückliste, Beschriftungsplan und Belegungsplan-Kopf verwenden den konfigurierten Firmennamen statt des fest kodierten Textes.
+
+### 🐛 Behoben
+- **Steckbrückenlogik (Querverbinder)** — Querverbinder und Steckbrücken wurden nie berechnet, weil der interne `showKlemmen`-State immer `false` war und kein `setShowKlemmen(true)` existierte. Fix: überflüssige Abhängigkeit entfernt, Querverbinder werden jetzt korrekt berechnet sobald `mitQV` aktiviert ist.
+
+### 🔧 Geändert
+- **⚙️-Button** öffnet jetzt das neue kombinierte Einstellungs-Modal statt des separaten API-Einstellungs-Dialogs.
+- Toten Code entfernt: `kabelId`, `kabelLabel`, `kabelInfoFromId`, `resolveKabeltyp`, `KABEL_LEGACY`, `zKabel`, `showKlemmen`
+
+---
+
 ## [1.5.0] – 2025
 
 ### ✨ Neu

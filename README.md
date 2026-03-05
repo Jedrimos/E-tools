@@ -1,8 +1,8 @@
 # ⚡ SVP Verteilerplaner
 
-**Professionelle Planung und Dokumentation von Elektroverteiler-Belegungen — direkt im Browser. Keine Installation, keine Cloud, keine Kompromisse.**
+**Professionelle Planung und Dokumentation von Elektroverteiler-Belegungen — direkt im Browser. Keine Installation, optionale Datenbankanbindung, keine Kompromisse.**
 
-[![Version](https://img.shields.io/badge/version-1.5.0-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -19,7 +19,7 @@ Entwickelt für den Alltag auf der Baustelle und im Büro. Funktioniert auf Desk
 ## Features
 
 ### 🏗️ Schritt 1 – Projektdaten
-Projektname, Adresse, Stockwerke mit Farbcodierung und Räume definieren. Warnungen wenn die Konfiguration unvollständig ist, bevor es weitergeht.
+Projektname/Kunde, Adresse, Ersteller und Standort des Verteilers angeben. Stockwerke mit Farbcodierung und Räume definieren. Warnungen wenn die Konfiguration unvollständig ist, bevor es weitergeht.
 
 ### 🔌 Schritt 2 – Kabelerfassung
 Kabel mit Bezeichnung, Raum, Stockwerk, Kabeltyp (NYM-J, NYY-J, H07V-K, LIYY), Adernanzahl und Querschnitt erfassen. Duplikate per Knopfdruck, Reihenfolge per Drag & Drop. KI-Import per Foto oder Scan über die Anthropic API.
@@ -42,7 +42,7 @@ Automatisch berechnete Materialliste: FI-Schutzschalter, Leitungsschutzschalter,
 Vollständiger Beschriftungsplan im Q1F1-Schema, exportierbar als WhatsApp-Text oder Druckversion.
 
 ### 💾 Projektverwaltung
-Projekte werden lokal im Browser gespeichert (localStorage). Laden, Speichern, Löschen — alles ohne Server.
+Projekte werden lokal im Browser gespeichert (localStorage) — optional auch in einer selbst gehosteten **Supabase-Datenbank** (PostgreSQL). Auto-Save nach jeder Plan-Generierung. Startfenster beim App-Start: neues Projekt anlegen oder vorhandenes laden.
 
 ---
 
@@ -54,13 +54,13 @@ Projekte werden lokal im Browser gespeichert (localStorage). Laden, Speichern, L
 
 ## Self-Hosting mit Coolify
 
-Der Verteilerplaner lässt sich in wenigen Minuten auf jeder eigenen Infrastruktur betreiben.
+Der Verteilerplaner lässt sich in wenigen Minuten auf jeder eigenen Infrastruktur betreiben — inklusive selbst gehosteter Datenbank.
 
 ### Voraussetzungen
 - [Coolify](https://coolify.io) Instanz (v4+)
 - GitHub/GitLab Repository mit diesem Code
 
-### Deployment
+### App deployen
 
 1. **Coolify öffnen** → *New Resource* → *Public Repository* (oder dein privates Repo verbinden)
 2. Repository-URL eintragen
@@ -72,6 +72,22 @@ Der Verteilerplaner lässt sich in wenigen Minuten auf jeder eigenen Infrastrukt
 4. *Deploy* klicken — fertig.
 
 Coolify erkennt das Vite-Projekt automatisch via Nixpacks. Bei jedem Push auf den konfigurierten Branch wird automatisch neu gebaut und deployed.
+
+### Datenbank (optional) — Supabase self-hosted auf Coolify
+
+Statt der Cloud-Version kann Supabase vollständig auf der eigenen Coolify-Instanz laufen:
+
+1. **Coolify** → *New Resource* → *Service* → **Supabase** → deployen
+2. Im Supabase-Dashboard: *Settings → API* → Project URL & anon key kopieren
+3. Im SQL-Editor das Schema aus `supabase-schema.sql` ausführen
+4. In der App-Konfiguration (Coolify Environment Variables oder `.env`):
+   ```
+   VITE_SUPABASE_URL=https://supabase.deine-domain.de
+   VITE_SUPABASE_ANON_KEY=dein-anon-key
+   ```
+5. App neu deployen — fertig.
+
+Ohne konfigurierte Umgebungsvariablen fällt die App automatisch auf localStorage zurück (funktioniert weiterhin vollständig).
 
 ### Manuelle Installation (ohne Coolify)
 
@@ -95,23 +111,33 @@ npm run dev
 
 | | |
 |---|---|
-| Framework | React 18 |
-| Build Tool | Vite 5 |
+| Framework | React 19 |
+| Build Tool | Vite 7 |
 | Styling | Inline CSS + CSS-in-JS |
-| Datenspeicherung | Browser localStorage |
+| Datenspeicherung | Browser localStorage + Supabase (optional) |
 | KI-Import | Anthropic Claude API (optional) |
-| Deployment | Static Build / Nixpacks |
+| Deployment | Static Build / Nixpacks (Coolify) |
 
-Keine externen CSS-Frameworks, keine UI-Bibliotheken, keine Abhängigkeiten außer React. Die gesamte Anwendung besteht aus einer einzigen Komponenten-Datei — bewusst einfach gehalten für maximale Portabilität.
+Keine externen CSS-Frameworks, keine UI-Bibliotheken. Einzige optionale Abhängigkeit: `@supabase/supabase-js` für die Datenbankanbindung.
 
 ---
 
-## KI-Import konfigurieren (optional)
+## Einstellungen (⚙️)
 
-Der Foto-Import von Kabellisten nutzt die Anthropic Claude API. Zum Aktivieren:
+Der ⚙️-Button öffnet das Einstellungs-Modal mit drei Bereichen:
+
+| Bereich | Inhalt |
+|---|---|
+| Firma & Export | Firmenname (erscheint in Stückliste, Beschriftungsplan, Planansicht) |
+| Firma & Export | Standard-Ersteller (wird bei neuen Projekten vorausgefüllt) |
+| KI-Foto-Import | API-Endpunkt, Modell, API-Key für die Kabellistenerkennung |
+
+### KI-Import konfigurieren (optional)
+
+Der Foto-Import von Kabellisten nutzt die Anthropic Claude API (oder kompatible Alternativen). Zum Aktivieren:
 
 1. [Anthropic API Key](https://console.anthropic.com) erstellen
-2. In der App: ⚙️ → API-Einstellungen → Key eintragen
+2. In der App: ⚙️ → KI-Foto-Import → Key eintragen
 3. Der Key wird ausschließlich lokal im Browser gespeichert und nie an eigene Server übertragen.
 
 ---
