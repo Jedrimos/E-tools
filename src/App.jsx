@@ -2585,6 +2585,25 @@ const stueckliste = (() => {
                           </div>
                         ))}
                       </div>
+                      {/* ── Phasenschiene ── */}
+                      {fi.phasenschiene&&(
+                        <div style={{marginTop:6,display:"flex",gap:3,alignItems:"center",minWidth:"max-content",padding:"5px 6px",background:"rgba(26,122,191,0.04)",borderRadius:6,border:"1px solid rgba(26,122,191,0.12)"}}>
+                          <span style={{fontSize:7,color:"var(--text3)",marginRight:4,flexShrink:0,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:700}}>Schiene</span>
+                          {(fi.pole>=4
+                            ? [{l:"L1",c:"#a05428"},{l:"L2",c:"#2d2d2d"},{l:"L3",c:"#6b7280"},{l:"N",c:"#1d6dbf"}]
+                            : [{l:"L1",c:"#a05428"},{l:"N",c:"#1d6dbf"}]
+                          ).map(({l,c})=>(
+                            <div key={l} style={{display:"flex",alignItems:"center",gap:3,background:c+"22",border:`1px solid ${c}55`,borderRadius:4,padding:"2px 6px 2px 4px"}}>
+                              <div style={{width:6,height:6,borderRadius:2,background:c,flexShrink:0}}/>
+                              <span style={{fontSize:8,color:c,fontFamily:"var(--mono)",fontWeight:800}}>{l}</span>
+                            </div>
+                          ))}
+                          {fi.pole>=4&&<div style={{display:"flex",alignItems:"center",gap:3,background:"#4ade8022",border:"1px solid #4ade8055",borderRadius:4,padding:"2px 6px 2px 4px"}}>
+                            <div style={{width:6,height:6,borderRadius:2,background:"#22c55e",flexShrink:0}}/>
+                            <span style={{fontSize:8,color:"#4ade80",fontFamily:"var(--mono)",fontWeight:800}}>PE</span>
+                          </div>}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
