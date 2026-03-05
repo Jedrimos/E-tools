@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Verteilerplaner from "./Verteilerplaner.jsx";
-import Stundenlang from "./Stundenlang.jsx";
+import Stundenbuch from "./Stundenbuch.jsx";
 
 // ── Lokaler Speicher für Konfiguration ──
 const CONFIG_KEY = "elektronikertools_config";
@@ -23,8 +23,8 @@ const APPS = [
     bg: "#0d2230",
   },
   {
-    id: "stundenlang",
-    name: "Stundenlang",
+    id: "stundenbuch",
+    name: "Stundenbuch",
     icon: "⏱",
     beschreibung: "Arbeitszeiten erfassen, Projekte zuordnen, Stundennachweis als CSV exportieren.",
     farbe: "#3dcc7e",
@@ -73,12 +73,12 @@ export default function Dashboard() {
     );
   }
 
-  if (aktiveApp === "stundenlang") {
+  if (aktiveApp === "stundenbuch") {
     return (
       <div>
-        <TopBar label="Stundenlang" icon="⏱" farbe="#3dcc7e" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        <TopBar label="Stundenbuch" icon="⏱" farbe="#3dcc7e" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
-        <Stundenlang config={config} />
+        <Stundenbuch config={config} />
       </div>
     );
   }

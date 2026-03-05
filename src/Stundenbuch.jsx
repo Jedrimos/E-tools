@@ -48,7 +48,7 @@ function calcNetto(eintrag) {
 }
 
 // ── Lokaler Speicher ──
-const LS_KEY = "elektronikertools_stundenlang";
+const LS_KEY = "elektronikertools_stundenbuch";
 function loadData() {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; }
 }
@@ -159,7 +159,7 @@ function EintragForm({ initial, onSave, onCancel, projekte }) {
 }
 
 // ── Haupt-Komponente ──
-export default function Stundenlang({ config = {} }) {
+export default function Stundenbuch({ config = {} }) {
   const [eintraege, setEintraege] = useState(loadData);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -229,7 +229,7 @@ export default function Stundenlang({ config = {} }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>⏱ Stundenlang</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>⏱ Stundenbuch</h2>
           <div style={{ color: "#888", fontSize: 13 }}>Zeiterfassung{config.firma ? ` – ${config.firma}` : ""}{config.mitarbeiter ? ` | ${config.mitarbeiter}` : ""}</div>
         </div>
         <div style={{ flex: 1 }} />
