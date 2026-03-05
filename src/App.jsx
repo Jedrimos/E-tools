@@ -2585,25 +2585,21 @@ const stueckliste = (() => {
                           </div>
                         ))}
                       </div>
-                      {/* ── Phasenschiene ── */}
-                      {fi.phasenschiene&&(
-                        <div style={{marginTop:6,display:"flex",gap:3,alignItems:"center",minWidth:"max-content",padding:"5px 6px",background:"rgba(26,122,191,0.04)",borderRadius:6,border:"1px solid rgba(26,122,191,0.12)"}}>
-                          <span style={{fontSize:7,color:"var(--text3)",marginRight:4,flexShrink:0,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:700}}>Schiene</span>
-                          {(fi.pole>=4
-                            ? [{l:"L1",c:"#a05428"},{l:"L2",c:"#2d2d2d"},{l:"L3",c:"#6b7280"},{l:"N",c:"#1d6dbf"}]
-                            : [{l:"L1",c:"#a05428"},{l:"N",c:"#1d6dbf"}]
-                          ).map(({l,c})=>(
-                            <div key={l} style={{display:"flex",alignItems:"center",gap:3,background:c+"22",border:`1px solid ${c}55`,borderRadius:4,padding:"2px 6px 2px 4px"}}>
-                              <div style={{width:6,height:6,borderRadius:2,background:c,flexShrink:0}}/>
-                              <span style={{fontSize:8,color:c,fontFamily:"var(--mono)",fontWeight:800}}>{l}</span>
-                            </div>
-                          ))}
-                          {fi.pole>=4&&<div style={{display:"flex",alignItems:"center",gap:3,background:"#4ade8022",border:"1px solid #4ade8055",borderRadius:4,padding:"2px 6px 2px 4px"}}>
-                            <div style={{width:6,height:6,borderRadius:2,background:"#22c55e",flexShrink:0}}/>
-                            <span style={{fontSize:8,color:"#4ade80",fontFamily:"var(--mono)",fontWeight:800}}>PE</span>
-                          </div>}
-                        </div>
-                      )}
+                      {/* ── N-Schiene ── */}
+                      {(()=>{
+                        const neIdx=groups.findIndex(g=>g.klemmen[0]?.type==="n_einspeisung");
+                        const nxIdx=groups.findIndex(g=>g.klemmen[0]?.type==="n_endklemme");
+                        if(neIdx<0||nxIdx<0) return null;
+                        const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
+                        const left=groups.slice(0,neIdx).reduce((s,g)=>s+gw(g)+4,0);
+                        const width=groups.slice(neIdx,nxIdx+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
+                        return(
+                          <div style={{marginTop:4,marginLeft:left,width:width,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
+                            <div style={{height:6,background:"rgba(33,150,201,0.75)",borderRadius:3,boxShadow:"0 0 6px rgba(33,150,201,0.35)"}}/>
+                            <div style={{fontSize:7,color:"rgba(33,150,201,0.7)",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:2,letterSpacing:"0.5px"}}>N-Schiene</div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
