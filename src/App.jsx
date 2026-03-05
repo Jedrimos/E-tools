@@ -1,4 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { isSupabaseConfigured } from "./lib/supabase.js";
+import { loadProjekteDB, saveProjektDB, deleteProjektDB } from "./lib/db.js";
 
 // ── Stammdaten ──
 const STD_SICHERUNGEN = [
@@ -60,22 +62,7 @@ const KABEL_TYP_OPTIONEN = ["NYM-J","NYY-J","H07V-K","LIYY"];
 const KABEL_QS_OPTIONEN  = ["1.5","2.5","4","6","10","16"];
 const STD_ADERN          = [3,5,7,10];
 
-function kabelId(typ, adern, qs)    { return `${typ}_${adern}x${qs}`; }
-function kabelLabel(typ, adern, qs) { return `${typ} ${adern}×${qs}mm²`; }
-function kabelInfoFromId(id) {
-  if (!id) return { typ:"NYM-J", adern:3, qs:"1.5" };
-  const m = id.match(/^(.+?)_(\d+)x(.+)$/);
-  if (m) return { typ:m[1], adern:Number(m[2]), qs:m[3] };
-  return { typ:"NYM-J", adern:3, qs:"2.5" };
-}
 
-// Legacy-IDs aus alten Projekten mappen
-const KABEL_LEGACY = {
-  "1.5":"NYM-J_3x1.5","2.5":"NYM-J_3x2.5","4":"NYM-J_3x4","6":"NYM-J_3x6","10":"NYM-J_3x10","16":"NYM-J_3x16",
-  "nym3x15":"NYM-J_3x1.5","nym3x25":"NYM-J_3x2.5","nym5x25":"NYM-J_5x2.5","nym5x6":"NYM-J_5x6",
-  "nym7x15":"NYM-J_7x1.5","nym7x25":"NYM-J_7x2.5",
-};
-function resolveKabeltyp(id) { return KABEL_LEGACY[id] || id || "NYM-J_3x1.5"; }
 
 const SW_COLOR_DEFAULT = { KG:"var(--purple)",EG:"var(--svp)",OG:"#34c98a",OG1:"var(--green)",OG2:"#4bc8e8",DG:"var(--red)",Außen:"#e87040",Technik:"var(--text2)" };
 const SW_COLOR_PALETTE = ["var(--purple)","var(--svp)","var(--green)","#4bc8e8","var(--red)","#e87040","#d45db5","#5bc4a8","#a0c43a","#f06060","#60a0f0","#c07a30","var(--text2)"];
@@ -281,6 +268,11 @@ function empfehleSicherung(kabelIds, alleKabel, dreipolig=false) {
 // ── Persistenz ──
 function loadProjekte() { try { return JSON.parse(localStorage.getItem("svp_projekte")||"[]"); } catch { return []; } }
 function saveProjekte(p) { localStorage.setItem("svp_projekte", JSON.stringify(p)); }
+
+// ── Einstellungen ──
+const SETTINGS_DEFAULTS = { firmenname:"SVP Elektrotechnik", defaultErsteller:"" };
+function loadSettings() { try { return {...SETTINGS_DEFAULTS,...JSON.parse(localStorage.getItem("svp_settings")||"{}")}; } catch { return {...SETTINGS_DEFAULTS}; } }
+function saveSettings(s) { localStorage.setItem("svp_settings",JSON.stringify(s)); }
 
 // ── API ──
 const API_DEFAULTS = { url:"https://api.anthropic.com/v1/messages", model:"claude-sonnet-4-20250514", apiKey:"", format:"openai" };
@@ -511,11 +503,237 @@ NUR JSON, keine Backticks, kein Text davor/danach.`;
 }
 
 // ══════════════════════════════════════════
+// ── Startfenster ──
+// ══════════════════════════════════════════
+function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
+  const [phase, setPhase] = useState("start"); // "start" | "neu" | "laden"
+  const [form, setForm] = useState({ name:"", adresse:"", ersteller:"", standort:"" });
+  const dbOk = isSupabaseConfigured();
+
+  const handleNeu = () => {
+    if (!form.name.trim()) return;
+    onNeu(form);
+  };
+
+  if (phase === "neu") return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:18,width:"100%",maxWidth:480,padding:32}}>
+        <button onClick={()=>setPhase("start")} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20,marginBottom:16,padding:0,display:"flex",alignItems:"center",gap:6}}>
+          ← <span style={{fontSize:13}}>Zurück</span>
+        </button>
+        <div style={{fontSize:18,fontWeight:800,color:"var(--text)",marginBottom:6}}>Neues Projekt</div>
+        <div style={{fontSize:12,color:"var(--text3)",marginBottom:24}}>Projektdaten werden beim ersten Speichern gesichert</div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div>
+            <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Kunde / Projektname *</div>
+            <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} autoFocus
+              onKeyDown={e=>e.key==="Enter"&&handleNeu()}
+              placeholder="z.B. EFH Müller, München"
+              style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:8,padding:"10px 12px",color:"var(--text)",fontSize:14}}/>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Adresse</div>
+            <input value={form.adresse} onChange={e=>setForm(f=>({...f,adresse:e.target.value}))}
+              placeholder="Musterstr. 12, 80333 München"
+              style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 12px",color:"var(--text)",fontSize:13}}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Ersteller</div>
+              <input value={form.ersteller} onChange={e=>setForm(f=>({...f,ersteller:e.target.value}))}
+                placeholder="Dein Name"
+                style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 12px",color:"var(--text)",fontSize:13}}/>
+            </div>
+            <div>
+              <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Standort Verteiler</div>
+              <input value={form.standort} onChange={e=>setForm(f=>({...f,standort:e.target.value}))}
+                placeholder="z.B. Keller EG"
+                style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 12px",color:"var(--text)",fontSize:13}}/>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={handleNeu} disabled={!form.name.trim()}
+          style={{...bPrimary,width:"100%",marginTop:24,opacity:form.name.trim()?1:0.4,fontSize:14,padding:"13px"}}>
+          Projekt anlegen →
+        </button>
+      </div>
+    </div>
+  );
+
+  if (phase === "laden") return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:18,width:"100%",maxWidth:520,maxHeight:"80vh",overflow:"auto",padding:28}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div>
+            <div style={{fontSize:17,fontWeight:800,color:"var(--text)"}}>📂 Projekt laden</div>
+            {dbOk && <div style={{fontSize:10,color:"var(--green)",marginTop:3}}>● Verbunden mit Datenbank</div>}
+            {!dbOk && <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>Lokale Projekte</div>}
+          </div>
+          <button onClick={()=>setPhase("start")} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20}}>←</button>
+        </div>
+        {projekte.length === 0
+          ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:32}}>Keine gespeicherten Projekte</div>
+          : projekte.map(p => (
+              <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,background:"var(--bg3)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,color:"var(--text)",fontSize:14}}>{p.name}</div>
+                  <div style={{fontSize:10,color:"var(--text3)",marginTop:3,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <span>{p.datum}</span>
+                    {p.projekt?.ersteller && <span style={{color:"var(--svp)"}}>· {p.projekt.ersteller}</span>}
+                    {p.projekt?.standort  && <span>· {p.projekt.standort}</span>}
+                    <span>· {(p.kabel||p.stromkreise||[]).length} Kabel</span>
+                  </div>
+                </div>
+                <button onClick={()=>onLaden(p)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)",padding:"7px 14px"}}>Laden</button>
+                <button onClick={()=>onLoescheProjekt(p.id||p.db_id)} style={bDanger}>✕</button>
+              </div>
+            ))
+        }
+      </div>
+    </div>
+  );
+
+  // Start-Phase
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{textAlign:"center",maxWidth:440,width:"100%"}}>
+        {/* Logo */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginBottom:32}}>
+          <div style={{width:56,height:56,borderRadius:14,background:"rgba(33,150,201,0.12)",border:"1px solid rgba(33,150,201,0.3)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width="30" height="30" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="12" height="12" rx="2.5" fill="#2196C9"/>
+              <rect x="0" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
+              <rect x="7" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
+              <rect x="14" y="0" width="12" height="5" rx="1.5" fill="#2196C9" opacity="0.4"/>
+              <rect x="14" y="7" width="8" height="5" rx="1.5" fill="#2196C9" opacity="0.25"/>
+            </svg>
+          </div>
+          <div style={{textAlign:"left"}}>
+            <div style={{fontSize:22,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px",lineHeight:1}}>SVP Verteilerplaner</div>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Elektroverteiler planen & dokumentieren</div>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <button onClick={()=>setPhase("neu")}
+            style={{...bPrimary,fontSize:15,padding:"15px 24px",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+            ⚡ Neues Projekt anlegen
+          </button>
+          <button onClick={()=>setPhase("laden")}
+            style={{background:"var(--bg2)",border:"1px solid var(--border2)",color:"var(--text2)",borderRadius:12,padding:"15px 24px",cursor:"pointer",fontSize:14,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.15s"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--svp)";e.currentTarget.style.color="var(--svp)";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--text2)";}}>
+            📂 Vorhandenes Projekt laden
+            {projekte.length > 0 && <span style={{background:"var(--svp)",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:11,fontWeight:800}}>{projekte.length}</span>}
+          </button>
+        </div>
+
+        {/* DB Status */}
+        <div style={{marginTop:24,fontSize:11,color:"var(--text3)"}}>
+          {dbOk
+            ? <span style={{color:"var(--green)"}}>● Datenbankverbindung aktiv</span>
+            : <span>💾 Lokale Speicherung · <a href="#" onClick={e=>{e.preventDefault();}} style={{color:"var(--svp)",textDecoration:"none"}}>Datenbank einrichten →</a></span>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+// ── Einstellungs-Modal ──
+// ══════════════════════════════════════════
+function SettingsModal({ settings, onSave, onClose }) {
+  const [s, setS] = useState({...settings});
+  const [apiCfg, setApiCfg] = useState(ladeApiConfig);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    onSave(s);
+    speichereApiConfig(apiCfg);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const apiPresets = [
+    {label:"Anthropic Claude", url:"https://api.anthropic.com/v1/messages",    model:"claude-sonnet-4-20250514"},
+    {label:"OpenAI",           url:"https://api.openai.com/v1/chat/completions", model:"gpt-4o"},
+    {label:"Ollama (lokal)",   url:"http://localhost:11434/v1/chat/completions", model:"llava"},
+    {label:"LM Studio",        url:"http://localhost:1234/v1/chat/completions",  model:"llava"},
+  ];
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:520,maxHeight:"90vh",overflow:"auto",padding:28}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+          <div style={{fontSize:17,fontWeight:800,color:"var(--text)"}}>⚙️ Einstellungen</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"var(--text3)",fontSize:22,cursor:"pointer"}}>✕</button>
+        </div>
+
+        {/* Firma & Export */}
+        <div style={{marginBottom:20,paddingBottom:20,borderBottom:"1px solid var(--border)"}}>
+          <div style={{fontSize:11,color:"var(--svp)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>Firma & Export</div>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Firmenname (für Stückliste & Beschriftungsplan)</div>
+            <input value={s.firmenname} onChange={e=>setS(x=>({...x,firmenname:e.target.value}))}
+              placeholder="z.B. SVP Elektrotechnik GmbH"
+              style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",color:"var(--text)",fontSize:13}}/>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Standard-Ersteller (Vorausfüllung bei neuem Projekt)</div>
+            <input value={s.defaultErsteller} onChange={e=>setS(x=>({...x,defaultErsteller:e.target.value}))}
+              placeholder="Dein Name"
+              style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",color:"var(--text)",fontSize:13}}/>
+          </div>
+        </div>
+
+        {/* KI-API */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:11,color:"var(--svp)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>KI-Foto-Import (optional)</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:12}}>
+            {apiPresets.map(p=>(
+              <button key={p.label} onClick={()=>setApiCfg(c=>({...c,...p}))}
+                style={{background:"var(--border)",border:"1px solid var(--border2)",borderRadius:7,padding:"5px 10px",color:"var(--text2)",fontSize:11,cursor:"pointer"}}>{p.label}</button>
+            ))}
+          </div>
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>API URL</div>
+            <input value={apiCfg.url} onChange={e=>setApiCfg(c=>({...c,url:e.target.value}))}
+              style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",color:"var(--text2)",fontSize:11,fontFamily:"var(--mono)"}}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div>
+              <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Modell</div>
+              <input value={apiCfg.model} onChange={e=>setApiCfg(c=>({...c,model:e.target.value}))}
+                style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",color:"var(--text2)",fontSize:11,fontFamily:"var(--mono)"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>API Key</div>
+              <input type="password" value={apiCfg.apiKey} onChange={e=>setApiCfg(c=>({...c,apiKey:e.target.value}))}
+                placeholder="sk-... oder leer"
+                style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",color:"var(--text2)",fontSize:12}}/>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={handleSave}
+          style={{...bPrimary,width:"100%",fontSize:14,padding:"12px"}}>
+          {saved ? "✓ Gespeichert!" : "Einstellungen speichern"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
 // ── Hauptkomponente ──
 // ══════════════════════════════════════════
 export default function App() {
   const [step, setStep] = useState(1);
-  const [projekt, setProjekt]     = useState({ name:"", adresse:"" });
+  const [projekt, setProjekt]     = useState({ name:"", adresse:"", ersteller:"", standort:"" });
   const [kabel, setKabel]         = useState([]);          // Step 2: Kabel
   const [sicherungen, setSicherungen] = useState([]);               // Step 3: Sicherungsgruppen
   const [fiKonfigs, setFiKonfigs] = useState([mkFI(), mkFI()]);     // Step 4: FI-Planung
@@ -526,14 +744,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("plan");
   const [mitRK, setMitRK]         = useState(false);
   const [istKNX, setIstKNX]         = useState(false);
-  const [showKlemmen, setShowKlemmen] = useState(false);
   const [mitQV, setMitQV]           = useState(false);
+  const [currentDbId, setCurrentDbId] = useState(null); // Supabase UUID des aktuellen Projekts
+  const [showStartScreen, setShowStartScreen] = useState(true);
+  const [settings, setSettings]   = useState(loadSettings);
+  const [showSettings, setShowSettings] = useState(false);
   const [mitNBruecke, setMitNBruecke] = useState(false);
   const [editKabelId, setEditKabelId] = useState(null);
   const [showBeschriftung, setShowBeschriftung] = useState(false);
   const [showStueckliste, setShowStueckliste] = useState(false);
   const [showFoto, setShowFoto]   = useState(false);
-  const [showApiSettings, setShowApiSettings] = useState(false);
   const [projekte, setProjekte]   = useState(loadProjekte);
   const [showSave, setShowSave]   = useState(false);
   const [showLoad, setShowLoad]   = useState(false);
@@ -634,7 +854,7 @@ export default function App() {
     }
     setNewSW(""); setShowSWInput(false);
     // precompute next random color
-    setNewSWColor(c=>randSwColor(Object.values(swColorMap)));
+    setNewSWColor(randSwColor(Object.values(swColorMap)));
   };
   const remSW = sw => setStockwerke(s=>s.filter(x=>x!==sw));
   const addRaum = () => { const v=newRaum.trim(); if(v&&!raeume.includes(v)) setRaeume(r=>[...r,v]); setNewRaum(""); setShowRaumInput(false); };
@@ -670,7 +890,6 @@ export default function App() {
 
   // Kabel einer Sicherung zuweisen (aus Pool oder aus anderer Sicherung)
   const weiseKabelZu = (kabelId, zielSichId) => {
-    const zKabel=kabel.find(k=>k.id===kabelId);
     setSicherungen(s=>s.map(si=>{
       const ohneKabel = si.kabelIds.filter(id=>id!==kabelId);
       if(si.id===zielSichId && !si.kabelIds.includes(kabelId)) {
@@ -737,28 +956,82 @@ export default function App() {
     planDragSK.current=null; planDragFI.current=null;
   };
 
-  // Speichern/Laden
-  const speichere = () => {
-    const nameToSave = saveName.trim() || `Projekt ${new Date().toLocaleDateString("de-DE")}`;
-    const entry={id:uid(),name:nameToSave,datum:new Date().toLocaleDateString("de-DE"),projekt,fiKonfigs,kabel,sicherungen,stockwerke,raeume,swColorMap};
-    const neu=[entry,...projekte.filter(p=>p.name!==nameToSave)];
-    setProjekte(neu); saveProjekte(neu); setShowSave(false); setSaveName(""); showToast(`"${nameToSave}" gespeichert ✓`);
+  // ── Hilfsfunktion: aktueller Zustand als Speicher-Objekt ──────────────────
+  const buildSavePayload = (name) => ({
+    db_id:    currentDbId,
+    projekt:  { ...projekt, name: name || projekt.name },
+    kabel, sicherungen, fiKonfigs, stockwerke, raeume, swColorMap,
+  });
+
+  // ── Speichern (lokal + optional Supabase) ─────────────────────────────────
+  const speichere = async () => {
+    const nameToSave = saveName.trim() || projekt.name || `Projekt ${new Date().toLocaleDateString("de-DE")}`;
+    const payload = buildSavePayload(nameToSave);
+
+    // 1. Supabase (wenn konfiguriert)
+    let newDbId = currentDbId;
+    if (isSupabaseConfigured()) {
+      try {
+        const saved = await saveProjektDB(payload);
+        newDbId = saved.db_id;
+        setCurrentDbId(newDbId);
+        showToast(`"${nameToSave}" in Datenbank gespeichert ✓`);
+      } catch(e) {
+        showToast(`Datenbank-Fehler: ${e.message}`, "error", 4000);
+      }
+    }
+
+    // 2. Immer auch lokal speichern (Fallback)
+    const entry = {
+      id: newDbId || uid(),
+      db_id: newDbId,
+      name: nameToSave,
+      datum: new Date().toLocaleDateString("de-DE"),
+      projekt: { ...projekt, name: nameToSave },
+      fiKonfigs, kabel, sicherungen, stockwerke, raeume, swColorMap,
+    };
+    const neu = [entry, ...projekte.filter(p => p.name !== nameToSave && p.id !== entry.id)];
+    setProjekte(neu); saveProjekte(neu); setShowSave(false); setSaveName("");
+    if (!isSupabaseConfigured()) showToast(`"${nameToSave}" gespeichert ✓`);
   };
+
+  // ── Auto-Speichern (nach Plan-Generierung, wenn Projekt hat Name) ──────────
+  const autoSpeichere = useCallback(async () => {
+    if (!projekt.name) return;
+    const payload = buildSavePayload(projekt.name);
+    if (isSupabaseConfigured()) {
+      try {
+        const saved = await saveProjektDB(payload);
+        setCurrentDbId(saved.db_id);
+        showToast("Auto-gespeichert ✓", "success", 1800);
+      } catch { /* still works locally */ }
+    }
+    const entry = {
+      id: currentDbId || uid(), db_id: currentDbId,
+      name: projekt.name, datum: new Date().toLocaleDateString("de-DE"),
+      projekt, fiKonfigs, kabel, sicherungen, stockwerke, raeume, swColorMap,
+    };
+    const neu = [entry, ...projekte.filter(p => p.name !== projekt.name && p.id !== entry.id)];
+    setProjekte(neu); saveProjekte(neu);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projekt, kabel, sicherungen, fiKonfigs, stockwerke, raeume, swColorMap, currentDbId, projekte]);
+
+  // ── Laden ─────────────────────────────────────────────────────────────────
   const lade = p => {
-    setProjekt(p.projekt||{name:"",adresse:""});
+    const pr = p.projekt || { name:p.name||"", adresse:"", ersteller:"", standort:"" };
+    setProjekt({ name:"", adresse:"", ersteller:"", standort:"", ...pr });
+    setCurrentDbId(p.db_id || null);
     setFiKonfigs(p.fiKonfigs||[mkFI(),mkFI()]);
     // Legacy: alte Projekte hatten stromkreise, neue haben kabel+sicherungen
     if (p.kabel) {
       setKabel(p.kabel); setSicherungen(p.sicherungen||[]);
     } else if (p.stromkreise) {
-      // Migration: alte stromkreise → kabel
       const migKabel = p.stromkreise.map(sk=>({
         id:sk.id, bezeichnung:sk.kabel||"", raum:sk.raum||"", stockwerk:sk.stockwerk||"EG",
         kabelTyp:sk.kabelTyp||"NYM-J", kabelAdern:sk.kabelAdern||3, kabelQs:sk.kabelQs||"2.5",
         dreipolig:!!sk.dreipolig,
       }));
       setKabel(migKabel);
-      // jedes alte Kabel = eigene Sicherung (1:1 Migration)
       setSicherungen(p.stromkreise.map(sk=>({
         id:uid(), kabelIds:[sk.id], sicherung:sk.sicherung||"B16",
         phase:sk.phase||"Auto", istFILS:!!sk.istFILS,
@@ -768,7 +1041,25 @@ export default function App() {
     if(p.swColorMap) setSwColorMap({...SW_COLOR_DEFAULT,...p.swColorMap});
     setRaeume(p.raeume||[]);
     setPlan(null); setMitRK(false); setStep(1); setShowLoad(false);
+    setShowStartScreen(false);
   };
+
+  // ── Projekte-Liste beim Start aus Supabase laden ───────────────────────────
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    loadProjekteDB().then(dbList => {
+      if (dbList && dbList.length > 0) {
+        // Merge DB-Projekte mit lokalen (DB hat Priorität)
+        const merged = [...dbList];
+        loadProjekte().forEach(local => {
+          if (!merged.find(d => d.id === local.db_id || d.name === local.name))
+            merged.push(local);
+        });
+        setProjekte(merged);
+        saveProjekte(merged);
+      }
+    }).catch(() => { /* Fallback auf localStorage bleibt */ });
+  }, []);
 
   // ── WhatsApp Clipboard Export ──
   const [kopiert, setKopiert] = useState(null); // "stueckliste" | "beschriftung"
@@ -807,7 +1098,8 @@ export default function App() {
       }
       txt += `  ${item.menge}× ${item.label}\n`;
     });
-    txt += `\n– SVP Elektrotechnik`;
+    txt += `\n– ${settings.firmenname||"SVP Elektrotechnik"}`;
+    if(projekt.ersteller) txt += ` · ${projekt.ersteller}`;
     return txt;
   };
 
@@ -842,10 +1134,19 @@ export default function App() {
         txt += `  ${qNr}F1  ${sInfo?.label||""}  ${bezeichnung}\n`;
       });
     }
-    txt += `\n– SVP Elektrotechnik`;
+    txt += `\n– ${settings.firmenname||"SVP Elektrotechnik"}`;
+    if(projekt.ersteller) txt += ` · ${projekt.ersteller}`;
     return txt;
   };
-  const loescheProjekt = id => { const p=projekte.find(x=>x.id===id); const neu=projekte.filter(x=>x.id!==id); setProjekte(neu); if(p) showToast(`"${p.name}" gelöscht`,"error"); saveProjekte(neu); };
+  const loescheProjekt = async id => {
+    const p = projekte.find(x => x.id === id || x.db_id === id);
+    const neu = projekte.filter(x => x.id !== id && x.db_id !== id);
+    setProjekte(neu); saveProjekte(neu);
+    if (p) showToast(`"${p.name}" gelöscht`, "error");
+    if (p?.db_id && isSupabaseConfigured()) {
+      try { await deleteProjektDB(p.db_id); } catch { /* lokal schon gelöscht */ }
+    }
+  };
 
   // Foto-Import
   const handleFotoImport = (liste, ersetzen) => {
@@ -898,13 +1199,25 @@ export default function App() {
     setStep(4);
   };
 
-  const generiere = () => { showToast("Plan erfolgreich generiert ⚡");
+  const generiere = () => {
+    showToast("Plan erfolgreich generiert ⚡");
     const sichFuerPlan = buildSicherungenFuerPlan();
     setPlan(verteile(sichFuerPlan, fiKonfigs));
     setStep(5); setActiveTab("plan"); setMitRK(false);
+    // Auto-Save nach Plangenerierung
+    setTimeout(() => autoSpeichere(), 500);
   };
 
   // Aufklapp-Status für Sicherungs-Karten (Step 3)
+  // ── Startfenster-Handler ──────────────────────────────────────────────────
+  const handleNeuStart = (form) => {
+    // Neues Projekt initialisieren
+    setProjekt({ name:form.name||"", adresse:form.adresse||"", ersteller:form.ersteller||settings.defaultErsteller||"", standort:form.standort||"" });
+    setKabel([]); setSicherungen([]); setFiKonfigs([mkFI(),mkFI()]); setPlan(null);
+    setStockwerke([]); setRaeume([]); setSwColorMap({...SW_COLOR_DEFAULT});
+    setCurrentDbId(null); setStep(1); setShowStartScreen(false);
+  };
+
   const [sichOffen, setSichOffen] = useState({});
   const toggleSichOffen = id => setSichOffen(o=>({...o,[id]:!(o[id]??true)}));
   const isSichOffen = id => sichOffen[id]??true;
@@ -1042,11 +1355,11 @@ export default function App() {
     return result;
   };
 
-  const querverbinder = (showKlemmen&&mitQV) ? berechneQuerverbinder() : [];
+  const querverbinder = mitQV ? berechneQuerverbinder() : [];
 
   // QV Stückliste: gruppiert nach Ports-Anzahl
   const qvStueckliste = (() => {
-    if(!showKlemmen||!mitQV||!querverbinder.length) return [];
+    if(!mitQV||!querverbinder.length) return [];
     const counts={};
     querverbinder.forEach(q=>{ counts[q.ports]=(counts[q.ports]||0)+1; });
     return Object.entries(counts).map(([p,n])=>({ports:Number(p),anzahl:n})).sort((a,b)=>a.ports-b.ports);
@@ -1089,6 +1402,15 @@ const stueckliste = (() => {
   // ══ RENDER ══
   return (
     <div style={{fontFamily:"'Outfit',sans-serif",background:"#111416",minHeight:"100vh",color:"#e8e4de"}}>
+      {/* ── STARTFENSTER ── */}
+      {showStartScreen && (
+        <StartScreen
+          projekte={projekte}
+          onNeu={handleNeuStart}
+          onLaden={p => { lade(p); }}
+          onLoescheProjekt={loescheProjekt}
+        />
+      )}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
         :root{
@@ -1254,7 +1576,7 @@ const stueckliste = (() => {
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>📷</button>
-          <button onClick={()=>setShowApiSettings(true)} title="KI-API Einstellungen"
+          <button onClick={()=>setShowSettings(true)} title="Einstellungen"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>⚙️</button>
@@ -1301,6 +1623,8 @@ const stueckliste = (() => {
             <G2>
               <F label="Projektname / Kunde"><I value={projekt.name} onChange={e=>setProjekt(p=>({...p,name:e.target.value}))} placeholder="z.B. EFH Müller, München"/></F>
               <F label="Adresse"><I value={projekt.adresse} onChange={e=>setProjekt(p=>({...p,adresse:e.target.value}))} placeholder="Musterstr. 12, 80333 München"/></F>
+              <F label="Ersteller"><I value={projekt.ersteller||""} onChange={e=>setProjekt(p=>({...p,ersteller:e.target.value}))} placeholder="Dein Name"/></F>
+              <F label="Standort Verteiler"><I value={projekt.standort||""} onChange={e=>setProjekt(p=>({...p,standort:e.target.value}))} placeholder="z.B. Keller EG, Technikraum"/></F>
             </G2>
           </Card>
 
@@ -1434,7 +1758,7 @@ const stueckliste = (() => {
               <div key={k.id}
                 draggable data-kabelid={k.id}
                 onDragStart={e=>onKabelDragStart(e,k.id)} onDragOver={e=>onKabelDragOver(e,k.id)} onDrop={onKabelDrop}
-                onTouchStart={e=>{dragKabelId.current=k.id;}}
+                onTouchStart={()=>{dragKabelId.current=k.id;}}
                 onTouchMove={e=>{e.preventDefault();const t=e.touches[0];const el=document.elementFromPoint(t.clientX,t.clientY)?.closest("[data-kabelid]");if(el)dragOverId.current=el.dataset.kabelid;}}
                 onTouchEnd={onKabelDrop}
                 style={{marginBottom:6,background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 12px",cursor:"grab"}}>
@@ -1650,7 +1974,6 @@ const stueckliste = (() => {
               )}
 
               {sicherungen.map((si,siIdx)=>{
-                const sInfo=STD_SICHERUNGEN.find(s=>s.id===si.sicherung);
                 const is3p=si.dreipolig;
                 const siKabel=si.kabelIds.map(id=>kabel.find(k=>k.id===id)).filter(Boolean);
                     const offen = isSichOffen(si.id);
@@ -1917,7 +2240,9 @@ const stueckliste = (() => {
               {plan.warnungen?.length>0&&plan.warnungen.map((w,i)=><div key={i} style={{fontSize:11,color:"var(--red)",marginTop:4}}>⚠ {w}</div>)}
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:"1.5px",fontFamily:"var(--mono)"}}>SVP Elektrotechnik GmbH</div>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:"1.5px",fontFamily:"var(--mono)"}}>{settings.firmenname||"SVP Elektrotechnik"}</div>
+              {projekt.ersteller&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1,fontFamily:"var(--mono)"}}>{projekt.ersteller}</div>}
+              {projekt.standort&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1,fontFamily:"var(--mono)"}}>📍 {projekt.standort}</div>}
               <div style={{fontSize:11,color:"var(--svp)",marginTop:3,fontFamily:"var(--mono)",fontWeight:600}}>{new Date().toLocaleDateString("de-DE")}</div>
               <div style={{display:"flex",gap:10,marginTop:6,justifyContent:"flex-end"}}>
                 <span style={{fontSize:10,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:700}}>{plan.gruppen.length} FI</span>
@@ -2351,7 +2676,7 @@ const stueckliste = (() => {
                   ))}
                 </tr></thead>
                 <tbody>
-                  {alleZeilen.map((z,zi)=>{
+                  {alleZeilen.map((z)=>{
                     if(z.typ==="fi"){
                       const filsBem=z.si?.filsBemessung||40, filsTyp=z.si?.filsTyp||"A", filsFs=z.si?.filsFehlerstrom||30, filsPole=z.si?.filsPole||4;
                       return(
@@ -2511,7 +2836,6 @@ const stueckliste = (() => {
           if(!fi||!si)return null;
           const qNr=plan.gruppen.indexOf(fi)+1;
           const fNr=fi.stromkreise.indexOf(si)+1;
-          const is3p=si.is3p;
           return(
             <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
               <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:24,width:"100%",maxWidth:460}} onClick={e=>e.stopPropagation()}>
@@ -2576,7 +2900,7 @@ const stueckliste = (() => {
 
       {/* ── MODALS ── */}
       {showFoto&&<FotoImportModal onClose={()=>setShowFoto(false)} onImport={handleFotoImport}/>}
-      {showApiSettings&&<ApiSettingsModal onClose={()=>setShowApiSettings(false)}/>}
+      {showSettings&&<SettingsModal settings={settings} onSave={s=>{setSettings(s);saveSettings(s);setShowSettings(false);showToast("Einstellungen gespeichert ✓");}} onClose={()=>setShowSettings(false)}/>}
 
       {/* ── INFO MODAL ── */}
       {showInfo&&(
