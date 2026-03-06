@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.3.2-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.3.5-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -36,6 +36,9 @@ Einfache Zeiterfassung für Elektriker und Monteure.
 **Features:**
 - Einträge mit Datum, Von/Bis-Zeit, Pause, Projekt/Baustelle, Tätigkeit und Notiz
 - Automatische Netto-Stundenberechnung
+- **Monats-Chart:** SVG-Balkendiagramm der Stunden pro Tag (Farbkodierung, 8h-Linie)
+- Wochenstunden-Anzeige in der Kopfzeile
+- Start/Stop-Timer: Von/Bis automatisch befüllen
 - Monats- und Projektfilter
 - CSV-Export als Stundennachweis (mit Firmenname)
 - Projekte/Baustellen per Autocomplete
@@ -79,6 +82,8 @@ VDE-konforme Messprotokollierung für Erst- und Wiederholungsprüfungen nach VDE
   - UB ≤ 50 V
   - ½×IΔN: Auslösung = Fehler
 - **Import aus Verteilerplaner:** Stromkreise direkt aus einem gespeicherten Verteiler-Projekt übernehmen (Bezeichnung, Nennstrom, Sicherungstyp, 3-phasig)
+- **PDF-Export:** Professionelles A4-Prüfprotokoll als PDF (DIN VDE 0100-600), lazy-geladen — direkt aus der Liste oder dem Editor
+- Drucken via `window.print()` + Print-CSS
 - Optionale Synchronisierung mit Supabase
 
 ---
@@ -200,6 +205,18 @@ CREATE POLICY "allow_all" ON stunden FOR ALL USING (true) WITH CHECK (true);
 
 Ohne Supabase-Konfiguration fällt die App automatisch auf `localStorage` zurück.
 
+### PWA — Als App installieren
+
+Die App ist als **Progressive Web App (PWA)** eingerichtet und kann auf Mobilgeräten und Desktop als eigenständige App installiert werden:
+
+- **Android (Chrome):** Beim Aufrufen der URL erscheint "Zum Startbildschirm hinzufügen"
+- **iOS (Safari):** Teilen → "Zum Home-Bildschirm"
+- **Desktop (Chrome/Edge):** Adressleiste → Installations-Icon
+
+Offline-Fähigkeit: Assets werden gecacht, Supabase-Aufrufe laufen immer live.
+
+---
+
 ### Lokale Installation
 
 ```bash
@@ -243,6 +260,7 @@ src/
 │   └── Toast.jsx              # Gemeinsame Toast-Komponente
 ├── lib/
 │   ├── supabase.js            # Supabase-Client
+│   ├── utils.js               # Gemeinsame Hilfsfunktionen (uid, …)
 │   ├── db.js                  # DB-Layer: Verteilerplaner
 │   ├── db_pruefprotokoll.js   # DB-Layer: Prüfprotokoll
 │   ├── db_stundenbuch.js      # DB-Layer: Stundenbuch

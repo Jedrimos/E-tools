@@ -9,7 +9,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ## Schnell umsetzbar ⚡
 
 ### 📋 Prüfprotokoll
-- ✅ ~~**Drucken / PDF**~~ — Umgesetzt: `window.print()` + Print-CSS
+- ✅ ~~**Drucken / PDF**~~ — Umgesetzt: `window.print()` + Print-CSS + jsPDF-Export (professionelles A4-PDF, lazy-loaded)
 - ✅ ~~**Ablaufdatum-Badge im Dashboard**~~ — Umgesetzt: Badge auf Prüfprotokoll-Karte + Warnung in der Liste
 - ⚡ **Normreferenzen** — Info-Icons (ⓘ) mit Tooltip der VDE-Norm und Grenzwert-Begründung direkt bei den Messwert-Feldern.
 
@@ -40,7 +40,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - 🔨 **Leitungsberechnung integriert** — Beim Kabel anlegen: Querschnitts-Empfehlung auf Basis von Strom und Länge (VDE 0100-520 Tabelle).
 
 ### ⏱ Stundenbuch
-- 🔨 **Monatsübersicht / Diagramm** — Gestapeltes Balkendiagramm der Arbeitsstunden pro Projekt über den Monat.
+- ✅ ~~**Monatsübersicht / Diagramm**~~ — Umgesetzt: SVG-Balkendiagramm (Stunden/Tag) mit 8h-Linie und Farbkodierung
 - 🔨 **Tagesberichte** — Strukturierter Tagesbericht als Nachweis für den Auftraggeber.
 - 🔨 **Regiezettel** — Aus Stunden + Materialien (vom Verteilerplaner) eine einfache Regie-Rechnung generieren.
 
@@ -49,7 +49,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ## Großer Aufwand / Langfristig 🏗
 
 ### 🔗 App-übergreifend
-- 🏗 **PWA / Offline-Modus** — Service Worker + IndexedDB für Baustellen-Einsatz ohne Internet. Sync bei Verbindung.
+- ✅ ~~**PWA / Offline-Modus**~~ — Umgesetzt: manifest.json, Service Worker (Cache-Strategie), iOS-Meta-Tags, App installierbar
 - 🏗 **Multi-Techniker / Betrieb** — Supabase Row Level Security: Techniker sehen eigene Daten, Chef-Login sieht alles.
 - 🏗 **Betriebsstammdaten / Briefkopf** — Firmenlogo + Adressdaten hinterlegen, automatisch auf Protokollen und Exporten.
 
@@ -71,7 +71,8 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ## Technische Schulden
 
 - `Verteilerplaner.jsx` ist mit ~3000 Zeilen sehr groß → schrittweise in kleinere Komponenten aufteilen (`Step1`, `Step2`, `PlanView` …)
-- ESLint-Fehler bereinigen — leere `catch`-Blöcke, ungenutzte Variablen, Toast.jsx aufteilen
+- ✅ ~~`uid()` in jeder Datei dupliziert~~ — Umgesetzt: `src/lib/utils.js` zentralisiert
+- ESLint-Fehler bereinigen — leere `catch`-Blöcke, ungenutzte Variablen
 - Tests — zumindest Unit-Tests für VDE-Grenzwertbewertung im Prüfprotokoll
 - Fehlerbehandlung — Supabase-Fehler verständlicher anzeigen (z.B. "Tabelle fehlt → SQL-Migration nötig")
 
