@@ -94,7 +94,7 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ### ✨ Neu
 - **`src/components/Toast.jsx`:** Gemeinsame Toast-Komponente + `useToasts`-Hook für alle Apps. Stundenbuch und Verteilerplaner importieren daraus statt eigene Implementierung zu führen.
-- **CSS-Design-Tokens global:** `:root`-Variablen (`--bg`, `--green`, `--red`, `--svp` …), Font-Import, globale Resets, Keyframes und Print-Stile in `index.css` ausgelagert. Alle Apps haben die Variablen verfügbar, ohne dass Verteilerplaner zuerst geladen werden muss.
+- **CSS-Design-Tokens global:** `:root`-Variablen (`--bg`, `--green`, `--red`, `--blue` …), Font-Import, globale Resets, Keyframes und Print-Stile in `index.css` ausgelagert. Alle Apps haben die Variablen verfügbar, ohne dass Verteilerplaner zuerst geladen werden muss.
 
 ### 🗑 Entfernt
 - `src/App.jsx` — Vite-Template-Überrest (tote Datei)
@@ -115,13 +115,13 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ### 🎉 Elektronikertools – Neustart
 
-Das Projekt wurde von "SVP Verteilerplaner" zu **Elektronikertools** umstrukturiert und erweitert.
+Das Projekt wurde zum **Elektronikertools**-Monorepo umstrukturiert und erweitert.
 
 ### ✨ Neu
 - **Dashboard** — Neue Startseite zur Tool-Auswahl. Alle Tools auf einen Blick, direkt anwählbar.
 - **Globale Konfiguration** — Einstellungsmodal mit Firmenname, Mitarbeiter, Ort, Datenbank-Name und Supabase-Credentials. Einstellungen gelten für alle Tools.
 - **Stundenbuch** — Neues Tool zur Zeiterfassung: Einträge mit Datum, Von/Bis, Pause, Projekt/Baustelle, Tätigkeit und Notiz. Monatsfilter, Projektfilter, CSV-Export als Stundennachweis.
-- **Verteilerplaner** — Der bisherige SVP Verteilerplaner ist als eigenständiges Tool integriert (keine Funktionsänderungen gegenüber 1.6.0).
+- **Verteilerplaner** — Als eigenständiges Tool integriert (keine Funktionsänderungen gegenüber 1.6.0).
 
 ### 🔧 Geändert
 - Paketname: `mein-sicherungsplaner` → `elektronikertools`
@@ -130,7 +130,7 @@ Das Projekt wurde von "SVP Verteilerplaner" zu **Elektronikertools** umstrukturi
 
 ---
 
-## Ältere Versionen (SVP Verteilerplaner, Semver)
+## Ältere Versionen (vor Elektronikertools, Semver)
 
 ### [1.6.0] – 2026-03-05
 
