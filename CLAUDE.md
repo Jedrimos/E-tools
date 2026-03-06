@@ -1,4 +1,4 @@
-# Claude Code – Projektregeln für Elektronikertools
+## Claude Code – Projektregeln für Elektronikertools
 
 Diese Datei enthält verbindliche Regeln die bei jeder Änderung am Projekt einzuhalten sind.
 
