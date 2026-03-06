@@ -49,8 +49,8 @@ const STD_ADERN          = [3,5,7,10];
 
 
 
-const SW_COLOR_DEFAULT = { KG:"var(--purple)",EG:"var(--svp)",OG:"#34c98a",OG1:"var(--green)",OG2:"#4bc8e8",DG:"var(--red)",Außen:"#e87040",Technik:"var(--text2)" };
-const SW_COLOR_PALETTE = ["var(--purple)","var(--svp)","var(--green)","#4bc8e8","var(--red)","#e87040","#d45db5","#5bc4a8","#a0c43a","#f06060","#60a0f0","#c07a30","var(--text2)"];
+const SW_COLOR_DEFAULT = { KG:"var(--purple)",EG:"var(--blue)",OG:"#34c98a",OG1:"var(--green)",OG2:"#4bc8e8",DG:"var(--red)",Außen:"#e87040",Technik:"var(--text2)" };
+const SW_COLOR_PALETTE = ["var(--purple)","var(--blue)","var(--green)","#4bc8e8","var(--red)","#e87040","#d45db5","#5bc4a8","#a0c43a","#f06060","#60a0f0","#c07a30","var(--text2)"];
 function randSwColor(used=[]) {
   const avail = SW_COLOR_PALETTE.filter(x=>!used.includes(x));
   return avail.length ? avail[Math.floor(Math.random()*avail.length)] : SW_COLOR_PALETTE[Math.floor(Math.random()*SW_COLOR_PALETTE.length)];
@@ -251,18 +251,24 @@ function empfehleSicherung(kabelIds, alleKabel, dreipolig=false) {
 }
 
 // ── Persistenz ──
-function loadProjekte() { try { return JSON.parse(localStorage.getItem("svp_projekte")||"[]"); } catch { return []; } }
-function saveProjekte(p) { localStorage.setItem("svp_projekte", JSON.stringify(p)); }
+// Migration: alte svp_* Keys → neue vp_* Keys (einmalig)
+(function migrateStorage() {
+  [["svp_projekte","vp_projekte"],["svp_settings","vp_settings"],["svp_api_config","vp_api_config"]].forEach(([alt,neu])=>{
+    if (!localStorage.getItem(neu) && localStorage.getItem(alt)) localStorage.setItem(neu, localStorage.getItem(alt));
+  });
+})();
+function loadProjekte() { try { return JSON.parse(localStorage.getItem("vp_projekte")||"[]"); } catch { return []; } }
+function saveProjekte(p) { localStorage.setItem("vp_projekte", JSON.stringify(p)); }
 
 // ── Einstellungen ──
-const SETTINGS_DEFAULTS = { firmenname:"SVP Elektrotechnik", defaultErsteller:"" };
-function loadSettings() { try { return {...SETTINGS_DEFAULTS,...JSON.parse(localStorage.getItem("svp_settings")||"{}")}; } catch { return {...SETTINGS_DEFAULTS}; } }
-function saveSettings(s) { localStorage.setItem("svp_settings",JSON.stringify(s)); }
+const SETTINGS_DEFAULTS = { firmenname:"", defaultErsteller:"" };
+function loadSettings() { try { return {...SETTINGS_DEFAULTS,...JSON.parse(localStorage.getItem("vp_settings")||"{}")}; } catch { return {...SETTINGS_DEFAULTS}; } }
+function saveSettings(s) { localStorage.setItem("vp_settings",JSON.stringify(s)); }
 
 // ── API ──
 const API_DEFAULTS = { url:"https://api.anthropic.com/v1/messages", model:"claude-sonnet-4-20250514", apiKey:"", format:"openai" };
-function ladeApiConfig() { try { return { ...API_DEFAULTS, ...JSON.parse(localStorage.getItem("svp_api_config")||"{}") }; } catch { return {...API_DEFAULTS}; } }
-function speichereApiConfig(cfg) { localStorage.setItem("svp_api_config", JSON.stringify(cfg)); }
+function ladeApiConfig() { try { return { ...API_DEFAULTS, ...JSON.parse(localStorage.getItem("vp_api_config")||"{}") }; } catch { return {...API_DEFAULTS}; } }
+function speichereApiConfig(cfg) { localStorage.setItem("vp_api_config", JSON.stringify(cfg)); }
 
 async function callVisionAPI(base64, prompt) {
   const cfg = ladeApiConfig();
@@ -323,7 +329,7 @@ const F = ({label,children}) => <div style={{marginBottom:10}}><div style={{font
 const G2 = ({children}) => <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{children}</div>;
 const St = ({label,val,color="var(--text2)"}) => <div><div style={{fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px"}}>{label}</div><div style={{fontSize:18,fontWeight:800,color,marginTop:1}}>{val}</div></div>;
 
-const bPrimary={background:"var(--svp)",border:"none",color:"#fff",borderRadius:8,padding:"11px 20px",cursor:"pointer",fontSize:13,fontWeight:700,transition:"opacity 0.15s,transform 0.15s"};
+const bPrimary={background:"var(--blue)",border:"none",color:"#fff",borderRadius:8,padding:"11px 20px",cursor:"pointer",fontSize:13,fontWeight:700,transition:"opacity 0.15s,transform 0.15s"};
 const bSec={background:"transparent",border:"1px solid var(--border2)",color:"var(--text2)",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:12,transition:"border-color 0.15s,color 0.15s"};
 const bSec2={background:"transparent",border:"1px solid var(--border)",color:"var(--text3)",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:11};
 const bDanger={background:"transparent",border:"1px solid rgba(255,107,107,0.25)",color:"#ff6b6b",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:11};
@@ -490,7 +496,7 @@ NUR JSON, keine Backticks, kein Text davor/danach.`;
 // ══════════════════════════════════════════
 // ── Startfenster ──
 // ══════════════════════════════════════════
-function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
+function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   const [phase, setPhase] = useState("start"); // "start" | "neu" | "laden"
   const [form, setForm] = useState({ name:"", adresse:"", ersteller:"", standort:"" });
   const dbOk = isSupabaseConfigured();
@@ -566,7 +572,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
                   <div style={{fontWeight:700,color:"var(--text)",fontSize:14}}>{p.name}</div>
                   <div style={{fontSize:10,color:"var(--text3)",marginTop:3,display:"flex",gap:8,flexWrap:"wrap"}}>
                     <span>{p.datum}</span>
-                    {p.projekt?.ersteller && <span style={{color:"var(--svp)"}}>· {p.projekt.ersteller}</span>}
+                    {p.projekt?.ersteller && <span style={{color:"var(--blue)"}}>· {p.projekt.ersteller}</span>}
                     {p.projekt?.standort  && <span>· {p.projekt.standort}</span>}
                     <span>· {(p.kabel||p.stromkreise||[]).length} Kabel</span>
                   </div>
@@ -583,6 +589,13 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
   // Start-Phase
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      {onBack && (
+        <button onClick={onBack} style={{position:"absolute",top:16,left:16,background:"none",border:"1px solid var(--border2)",color:"var(--text3)",cursor:"pointer",fontSize:13,borderRadius:8,padding:"7px 12px",display:"flex",alignItems:"center",gap:6,transition:"all 0.15s"}}
+          onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border)";}}
+          onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border2)";}}>
+          ← <span>Dashboard</span>
+        </button>
+      )}
       <div style={{textAlign:"center",maxWidth:440,width:"100%"}}>
         {/* Logo */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginBottom:32}}>
@@ -596,7 +609,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
             </svg>
           </div>
           <div style={{textAlign:"left"}}>
-            <div style={{fontSize:22,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px",lineHeight:1}}>SVP Verteilerplaner</div>
+            <div style={{fontSize:22,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px",lineHeight:1}}>Verteilerplaner</div>
             <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Elektroverteiler planen & dokumentieren</div>
           </div>
         </div>
@@ -609,10 +622,10 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
           </button>
           <button onClick={()=>setPhase("laden")}
             style={{background:"var(--bg2)",border:"1px solid var(--border2)",color:"var(--text2)",borderRadius:12,padding:"15px 24px",cursor:"pointer",fontSize:14,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.15s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--svp)";e.currentTarget.style.color="var(--svp)";}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--blue)";e.currentTarget.style.color="var(--blue)";}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--text2)";}}>
             📂 Vorhandenes Projekt laden
-            {projekte.length > 0 && <span style={{background:"var(--svp)",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:11,fontWeight:800}}>{projekte.length}</span>}
+            {projekte.length > 0 && <span style={{background:"var(--blue)",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:11,fontWeight:800}}>{projekte.length}</span>}
           </button>
         </div>
 
@@ -620,7 +633,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
         <div style={{marginTop:24,fontSize:11,color:"var(--text3)"}}>
           {dbOk
             ? <span style={{color:"var(--green)"}}>● Datenbankverbindung aktiv</span>
-            : <span>💾 Lokale Speicherung · <a href="#" onClick={e=>{e.preventDefault();}} style={{color:"var(--svp)",textDecoration:"none"}}>Datenbank einrichten →</a></span>
+            : <span>💾 Lokale Speicherung · <a href="#" onClick={e=>{e.preventDefault();}} style={{color:"var(--blue)",textDecoration:"none"}}>Datenbank einrichten →</a></span>
           }
         </div>
       </div>
@@ -660,11 +673,11 @@ function SettingsModal({ settings, onSave, onClose }) {
 
         {/* Firma & Export */}
         <div style={{marginBottom:20,paddingBottom:20,borderBottom:"1px solid var(--border)"}}>
-          <div style={{fontSize:11,color:"var(--svp)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>Firma & Export</div>
+          <div style={{fontSize:11,color:"var(--blue)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>Firma & Export</div>
           <div style={{marginBottom:10}}>
             <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Firmenname (für Stückliste & Beschriftungsplan)</div>
             <input value={s.firmenname} onChange={e=>setS(x=>({...x,firmenname:e.target.value}))}
-              placeholder="z.B. SVP Elektrotechnik GmbH"
+              placeholder="z.B. Meine Firma GmbH"
               style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",color:"var(--text)",fontSize:13}}/>
           </div>
           <div>
@@ -677,7 +690,7 @@ function SettingsModal({ settings, onSave, onClose }) {
 
         {/* KI-API */}
         <div style={{marginBottom:20}}>
-          <div style={{fontSize:11,color:"var(--svp)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>KI-Foto-Import (optional)</div>
+          <div style={{fontSize:11,color:"var(--blue)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>KI-Foto-Import (optional)</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:12}}>
             {apiPresets.map(p=>(
               <button key={p.label} onClick={()=>setApiCfg(c=>({...c,...p}))}
@@ -716,7 +729,7 @@ function SettingsModal({ settings, onSave, onClose }) {
 // ══════════════════════════════════════════
 // ── Hauptkomponente ──
 // ══════════════════════════════════════════
-export default function Verteilerplaner() {
+export default function Verteilerplaner({ onBack } = {}) {
   const [step, setStep] = useState(1);
   const [projekt, setProjekt]     = useState({ name:"", adresse:"", ersteller:"", standort:"" });
   const [kabel, setKabel]         = useState([]);          // Step 2: Kabel
@@ -1093,7 +1106,7 @@ export default function Verteilerplaner() {
       }
       txt += `  ${item.menge}× ${item.label}\n`;
     });
-    txt += `\n– ${settings.firmenname||"SVP Elektrotechnik"}`;
+    txt += `\n– ${settings.firmenname||""}`;
     if(projekt.ersteller) txt += ` · ${projekt.ersteller}`;
     return txt;
   };
@@ -1129,7 +1142,7 @@ export default function Verteilerplaner() {
         txt += `  ${qNr}F1  ${sInfo?.label||""}  ${bezeichnung}\n`;
       });
     }
-    txt += `\n– ${settings.firmenname||"SVP Elektrotechnik"}`;
+    txt += `\n– ${settings.firmenname||""}`;
     if(projekt.ersteller) txt += ` · ${projekt.ersteller}`;
     return txt;
   };
@@ -1404,12 +1417,13 @@ const stueckliste = (() => {
           onNeu={handleNeuStart}
           onLaden={p => { lade(p); }}
           onLoescheProjekt={loescheProjekt}
+          onBack={onBack}
         />
       )}
       <style>{`
         .sichzone{transition:background 0.15s,border-color 0.15s,box-shadow 0.15s;}
-        .sichzone.dragover{background:rgba(33,150,201,0.05)!important;border-color:var(--svp)!important;box-shadow:0 0 0 2px rgba(33,150,201,0.15)!important;}
-        .sichzone.touch-over{background:rgba(33,150,201,0.05)!important;border-color:var(--svp)!important;}
+        .sichzone.dragover{background:rgba(33,150,201,0.05)!important;border-color:var(--blue)!important;box-shadow:0 0 0 2px rgba(33,150,201,0.15)!important;}
+        .sichzone.touch-over{background:rgba(33,150,201,0.05)!important;border-color:var(--blue)!important;}
         .main-wrap{max-width:960px;margin:0 auto;padding:20px 16px;}
         .step3-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
         .header-nav{display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;}
@@ -1468,22 +1482,31 @@ const stueckliste = (() => {
       {/* ── HEADER ── */}
       <div className="no-print" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
 
-        {/* LEFT: Logo + Version */}
-        <div onClick={()=>setShowStartScreen(true)} title="Zur Startseite" style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,cursor:"pointer",borderRadius:8,padding:"4px 6px",transition:"background 0.15s"}}
-          onMouseEnter={e=>e.currentTarget.style.background="var(--bg3)"}
-          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="0" y="0" width="12" height="12" rx="2.5" fill="#2196C9"/>
-            <rect x="0" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
-            <rect x="7" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
-            <rect x="14" y="0" width="12" height="5" rx="1.5" fill="#2196C9" opacity="0.4"/>
-            <rect x="14" y="7" width="8" height="5" rx="1.5" fill="#2196C9" opacity="0.25"/>
-          </svg>
-          <div>
-            <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>SVP</div>
-            <div style={{fontSize:7.5,color:"var(--text3)",letterSpacing:"1.5px",fontWeight:500,textTransform:"uppercase",lineHeight:1,marginTop:2}}>Verteilerplaner</div>
+        {/* LEFT: Dashboard-Back + Logo */}
+        <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+          {onBack && (
+            <button onClick={onBack} title="Zurück zum Dashboard"
+              style={{height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:12,fontWeight:600,padding:"0 10px",display:"flex",alignItems:"center",gap:5,transition:"all 0.15s",marginRight:4}}
+              onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
+              onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>
+              ← <span className="nav-label-long">Dashboard</span>
+            </button>
+          )}
+          <div onClick={()=>setShowStartScreen(true)} title="Zur Projektauswahl" style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",borderRadius:8,padding:"4px 6px",transition:"background 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.background="var(--bg3)"}
+            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="12" height="12" rx="2.5" fill="#2196C9"/>
+              <rect x="0" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
+              <rect x="7" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
+              <rect x="14" y="0" width="12" height="5" rx="1.5" fill="#2196C9" opacity="0.4"/>
+              <rect x="14" y="7" width="8" height="5" rx="1.5" fill="#2196C9" opacity="0.25"/>
+            </svg>
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>Verteilerplaner</div>
+            </div>
+            <span style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3</span>
           </div>
-          <span style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v1.5.0</span>
         </div>
 
         {/* CENTER: Step Navigation */}
@@ -1498,7 +1521,7 @@ const stueckliste = (() => {
             ) : "";
             const btn = (
               <button key={n} onClick={()=>{ if(erreichbar) setStep(ni); }}
-                style={{background:active?"var(--svp)":done?"rgba(33,150,201,0.08)":"transparent",border:`1px solid ${active?"var(--svp)":done?"rgba(33,150,201,0.25)":"var(--border)"}`,color:active?"#fff":done?"var(--svp)":erreichbar?"var(--text3)":"var(--border2)",borderRadius:6,padding:"5px 11px",cursor:erreichbar?"pointer":"not-allowed",fontSize:11,fontWeight:active?700:done?600:400,transition:"all 0.15s",display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap",opacity:erreichbar?1:0.45}}>
+                style={{background:active?"var(--blue)":done?"rgba(33,150,201,0.08)":"transparent",border:`1px solid ${active?"var(--blue)":done?"rgba(33,150,201,0.25)":"var(--border)"}`,color:active?"#fff":done?"var(--blue)":erreichbar?"var(--text3)":"var(--border2)",borderRadius:6,padding:"5px 11px",cursor:erreichbar?"pointer":"not-allowed",fontSize:11,fontWeight:active?700:done?600:400,transition:"all 0.15s",display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap",opacity:erreichbar?1:0.45}}>
                 {done&&!active&&<span style={{fontSize:8,opacity:0.8}}>✓</span>}
                 {!erreichbar&&<span style={{fontSize:9}}>🔒</span>}
                 <span className="nav-label-long">{l}</span>
@@ -1515,7 +1538,7 @@ const stueckliste = (() => {
         <div style={{display:"flex",gap:3,alignItems:"center",flexShrink:0}}>
           {undoStack.length>0&&(
             <button onClick={doUndo} title={`Rückgängig: ${undoStack[undoStack.length-1]?.label}`}
-              style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:6,border:"1px solid rgba(33,150,201,0.3)",background:"rgba(33,150,201,0.06)",color:"var(--svp)",cursor:"pointer",fontSize:11,fontWeight:600,transition:"all 0.15s"}}>
+              style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:6,border:"1px solid rgba(33,150,201,0.3)",background:"rgba(33,150,201,0.06)",color:"var(--blue)",cursor:"pointer",fontSize:11,fontWeight:600,transition:"all 0.15s"}}>
               ↩ <span className="nav-label-long" style={{fontSize:10}}>Undo</span>
             </button>
           )}
@@ -1525,7 +1548,7 @@ const stueckliste = (() => {
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>
             📂
-            {projekte.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"var(--svp)",color:"#fff",borderRadius:8,padding:"0 4px",fontSize:8,fontWeight:800,minWidth:14,textAlign:"center",lineHeight:"14px"}}>{projekte.length}</span>}
+            {projekte.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"var(--blue)",color:"#fff",borderRadius:8,padding:"0 4px",fontSize:8,fontWeight:800,minWidth:14,textAlign:"center",lineHeight:"14px"}}>{projekte.length}</span>}
           </button>
           <button onClick={()=>{setSaveName(projekt.name||"");setShowSave(true);}} title="Projekt speichern"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
@@ -1540,7 +1563,7 @@ const stueckliste = (() => {
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>⚙️</button>
-          <button onClick={()=>setShowInfo(true)} title="Über SVP Verteilerplaner"
+          <button onClick={()=>setShowInfo(true)} title="Über Verteilerplaner"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>ℹ️</button>
@@ -1562,10 +1585,10 @@ const stueckliste = (() => {
             const dot = (
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:erreichbar2?"pointer":"not-allowed",opacity:erreichbar2?1:0.5}}
                 onClick={()=>{ if(erreichbar2) setStep(n); }}>
-                <div style={{width:28,height:28,borderRadius:"50%",background:active?"var(--svp)":done?"rgba(33,150,201,0.15)":erreichbar2?"var(--bg3)":"var(--bg2)",border:`2px solid ${active?"var(--svp)":done?"rgba(33,150,201,0.4)":erreichbar2?"var(--border)":"#2a3035"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:active?"#fff":done?"var(--svp)":erreichbar2?"var(--text3)":"var(--border2)",transition:"all 0.2s",flexShrink:0}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:active?"var(--blue)":done?"rgba(33,150,201,0.15)":erreichbar2?"var(--bg3)":"var(--bg2)",border:`2px solid ${active?"var(--blue)":done?"rgba(33,150,201,0.4)":erreichbar2?"var(--border)":"#2a3035"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:active?"#fff":done?"var(--blue)":erreichbar2?"var(--text3)":"var(--border2)",transition:"all 0.2s",flexShrink:0}}>
                   {done?<span style={{fontSize:10}}>✓</span>:erreichbar2?n:<span style={{fontSize:10}}>🔒</span>}
                 </div>
-                <div style={{fontSize:9,color:active?"var(--svp)":done?"var(--svp)":erreichbar2?"var(--text3)":"var(--border2)",fontWeight:active?700:done?500:400,whiteSpace:"nowrap",letterSpacing:"0.3px",transition:"color 0.2s"}} className="nav-label-long">{labels[i]}</div>
+                <div style={{fontSize:9,color:active?"var(--blue)":done?"var(--blue)":erreichbar2?"var(--text3)":"var(--border2)",fontWeight:active?700:done?500:400,whiteSpace:"nowrap",letterSpacing:"0.3px",transition:"color 0.2s"}} className="nav-label-long">{labels[i]}</div>
               </div>
             );
             return <div key={n} style={{display:"flex",alignItems:"center",flex:n<5?1:"none"}}>
@@ -1703,7 +1726,7 @@ const stueckliste = (() => {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
             <div>
               <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.3px"}}>🔌 Kabel erfassen</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:1,display:"flex",gap:10}}><span>{kabel.length} Kabel</span>{sicherungen.length>0&&<span style={{color:"var(--svp)"}}>· {kabel.filter(k=>sicherungen.some(s=>s.kabelIds.includes(k.id))).length} zugewiesen</span>}</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:1,display:"flex",gap:10}}><span>{kabel.length} Kabel</span>{sicherungen.length>0&&<span style={{color:"var(--blue)"}}>· {kabel.filter(k=>sicherungen.some(s=>s.kabelIds.includes(k.id))).length} zugewiesen</span>}</div>
             </div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setStep(1)} style={bSec}>← Zurück</button>
@@ -1804,7 +1827,7 @@ const stueckliste = (() => {
             <div>
               <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.3px"}}>⚡ Sicherungen zuweisen</div>
               <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>
-                Kabel per Drag&Drop auf Sicherungen ziehen · {kabelImPool.length>0?<span style={{color:"var(--svp)"}}>{kabelImPool.length} noch nicht zugewiesen</span>:<span style={{color:"var(--green)"}}>✓ Alle zugewiesen</span>}
+                Kabel per Drag&Drop auf Sicherungen ziehen · {kabelImPool.length>0?<span style={{color:"var(--blue)"}}>{kabelImPool.length} noch nicht zugewiesen</span>:<span style={{color:"var(--green)"}}>✓ Alle zugewiesen</span>}
               </div>
             </div>
             <div style={{display:"flex",gap:8}}>
@@ -1819,7 +1842,7 @@ const stueckliste = (() => {
             <div>
               <div style={{fontSize:11,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"1px",marginBottom:8,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
                 🔌 Kabel-Pool
-                {kabelImPool.length>0&&<span style={{background:"#f0a50022",border:"1px solid #f0a50044",color:"var(--svp)",borderRadius:10,padding:"1px 7px",fontSize:9}}>{kabelImPool.length} offen</span>}
+                {kabelImPool.length>0&&<span style={{background:"#f0a50022",border:"1px solid #f0a50044",color:"var(--blue)",borderRadius:10,padding:"1px 7px",fontSize:9}}>{kabelImPool.length} offen</span>}
               </div>
               {kabelImPool.length===0
                 ? <div style={{background:"rgba(82,217,138,0.05)",border:"1px solid rgba(82,217,138,0.2)",borderRadius:10,padding:"20px",textAlign:"center"}}><div style={{fontSize:20,marginBottom:6}}>✓</div><div style={{color:"var(--green)",fontSize:13,fontWeight:700}}>Alle Kabel zugewiesen</div><div style={{color:"var(--text3)",fontSize:11,marginTop:4}}>Kabel können weiterhin aus Sicherungen hierher gezogen werden</div></div>
@@ -2077,7 +2100,7 @@ const stueckliste = (() => {
             <St label="Sicherungen" val={sicherungen.length}/>
             <St label="FILS" val={sicherungen.filter(s=>s.istFILS).length} color="var(--purple)"/>
             <St label="TE benötigt" val={`${teBenoetigt} TE`}/>
-            {kabelImPool.length>0&&<span style={{fontSize:12,color:"var(--svp)",fontWeight:600}}>⚠ {kabelImPool.length} Kabel noch nicht zugewiesen</span>}
+            {kabelImPool.length>0&&<span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>⚠ {kabelImPool.length} Kabel noch nicht zugewiesen</span>}
           </div>
           <div style={{display:"flex",gap:10,marginTop:12}}>
             <button onClick={()=>setStep(2)} style={bSec}>← Zurück</button>
@@ -2106,7 +2129,7 @@ const stueckliste = (() => {
               <div style={{background:"var(--bg2)",border:`1px solid ${diff<0?"var(--red)":diff<4?"#f0a50044":"var(--border)"}`,borderRadius:10,padding:"12px 16px",marginBottom:14,display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
                 <St label="TE benötigt" val={`${teBenoetigt} TE`}/>
                 <St label="TE verfügbar" val={`${teVerfuegbar} TE`}/>
-                <St label="Reserve" val={`${diff} TE`} color={diff<0?"var(--red)":diff<4?"var(--svp)":"var(--green)"}/>
+                <St label="Reserve" val={`${diff} TE`} color={diff<0?"var(--red)":diff<4?"var(--blue)":"var(--green)"}/>
                 <St label="FI-Gruppen" val={fiKonfigs.length}/>
                 {diff<0&&<span style={{fontSize:11,color:"var(--red)",fontWeight:600}}>⚠ Zu wenig TE!</span>}
               </div>
@@ -2202,10 +2225,10 @@ const stueckliste = (() => {
               {plan.warnungen?.length>0&&plan.warnungen.map((w,i)=><div key={i} style={{fontSize:11,color:"var(--red)",marginTop:4}}>⚠ {w}</div>)}
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:"1.5px",fontFamily:"var(--mono)"}}>{settings.firmenname||"SVP Elektrotechnik"}</div>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:"1.5px",fontFamily:"var(--mono)"}}>{settings.firmenname||""}</div>
               {projekt.ersteller&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1,fontFamily:"var(--mono)"}}>{projekt.ersteller}</div>}
               {projekt.standort&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1,fontFamily:"var(--mono)"}}>📍 {projekt.standort}</div>}
-              <div style={{fontSize:11,color:"var(--svp)",marginTop:3,fontFamily:"var(--mono)",fontWeight:600}}>{new Date().toLocaleDateString("de-DE")}</div>
+              <div style={{fontSize:11,color:"var(--blue)",marginTop:3,fontFamily:"var(--mono)",fontWeight:600}}>{new Date().toLocaleDateString("de-DE")}</div>
               <div style={{display:"flex",gap:10,marginTop:6,justifyContent:"flex-end"}}>
                 <span style={{fontSize:10,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:700}}>{plan.gruppen.length} FI</span>
                 <span style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)"}}>{sicherungen.filter(s=>!s.istFILS).length} LS</span>
@@ -2230,7 +2253,7 @@ const stueckliste = (() => {
                     {fi.phasenschiene&&<span style={{background:"rgba(82,217,138,0.08)",border:"1px solid #52c07a33",borderRadius:5,padding:"2px 8px",fontSize:10,color:"var(--green)"}}>Phasenschiene {fiPhasenschiene(fi.pole)}</span>}
                     <div style={{flex:1,minWidth:80}}>
                       <div style={{fontSize:9,color:"var(--text3)",marginBottom:2}}>{sicherTE}/{fiMaxTE(fi.pole)} TE · {ausl}%</div>
-                      <div style={{height:4,background:"var(--border)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(100,ausl)}%`,background:ausl>100?"var(--red)":ausl>85?"var(--svp)":"var(--green)",borderRadius:2}}/></div>
+                      <div style={{height:4,background:"var(--border)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(100,ausl)}%`,background:ausl>100?"var(--red)":ausl>85?"var(--blue)":"var(--green)",borderRadius:2}}/></div>
                     </div>
                     <div style={{display:"flex",gap:5}}>{Object.entries(fi.phasen).map(([ph,amp])=><span key={ph} style={{fontSize:10,background:PH_BG[ph],border:`1px solid ${PH_BORDER[ph]}`,borderRadius:4,padding:"2px 7px",color:PH_COLOR[ph],fontWeight:700,fontFamily:"var(--mono)"}}>{ph}: {amp}A</span>)}</div>
                   </div>
@@ -2764,7 +2787,7 @@ const stueckliste = (() => {
             </button>
             <button onClick={()=>{setShowStueckliste(true);}}
               style={{flex:1,background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text)",borderRadius:10,padding:"13px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--svp)";e.currentTarget.style.color="var(--svp)";}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--blue)";e.currentTarget.style.color="var(--blue)";}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--text)";}}>
               📦 Stückliste erstellen
             </button>
@@ -2908,8 +2931,8 @@ const stueckliste = (() => {
             <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
               <div style={{width:48,height:48,borderRadius:12,background:"rgba(33,150,201,0.12)",border:"1px solid rgba(33,150,201,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>⚡</div>
               <div>
-                <div style={{fontSize:20,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px"}}>SVP Verteilerplaner</div>
-                <div style={{fontSize:12,color:"var(--svp)",fontFamily:"var(--mono)",fontWeight:600,marginTop:2}}>Version 1.5.0 · by Jedrimos</div>
+                <div style={{fontSize:20,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px"}}>Verteilerplaner</div>
+                <div style={{fontSize:12,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:600,marginTop:2}}>Version 2026.3 · by Jedrimos</div>
               </div>
             </div>
 
@@ -2946,9 +2969,7 @@ const stueckliste = (() => {
                 Lokale Datenspeicherung · Keine Cloud · Keine Werbung
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)"}}>SVP Elektrotechnik</span>
-                <div style={{width:4,height:4,borderRadius:"50%",background:"var(--border2)"}}/>
-                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)"}}>© 2025 Jedrimos</span>
+                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)"}}>© 2026 Jedrimos</span>
               </div>
             </div>
           </div>

@@ -114,8 +114,8 @@ Alle Design-Tokens sind in `src/index.css` als CSS Custom Properties:
 | `--bg3` | `#1e2327` | Input-Hintergrund, subtile Hervorhebung |
 | `--border` | `#2a3035` | Dezente Trennlinien |
 | `--border2` | `#333b42` | Aktive Trennlinien |
-| `--svp` | `#2196C9` | Verteilerplaner-Akzent |
-| `--blue` | `#2196C9` | Info-Blau |
+| `--blue` | `#2196C9` | Verteilerplaner-Akzent / Info-Blau |
+| `--blue2` | `#1a82b4` | Verteilerplaner-Akzent dunkel |
 | `--green` | `#52d98a` | Erfolg / OK |
 | `--red` | `#ff6b6b` | Fehler / Löschen |
 | `--purple` | `#a78bfa` | 3-phasig, Akzent |

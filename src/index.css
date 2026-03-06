@@ -7,9 +7,8 @@
   --bg3:     #1e2327;
   --border:  #2a3035;
   --border2: #333b42;
-  --svp:     #2196C9;
-  --svp2:    #1a82b4;
   --blue:    #2196C9;
+  --blue2:   #1a82b4;
   --green:   #52d98a;
   --red:     #ff6b6b;
   --purple:  #a78bfa;
@@ -41,7 +40,7 @@ input, select {
 }
 input:focus, select:focus {
   outline: none !important;
-  border-color: var(--svp) !important;
+  border-color: var(--blue) !important;
   box-shadow: 0 0 0 2px rgba(33, 150, 201, 0.12) !important;
 }
 input::placeholder { color: var(--text3); }

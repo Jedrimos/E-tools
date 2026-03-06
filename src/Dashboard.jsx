@@ -84,9 +84,7 @@ export default function Dashboard() {
   if (aktiveApp === "verteilerplaner") {
     return (
       <div>
-        <TopBar label="Verteilerplaner" icon="⚡" farbe="#4bc8e8" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
-        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
-        <Verteilerplaner />
+        <Verteilerplaner onBack={() => setAktiveApp(null)} />
       </div>
     );
   }

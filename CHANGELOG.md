@@ -8,12 +8,17 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ## [2026.3.5] – 2026-03-06
 
-### Verteilerplaner: Logo klickbar → Zurück zur Startauswahl
+### Verteilerplaner: Dashboard-Navigation + Branding bereinigt
+
+### ✨ Neu
+- **Zurück zum Dashboard:** Im Startfenster und im Header gibt es jetzt einen "← Dashboard"-Button — jederzeit zurück zur App-Auswahl
+- **Logo klickbar:** Klick auf das Verteilerplaner-Logo bringt zurück zur Projektauswahl
 
 ### 🔧 Geändert
-- **Verteilerplaner:** Logo im Header ist jetzt klickbar — Klick auf das SVP-Logo bringt den Nutzer zurück zum Startfenster (Neues Projekt / Laden)
-- Hover-Effekt am Logo signalisiert die Klickbarkeit
-- `title="Zur Startseite"` als Tooltip
+- **Branding entfernt:** Alle "SVP"-Bezeichnungen aus der gesamten Codebasis entfernt (Texte, Variablen, Defaults)
+- **CSS:** `--svp` / `--svp2` entfernt → `--blue` / `--blue2` (gleiche Farbe `#2196C9`, neutraler Name)
+- **localStorage:** Keys umbenannt (`svp_*` → `vp_*`) mit automatischer einmaliger Migration
+- **Firmenname:** Kein vorbelegter Firmenname mehr — nur angezeigt wenn konfiguriert
 
 ---
 

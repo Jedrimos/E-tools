@@ -42,7 +42,7 @@ Professionelle Planung und Dokumentation von Elektroverteiler-Belegungen im Brow
 
 ## Datenspeicherung
 
-- **Lokal:** `localStorage` unter Key `svp_projekte`
+- **Lokal:** `localStorage` unter Key `vp_projekte` (Migration von `svp_projekte` automatisch)
 - **Supabase:** Tabelle `projekte` (wenn konfiguriert) — automatischer Sync
 
 ## Technische Besonderheiten
@@ -51,7 +51,7 @@ Professionelle Planung und Dokumentation von Elektroverteiler-Belegungen im Brow
 - Auto-Save nach Plan-Generierung
 - Projekt-Verwaltung: mehrere Projekte speichern, laden, löschen
 - KI-API über eigenen Anthropic-Key konfigurierbar
-- **Logo klickbar:** Klick auf das SVP-Logo im Header kehrt jederzeit zur Startauswahl zurück
+- **Navigation:** "← Dashboard"-Button führt jederzeit zurück zur App-Auswahl; Logo-Klick zurück zur Projektauswahl
 
 ## Integration mit Prüfprotokoll
 

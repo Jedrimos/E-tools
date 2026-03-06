@@ -109,7 +109,7 @@ export async function loadProjekteForImport() {
   }
   // localStorage-Fallback
   try {
-    return JSON.parse(localStorage.getItem("svp_projekte") || "[]");
+    return JSON.parse(localStorage.getItem("vp_projekte") || localStorage.getItem("svp_projekte") || "[]");
   } catch {
     return [];
   }
