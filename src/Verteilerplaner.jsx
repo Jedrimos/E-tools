@@ -1342,53 +1342,76 @@ export default function Verteilerplaner({ onBack } = {}) {
   };
 
   // ── Querverbinder-Berechnung ──
-  // Normaler FI-Block: nur L-Querverbinder pro Sicherung mit n>=2 Kabeln
-  //   → N läuft über die gemeinsame N-Schiene (NE→NX-Brücke), kein separater N-QV nötig
-  // FILS: L- UND N-Querverbinder, weil FILS keine NE/NX-Schiene hat
+  // Baut die reale Klemmensequenz pro Stromkreis auf (L=rk_mit_pe, N=rk_ohne_pe),
+  // berechnet den genauen Bridge-Span und markiert Pins die abgezwickt werden müssen.
+  // Normaler FI-Block: nur L-Querverbinder (N läuft über gemeinsame N-Schiene)
+  // FILS: L- UND N-Querverbinder wenn eigene N-Klemmen vorhanden
+
+  // Hilfsfunktion: flache Klemmensequenz für eine Liste von Kabel-IDs
+  const buildKlemmenSeq = (kids) => {
+    const seq=[];
+    kids.forEach(kid=>{
+      const k=kabel.find(x=>x.id===kid);
+      if(!k) return;
+      const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
+      for(let i=0;i<mitPE;i++) seq.push('L');
+      for(let i=0;i<ohnePE;i++) seq.push('N');
+    });
+    return seq;
+  };
+
+  // Hilfsfunktion: berechnet Bridge-Span und abzuzwickende Pins
+  // targetType='L'|'N', gibt null zurück wenn weniger als 2 target-Positionen
+  const berechneBridge = (seq, targetType) => {
+    const otherType = targetType==='L' ? 'N' : 'L';
+    const targetIdx=seq.map((t,i)=>t===targetType?i:-1).filter(i=>i>=0);
+    if(targetIdx.length<2) return null;
+    const firstPos=targetIdx[0], lastPos=targetIdx[targetIdx.length-1];
+    // Bridge-Span: von firstPos bis lastPos (inkl. dazwischen liegende N-Klemmen)
+    const span=lastPos-firstPos+1;
+    // Pins die abgezwickt werden müssen: andere Klemmen innerhalb des Spans (1-indiziert)
+    const clipPins=seq.slice(firstPos,lastPos+1)
+      .map((t,i)=>t===otherType?(i+1):-1).filter(i=>i>=0);
+    return {ports:span, clipPins, count:targetIdx.length};
+  };
+
   const berechneQuerverbinder = () => {
     if(!plan) return [];
     const result=[];
 
-    // Normale FI-Gruppen → nur L
+    // Normale FI-Gruppen → nur L-Bridge
     plan.gruppen.forEach((fi,fiIdx)=>{
       fi.stromkreise.forEach((sk,skIdx)=>{
+        if(sk.istReserve) return;
         const kids=sk.kabelIds||[];
         if(kids.length<2) return;
-        let mitPE_total=0;
-        kids.forEach(kid=>{
-          const k=kabel.find(x=>x.id===kid);
-          if(!k) return;
-          mitPE_total+=klemmenFuerKabel(k.kabelAdern).mitPE;
-        });
-        if(mitPE_total<2) return;
-        const fLabel=`Q${fiIdx+1} / ${fiIdx+1}F${skIdx+1}`;
-        const skLabel=sk.kabel?.map(k=>k.bezeichnung||k.raum||'?').join(' + ')
-                      || kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean).map(k=>k.bezeichnung||k.raum||'?').join(' + ');
-        result.push({fLabel, skLabel, ports:mitPE_total, typ:'L', color:'#ff6b6b', fils:false});
+        const seq=buildKlemmenSeq(kids);
+        const bridge=berechneBridge(seq,'L');
+        if(!bridge||bridge.count<2) return;
+        const fLabel=`Q${fiIdx+1}F${skIdx+1}`;
+        const skLabel=kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean)
+                         .map(k=>k.bezeichnung||k.raum||'?').join(' + ');
+        result.push({fLabel, skLabel, ports:bridge.ports, clipPins:bridge.clipPins,
+                     lCount:bridge.count, typ:'L', color:'#ff6b6b', fils:false});
       });
     });
 
-    // FILS → L + N (keine gemeinsame N-Schiene vorhanden)
+    // FILS → L-Bridge + N-Bridge (keine gemeinsame N-Schiene vorhanden)
     plan.fils.forEach((sk,i)=>{
       const kids=sk.kabelIds||[];
       if(kids.length<2) return;
-      let mitPE_total=0, ohnePE_total=0;
-      kids.forEach(kid=>{
-        const k=kabel.find(x=>x.id===kid);
-        if(!k) return;
-        const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
-        mitPE_total+=mitPE; ohnePE_total+=ohnePE;
-      });
+      const seq=buildKlemmenSeq(kids);
       const fLabel=`Q${plan.gruppen.length+i+1} FILS`;
-      const skLabel=sk.kabel?.map(k=>k.bezeichnung||k.raum||'?').join(' + ')
-                    || kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean).map(k=>k.bezeichnung||k.raum||'?').join(' + ');
-      if(mitPE_total>=2){
-        result.push({fLabel, skLabel, ports:mitPE_total, typ:'L', color:'#ff6b6b', fils:true});
-      }
-      // N-Querverbinder nur wenn eigene N-Klemmen (ohnePE) vorhanden
-      if(ohnePE_total>=2){
-        result.push({fLabel, skLabel, ports:ohnePE_total, typ:'N', color:'rgba(33,150,201,0.9)', fils:true});
-      }
+      const skLabel=kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean)
+                       .map(k=>k.bezeichnung||k.raum||'?').join(' + ');
+      const lBridge=berechneBridge(seq,'L');
+      if(lBridge&&lBridge.count>=2)
+        result.push({fLabel,skLabel,ports:lBridge.ports,clipPins:lBridge.clipPins,
+                     lCount:lBridge.count,typ:'L',color:'#ff6b6b',fils:true});
+      const nBridge=berechneBridge(seq,'N');
+      if(nBridge&&nBridge.count>=2)
+        result.push({fLabel,skLabel,ports:nBridge.ports,clipPins:nBridge.clipPins,
+                     lCount:nBridge.count,typ:'N',color:'rgba(33,150,201,0.9)',fils:true});
     });
 
     return result;
