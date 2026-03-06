@@ -6,6 +6,31 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.3] – 2026-03-06
+
+### ✨ Neu
+
+**Dashboard**
+- Ablaufdatum-Badge auf der Prüfprotokoll-Karte: zeigt Anzahl abgelaufener und bald fälliger Protokolle
+- Supabase-Verbindungsstatus-Indikator (grün/rot/grau) direkt im Dashboard
+- Backup-Export: alle App-Daten als JSON-Datei herunterladen
+- Backup-Import: JSON-Backup einlesen und localStorage wiederherstellen
+
+**Stundenbuch**
+- Wochenstunden-Anzeige: Netto-Stunden der aktuellen Woche direkt im Header
+- Start/Stop-Timer: Zeitmessung per Klick, füllt beim Stopp automatisch Von/Bis-Felder im neuen Eintrag
+
+**Verteilerplaner**
+- Projekt-Suche in beiden Lade-Dialogen (StartScreen + Mid-Session-Modal), erscheint ab 4 Projekten
+- Reserveplatz-Markierung: Sicherung als "Reserve" flaggen (erscheint grau/gedimmt), wird in der Stückliste als "Reserveplatz (leer)" aufgeführt
+
+**Prüfprotokoll**
+- Drucken-Button im Protokoll-Editor (`window.print()`)
+- Ablaufwarnung direkt an jedem Protokoll in der Liste: roter Badge bei abgelaufener Prüffrist, gelber Badge bei Fälligkeit in 30 Tagen
+- Print-CSS verbessert: saubere Druckansicht, Buttons werden ausgeblendet, helle Hintergrundfarben
+
+---
+
 ## [2026.3.2] – 2026-03-06
 
 ### 🎉 Elektronikertools – Erster vollständiger Release

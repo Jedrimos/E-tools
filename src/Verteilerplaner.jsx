@@ -70,15 +70,15 @@ const mkKabel = (sw="EG") => ({
 // Sicherung = Leitungsschutzschalter mit 1–n Kabeln
 const mkSicherung = () => ({
   id: uid(), kabelIds:[], sicherung:"B16", phase:"Auto", istFILS:false, dreipolig:false,
-  filsBemessung:40, filsTyp:"A", filsFehlerstrom:30, filsPole:4,
+  filsBemessung:40, filsTyp:"A", filsFehlerstrom:30, filsPole:4, istReserve:false,
 });
 
 const mkFI = () => ({ id:uid(), bemessung:40, fiTyp:"A", fehlerstrom:30, pole:4, phasenschiene:true });
 
 // ── Planverteilung ──
 function verteile(sicherungen, fiKonfigs) {
-  const normal = sicherungen.filter(s => !s.istFILS);
-  const fils   = sicherungen.filter(s =>  s.istFILS);
+  const normal = sicherungen.filter(s => !s.istFILS && !s.istReserve);
+  const fils   = sicherungen.filter(s =>  s.istFILS && !s.istReserve);
   const warnungen = [];
   const gruppen = fiKonfigs.map(f => ({ ...f, stromkreise:[], belegteTE:0, lastA:0, phasen:{L1:0,L2:0,L3:0} }));
   if (!fiKonfigs.length || !normal.length) return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
@@ -149,7 +149,7 @@ function klemmenFuerKabel(adern) {
   return { mitPE:1, ohnePE:Math.floor((a-3)/2) };
 }
 
-function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false) {
+function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherungen=[]) {
   if (!plan) return [];
   const items={};
   const add=(key,label,menge,kat)=>{ if(!items[key])items[key]={label,menge:0,kat}; items[key].menge+=menge; };
@@ -229,7 +229,12 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false) {
   });
 
   Object.entries(sichCount).forEach(([key,val])=>add(key,val.label,val.count,val.kat));
-  const order=["FI-Schutzschalter","Leitungsschutzschalter","FILS","Phasenschiene","Reihenklemmen"];
+
+  // Reserveplätze
+  const reserveCount = alleSicherungen.filter(s=>s.istReserve).length;
+  if (reserveCount > 0) add("reserve_lss","Reserveplatz (leer, mit Abdeckkappe)",reserveCount,"Reserveplätze");
+
+  const order=["FI-Schutzschalter","Leitungsschutzschalter","FILS","Reserveplätze","Phasenschiene","Reihenklemmen"];
   return Object.values(items).sort((a,b)=>order.indexOf(a.kat)-order.indexOf(b.kat));
 }
 
@@ -499,7 +504,11 @@ NUR JSON, keine Backticks, kein Text davor/danach.`;
 function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   const [phase, setPhase] = useState("start"); // "start" | "neu" | "laden"
   const [form, setForm] = useState({ name:"", adresse:"", ersteller:"", standort:"" });
+  const [suche, setSuche] = useState("");
   const dbOk = isSupabaseConfigured();
+  const gefilterteProjekte = suche.trim()
+    ? projekte.filter(p => (p.name||"").toLowerCase().includes(suche.toLowerCase()) || (p.projekt?.adresse||"").toLowerCase().includes(suche.toLowerCase()))
+    : projekte;
 
   const handleNeu = () => {
     if (!form.name.trim()) return;
@@ -564,9 +573,16 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
           </div>
           <button onClick={()=>setPhase("start")} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20}}>←</button>
         </div>
-        {projekte.length === 0
-          ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:32}}>Keine gespeicherten Projekte</div>
-          : projekte.map(p => (
+        {projekte.length > 3 && (
+          <input
+            value={suche} onChange={e=>setSuche(e.target.value)}
+            placeholder="Projekt suchen…"
+            style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:8,padding:"8px 12px",color:"var(--text)",fontSize:13,marginBottom:12,boxSizing:"border-box"}}
+          />
+        )}
+        {gefilterteProjekte.length === 0
+          ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:32}}>{suche ? "Keine Projekte gefunden" : "Keine gespeicherten Projekte"}</div>
+          : gefilterteProjekte.map(p => (
               <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,background:"var(--bg3)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:700,color:"var(--text)",fontSize:14}}>{p.name}</div>
@@ -755,6 +771,7 @@ export default function Verteilerplaner({ onBack } = {}) {
   const [projekte, setProjekte]   = useState(loadProjekte);
   const [showSave, setShowSave]   = useState(false);
   const [showLoad, setShowLoad]   = useState(false);
+  const [ladesuche, setLadesuche] = useState("");
   const [saveName, setSaveName]   = useState("");
   const [newSW, setNewSW]         = useState("");
   const [newSWColor, setNewSWColor] = useState("var(--green)");
@@ -1374,7 +1391,7 @@ export default function Verteilerplaner({ onBack } = {}) {
   })();
 const stueckliste = (() => {
     if(!plan) return [];
-    const base = berechneStueckliste(plan,mitRK,kabel,istKNX);
+    const base = berechneStueckliste(plan,mitRK,kabel,istKNX,sicherungen);
     if(!mitRK) return base;
     // Querverbinder hinzufügen wenn aktiviert
     if(mitQV && querverbinder.length>0) {
@@ -1974,7 +1991,7 @@ const stueckliste = (() => {
                       weiseKabelZu(dragKabelId.current, si.id);
                       dragKabelId.current=null;
                     }}
-                    style={{background:si.istFILS?"#14121e":"var(--bg2)",border:`1px solid ${si.istFILS?"rgba(167,139,250,0.15)":is3p?"rgba(167,139,250,0.1)":"var(--border)"}`,borderRadius:10,marginBottom:8,overflow:"hidden"}}>
+                    style={{background:si.istReserve?"#141618":si.istFILS?"#14121e":"var(--bg2)",border:`1px solid ${si.istReserve?"rgba(90,99,112,0.25)":si.istFILS?"rgba(167,139,250,0.15)":is3p?"rgba(167,139,250,0.1)":"var(--border)"}`,borderRadius:10,marginBottom:8,overflow:"hidden",opacity:si.istReserve?0.7:1}}>
 
                     {/* Sicherungs-Header */}
                     <div style={{padding:"8px 12px",background:"var(--bg3)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
@@ -2003,6 +2020,12 @@ const stueckliste = (() => {
                       <button onClick={()=>updSicherung(si.id,"istFILS",!si.istFILS)}
                         style={{padding:"3px 8px",borderRadius:5,border:`1px solid ${si.istFILS?"var(--purple)":"var(--border2)"}`,background:si.istFILS?"rgba(167,139,250,0.1)":"transparent",color:si.istFILS?"var(--purple)":"var(--text3)",cursor:"pointer",fontSize:10,fontWeight:700}}>
                         {si.istFILS?"⚡FILS":"FILS"}
+                      </button>
+                      {/* Reserve */}
+                      <button onClick={()=>updSicherung(si.id,"istReserve",!si.istReserve)}
+                        title="Als Reserveplatz markieren (leerer Sicherungsplatz)"
+                        style={{padding:"3px 8px",borderRadius:5,border:`1px solid ${si.istReserve?"var(--text2)":"var(--border2)"}`,background:si.istReserve?"rgba(158,166,175,0.15)":"transparent",color:si.istReserve?"var(--text2)":"var(--text3)",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                        {si.istReserve?"↩ Reserve":"Reserve"}
                       </button>
                       <div style={{flex:1}}/>
                       <span style={{fontSize:10,color:"var(--text3)"}}>{siKabel.length} Kabel</span>
@@ -2995,17 +3018,21 @@ const stueckliste = (() => {
           <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:14,padding:24,width:"100%",maxWidth:480,maxHeight:"80vh",overflow:"auto"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
               <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>📂 Projekt laden</div>
-              <button onClick={()=>setShowLoad(false)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer"}}>✕</button>
+              <button onClick={()=>{setShowLoad(false);setLadesuche("");}} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer"}}>✕</button>
             </div>
-            {projekte.length===0
-              ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:24}}>Keine gespeicherten Projekte</div>
-              : projekte.map(p=>(
+            {projekte.length > 3 && (
+              <input value={ladesuche} onChange={e=>setLadesuche(e.target.value)} placeholder="Projekt suchen…"
+                style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:8,padding:"8px 12px",color:"var(--text)",fontSize:13,marginBottom:12,boxSizing:"border-box"}} />
+            )}
+            {projekte.filter(p=>!ladesuche||p.name?.toLowerCase().includes(ladesuche.toLowerCase())).length===0
+              ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:24}}>{ladesuche?"Keine Projekte gefunden":"Keine gespeicherten Projekte"}</div>
+              : projekte.filter(p=>!ladesuche||p.name?.toLowerCase().includes(ladesuche.toLowerCase())).map(p=>(
                   <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 14px",marginBottom:8}}>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:600,color:"var(--text)"}}>{p.name}</div>
                       <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{p.datum} · {(p.kabel||p.stromkreise||[]).length} Kabel</div>
                     </div>
-                    <button onClick={()=>lade(p)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>Laden</button>
+                    <button onClick={()=>{lade(p);setShowLoad(false);setLadesuche("");}} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>Laden</button>
                     <button onClick={()=>loescheProjekt(p.id)} style={bDanger}>✕</button>
                   </div>
                 ))

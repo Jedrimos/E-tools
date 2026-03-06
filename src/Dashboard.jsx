@@ -3,6 +3,7 @@ import Verteilerplaner from "./Verteilerplaner.jsx";
 import Stundenbuch from "./Stundenbuch.jsx";
 import Pruefprotokoll from "./Pruefprotokoll.jsx";
 import Wissensdatenbank from "./Wissensdatenbank.jsx";
+import { isSupabaseConfigured, supabase } from "./lib/supabase.js";
 
 // ── Lokaler Speicher für Konfiguration ──
 const CONFIG_KEY = "elektronikertools_config";
@@ -12,6 +13,57 @@ function loadConfig() {
 }
 function saveConfig(cfg) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+// ── Ablauf-Check Prüfprotokoll ──
+function ladeAblaufInfo() {
+  try {
+    const protokolle = JSON.parse(localStorage.getItem("elektronikertools_pruefprotokoll")) || [];
+    const heute = new Date().toISOString().slice(0, 10);
+    const in30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    const abgelaufen = protokolle.filter(p => p.naechste_pruefung && p.naechste_pruefung < heute).length;
+    const baldFaellig = protokolle.filter(p => p.naechste_pruefung && p.naechste_pruefung >= heute && p.naechste_pruefung <= in30).length;
+    return { abgelaufen, baldFaellig };
+  } catch { return { abgelaufen: 0, baldFaellig: 0 }; }
+}
+
+// ── Backup / Restore ──
+const BACKUP_KEYS = [
+  "elektronikertools_config",
+  "elektronikertools_pruefprotokoll",
+  "elektronikertools_stundenbuch",
+  "elektronikertools_wissen",
+  "vp_projekte",
+];
+
+function exportBackup() {
+  const data = {};
+  BACKUP_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    if (v) data[k] = JSON.parse(v);
+  });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `elektronikertools_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(file, onDone) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      let count = 0;
+      BACKUP_KEYS.forEach(k => {
+        if (data[k] !== undefined) { localStorage.setItem(k, JSON.stringify(data[k])); count++; }
+      });
+      onDone(count);
+    } catch { onDone(0); }
+  };
+  reader.readAsText(file);
 }
 
 // ── App-Definitionen ──
@@ -67,8 +119,22 @@ export default function Dashboard() {
   const [config, setConfig] = useState(loadConfig);
   const [showConfig, setShowConfig] = useState(false);
   const [configDraft, setConfigDraft] = useState({});
+  const [ablauf, setAblauf] = useState({ abgelaufen: 0, baldFaellig: 0 });
+  const [dbStatus, setDbStatus] = useState("unbekannt"); // "ok" | "fehler" | "unbekannt" | "nicht-konfiguriert"
+  const [importMsg, setImportMsg] = useState("");
 
   useEffect(() => { saveConfig(config); }, [config]);
+
+  // Ablauf-Info laden beim Start
+  useEffect(() => { setAblauf(ladeAblaufInfo()); }, []);
+
+  // Supabase-Ping
+  useEffect(() => {
+    if (!isSupabaseConfigured()) { setDbStatus("nicht-konfiguriert"); return; }
+    supabase.from("projekte").select("id", { head: true, count: "exact" }).then(({ error }) => {
+      setDbStatus(error ? "fehler" : "ok");
+    }).catch(() => setDbStatus("fehler"));
+  }, []);
 
   function openConfig() {
     setConfigDraft({ ...config });
@@ -78,6 +144,16 @@ export default function Dashboard() {
   function saveConfigDraft() {
     setConfig(configDraft);
     setShowConfig(false);
+  }
+
+  function handleImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    importBackup(file, count => {
+      setImportMsg(count > 0 ? `${count} Datenbereiche wiederhergestellt. Seite neu laden!` : "Ungültige Backup-Datei.");
+      setTimeout(() => setImportMsg(""), 6000);
+    });
+    e.target.value = "";
   }
 
   // App rendern
@@ -148,32 +224,76 @@ export default function Dashboard() {
       </div>
 
       {/* App-Karten */}
-      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center", maxWidth: 800, width: "100%", marginBottom: 48 }}>
-        {APPS.map(app => (
-          <button
-            key={app.id}
-            onClick={() => setAktiveApp(app.id)}
-            style={{
-              background: app.bg,
-              border: `2px solid ${app.farbe}30`,
-              borderRadius: 18,
-              padding: "32px 28px",
-              cursor: "pointer",
-              textAlign: "left",
-              color: "var(--text)",
-              flex: "1 1 280px",
-              maxWidth: 340,
-              transition: "border-color 0.2s, transform 0.15s",
-              outline: "none",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = app.farbe; e.currentTarget.style.transform = "translateY(-2px)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = `${app.farbe}30`; e.currentTarget.style.transform = "none"; }}
-          >
-            <div style={{ fontSize: 40, marginBottom: 12 }}>{app.icon}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: app.farbe, marginBottom: 8 }}>{app.name}</div>
-            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>{app.beschreibung}</div>
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center", maxWidth: 800, width: "100%", marginBottom: 32 }}>
+        {APPS.map(app => {
+          const badge = app.id === "pruefprotokoll" && (ablauf.abgelaufen > 0 || ablauf.baldFaellig > 0);
+          return (
+            <button
+              key={app.id}
+              onClick={() => { setAktiveApp(app.id); if (app.id === "pruefprotokoll") setAblauf(ladeAblaufInfo()); }}
+              style={{
+                background: app.bg,
+                border: `2px solid ${app.farbe}30`,
+                borderRadius: 18,
+                padding: "32px 28px",
+                cursor: "pointer",
+                textAlign: "left",
+                color: "var(--text)",
+                flex: "1 1 280px",
+                maxWidth: 340,
+                transition: "border-color 0.2s, transform 0.15s",
+                outline: "none",
+                position: "relative",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = app.farbe; e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = `${app.farbe}30`; e.currentTarget.style.transform = "none"; }}
+            >
+              {badge && (
+                <div style={{
+                  position: "absolute", top: 12, right: 12,
+                  display: "flex", gap: 4, flexDirection: "column", alignItems: "flex-end",
+                }}>
+                  {ablauf.abgelaufen > 0 && (
+                    <span style={{ background: "var(--red)", color: "#fff", borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 800 }}>
+                      {ablauf.abgelaufen} abgelaufen
+                    </span>
+                  )}
+                  {ablauf.baldFaellig > 0 && (
+                    <span style={{ background: "#f59e0b", color: "#000", borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 800 }}>
+                      {ablauf.baldFaellig} bald fällig
+                    </span>
+                  )}
+                </div>
+              )}
+              <div style={{ fontSize: 40, marginBottom: 12 }}>{app.icon}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: app.farbe, marginBottom: 8 }}>{app.name}</div>
+              <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>{app.beschreibung}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Supabase-Status */}
+      <div style={{ marginBottom: 20, fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 6 }}>
+        {dbStatus === "ok" && <span style={{ color: "var(--green)" }}>● Datenbank verbunden</span>}
+        {dbStatus === "fehler" && <span style={{ color: "var(--red)" }}>● Datenbank nicht erreichbar</span>}
+        {dbStatus === "nicht-konfiguriert" && <span>💾 Lokale Speicherung (kein Supabase)</span>}
+      </div>
+
+      {/* Backup / Restore */}
+      {importMsg && (
+        <div style={{ marginBottom: 12, background: "rgba(82,217,138,0.1)", border: "1px solid rgba(82,217,138,0.3)", borderRadius: 8, padding: "8px 16px", color: "var(--green)", fontSize: 13 }}>
+          {importMsg}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", justifyContent: "center" }}>
+        <button onClick={exportBackup} style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text3)", borderRadius: 8, padding: "7px 16px", cursor: "pointer", fontSize: 12 }}>
+          ↓ Backup exportieren
+        </button>
+        <label style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text3)", borderRadius: 8, padding: "7px 16px", cursor: "pointer", fontSize: 12 }}>
+          ↑ Backup einlesen
+          <input type="file" accept=".json" onChange={handleImport} style={{ display: "none" }} />
+        </label>
       </div>
 
       {/* Einstellungen Button */}

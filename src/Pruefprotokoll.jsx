@@ -438,6 +438,7 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
           <div style={{ fontSize: 12, color: "var(--text3)" }}>{p.datum}</div>
         </div>
         {hatMessungen && <Badge status={bestanden ? "ok" : "fail"} />}
+        <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => window.print()} title="Protokoll drucken (Strg+P)">🖨 Drucken</button>
         <button style={bPrim} onClick={() => onSave(p)}>Speichern</button>
       </div>
 
@@ -619,25 +620,41 @@ function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync 
             const hatFehler = statuses.includes("fail");
             const alleOk = statuses.length > 0 && statuses.every(s => s === "ok");
             const gesamt = hatFehler ? "fail" : alleOk ? "ok" : "offen";
+            const heute = new Date().toISOString().slice(0, 10);
+            const in30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+            const istAbgelaufen = p.naechste_pruefung && p.naechste_pruefung < heute;
+            const istBaldFaellig = p.naechste_pruefung && !istAbgelaufen && p.naechste_pruefung <= in30;
 
             return (
               <div
                 key={p.id}
                 style={{
-                  background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12,
+                  background: "var(--bg2)",
+                  border: `1px solid ${istAbgelaufen ? "rgba(255,107,107,0.4)" : istBaldFaellig ? "rgba(245,158,11,0.4)" : "var(--border)"}`,
+                  borderRadius: 12,
                   padding: "14px 16px", cursor: "pointer", transition: "border-color 0.15s, transform 0.1s",
                 }}
                 onClick={() => onOpen(p)}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = AMBER + "60"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.transform = "none"; }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "none"; }}
               >
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                       <span style={{ fontWeight: 700, fontSize: 15 }}>
                         {p.auftraggeber || "Kein Auftraggeber"}
                       </span>
                       <Badge status={gesamt} />
+                      {istAbgelaufen && (
+                        <span style={{ background: "rgba(255,107,107,0.15)", color: "var(--red)", border: "1px solid rgba(255,107,107,0.3)", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
+                          ⚠ Prüffrist abgelaufen ({p.naechste_pruefung})
+                        </span>
+                      )}
+                      {istBaldFaellig && (
+                        <span style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
+                          ⏰ Fällig {p.naechste_pruefung}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text3)", display: "flex", gap: 16, flexWrap: "wrap" }}>
                       {p.anlagenstandort && <span>📍 {p.anlagenstandort}</span>}

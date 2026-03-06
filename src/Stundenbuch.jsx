@@ -132,13 +132,57 @@ function EintragForm({ initial, onSave, onCancel, projekte }) {
   );
 }
 
+// ── Wochenstunden berechnen ──
+function aktuelleWocheMinuten(eintraege) {
+  const heute = new Date();
+  const tag = heute.getDay();
+  // Montag dieser Woche
+  const montag = new Date(heute);
+  montag.setDate(heute.getDate() - (tag === 0 ? 6 : tag - 1));
+  const montagStr = montag.toISOString().slice(0, 10);
+  const sonntagStr = new Date(montag.getTime() + 6 * 864e5).toISOString().slice(0, 10);
+  return eintraege
+    .filter(e => e.datum >= montagStr && e.datum <= sonntagStr)
+    .reduce((sum, e) => sum + calcNetto(e), 0);
+}
+
 // ── Haupt-Komponente ──
 export default function Stundenbuch({ config = {} }) {
   const [eintraege, setEintraegeLive] = useState(loadData);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [filter, setFilter] = useState({ monat: new Date().toISOString().slice(0, 7), projekt: "" });
+  const [timerStart, setTimerStart] = useState(null);
+  const [timerNow, setTimerNow] = useState(null);
   const { toasts, addToast } = useToasts();
+
+  // Timer-Tick jede Sekunde
+  useEffect(() => {
+    if (!timerStart) return;
+    const iv = setInterval(() => setTimerNow(new Date()), 1000);
+    return () => clearInterval(iv);
+  }, [timerStart]);
+
+  function timerStarten() {
+    setTimerStart(new Date());
+    setTimerNow(new Date());
+  }
+
+  function timerStoppen() {
+    if (!timerStart) return;
+    const jetzt = new Date();
+    const vonStr = `${timerStart.getHours().toString().padStart(2,"0")}:${timerStart.getMinutes().toString().padStart(2,"0")}`;
+    const bisStr = `${jetzt.getHours().toString().padStart(2,"0")}:${jetzt.getMinutes().toString().padStart(2,"0")}`;
+    const datum = timerStart.toISOString().slice(0, 10);
+    setTimerStart(null);
+    setTimerNow(null);
+    setEditId(null);
+    setShowForm(true);
+    // Prefill form via global state — wir übergeben es als initiales Formular
+    setTimerVorbelegung({ datum, von: vonStr, bis: bisStr });
+  }
+
+  const [timerVorbelegung, setTimerVorbelegung] = useState(null);
 
   function setEintraege(fn) {
     setEintraegeLive(prev => {
@@ -228,25 +272,46 @@ export default function Stundenbuch({ config = {} }) {
       <Toast toasts={toasts} />
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>⏱ Stundenbuch</h2>
           <div style={{ color: "var(--text3)", fontSize: 13 }}>Zeiterfassung{config.firma ? ` – ${config.firma}` : ""}{config.mitarbeiter ? ` | ${config.mitarbeiter}` : ""}</div>
         </div>
         <div style={{ flex: 1 }} />
         <button onClick={exportCSV} style={btnStyle("rgba(33,150,201,0.1)", "var(--blue)")}>↓ CSV Export</button>
-        <button onClick={() => { setEditId(null); setShowForm(s => !s); }} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>
+        <button onClick={() => { setEditId(null); setTimerVorbelegung(null); setShowForm(s => !s); }} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>
           {showForm && !editId ? "✕ Schließen" : "+ Neuer Eintrag"}
         </button>
+      </div>
+
+      {/* Wochenstunden + Timer */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 16px", fontSize: 13 }}>
+          Diese Woche: <strong style={{ color: "var(--green)" }}>{formatDuration(aktuelleWocheMinuten(eintraege))}</strong>
+        </div>
+        {timerStart ? (
+          <button onClick={timerStoppen} style={{ ...btnStyle("rgba(255,107,107,0.12)", "var(--red)"), display: "flex", alignItems: "center", gap: 8 }}>
+            ⏹ Stop
+            {timerNow && (
+              <span style={{ fontFamily: "var(--mono)", fontSize: 13 }}>
+                {Math.floor((timerNow - timerStart) / 60000)}:{String(Math.floor(((timerNow - timerStart) % 60000) / 1000)).padStart(2,"0")}
+              </span>
+            )}
+          </button>
+        ) : (
+          <button onClick={timerStarten} style={btnStyle("rgba(82,217,138,0.08)", "var(--green)")}>
+            ▶ Timer starten
+          </button>
+        )}
       </div>
 
       {/* Formular */}
       {showForm && (
         <EintragForm
-          initial={editEintrag}
+          initial={editEintrag || timerVorbelegung || undefined}
           projekte={projekte}
-          onSave={handleSave}
-          onCancel={() => { setShowForm(false); setEditId(null); }}
+          onSave={e => { handleSave(e); setTimerVorbelegung(null); }}
+          onCancel={() => { setShowForm(false); setEditId(null); setTimerVorbelegung(null); }}
         />
       )}
 

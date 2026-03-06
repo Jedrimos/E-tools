@@ -9,22 +9,22 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ## Schnell umsetzbar ⚡
 
 ### 📋 Prüfprotokoll
-- ⚡ **Drucken / PDF** — `window.print()` + Print-CSS mit Briefkopf, Tabellen und Unterschriftsfeld. Keine externe Bibliothek nötig.
+- ✅ ~~**Drucken / PDF**~~ — Umgesetzt: `window.print()` + Print-CSS
+- ✅ ~~**Ablaufdatum-Badge im Dashboard**~~ — Umgesetzt: Badge auf Prüfprotokoll-Karte + Warnung in der Liste
 - ⚡ **Normreferenzen** — Info-Icons (ⓘ) mit Tooltip der VDE-Norm und Grenzwert-Begründung direkt bei den Messwert-Feldern.
-- ⚡ **Ablaufdatum-Badge im Dashboard** — Protokolle mit überschrittenem `naechste_pruefung`-Datum werden auf der Prüfprotokoll-Karte im Dashboard markiert.
 
 ### ⏱ Stundenbuch
-- ⚡ **Wochenstunden-Summe** — Neben der Monats-Summe auch die aktuelle Woche anzeigen.
-- ⚡ **Schnelleintrag via Timer** — Start/Stop-Button der automatisch Von/Bis-Zeit füllt.
+- ✅ ~~**Wochenstunden-Summe**~~ — Umgesetzt
+- ✅ ~~**Schnelleintrag via Timer**~~ — Umgesetzt: Start/Stop-Button füllt Von/Bis automatisch
 
 ### ⚡ Verteilerplaner
-- ⚡ **Reserveplatz-Markierung** — Sicherungsplatz als "Reserve" flaggen, erscheint grau im Plan + in der Stückliste als "1× Reserve (leer)".
-- ⚡ **Projekt-Suche** — Suchfeld in der Projektladeliste um bei vielen Projekten schnell zu filtern.
+- ✅ ~~**Reserveplatz-Markierung**~~ — Umgesetzt: Reserve-Toggle an Sicherungen, Stückliste
+- ✅ ~~**Projekt-Suche**~~ — Umgesetzt: Suchfeld in beiden Lade-Dialogen
 
 ### 🔗 App-übergreifend
-- ⚡ **Daten-Backup / Export** — Alle lokalen Daten als JSON-Datei herunterladen (vollständiges Backup aller Tools).
-- ⚡ **Daten-Import / Restore** — Backup-JSON wieder einlesen und localStorage befüllen.
-- ⚡ **Supabase Verbindungsstatus** — Kleiner Indikator im Dashboard ob die DB erreichbar ist (ping beim Start).
+- ✅ ~~**Daten-Backup / Export**~~ — Umgesetzt
+- ✅ ~~**Daten-Import / Restore**~~ — Umgesetzt
+- ✅ ~~**Supabase Verbindungsstatus**~~ — Umgesetzt: Ping-Indikator im Dashboard
 - ⚡ **Zuletzt geöffnet** — Dashboard zeigt die letzten 3 verwendeten Projekte/Protokolle als Direktlinks.
 
 ---
