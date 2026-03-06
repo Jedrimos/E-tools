@@ -20,7 +20,6 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ### ⚡ Verteilerplaner
 - ✅ ~~**Reserveplatz-Markierung**~~ — Umgesetzt: Reserve-Toggle an Sicherungen, Stückliste
 - ✅ ~~**Projekt-Suche**~~ — Umgesetzt: Suchfeld in beiden Lade-Dialogen
-Klemmbezeichnunge. je Fi abhängig von FI nummer. vorne an der einspeisse klemme bei z.b q1 ist dann X1 und die klemmen dann forlaufend ab 1 bei Q2 ist dann x2 und die reihenklemmen fortlaufend ab 1
 
 ### 🔗 App-übergreifend
 - ✅ ~~**Daten-Backup / Export**~~ — Umgesetzt
