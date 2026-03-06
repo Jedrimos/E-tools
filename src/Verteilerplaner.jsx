@@ -73,7 +73,7 @@ const mkSicherung = () => ({
   filsBemessung:40, filsTyp:"A", filsFehlerstrom:30, filsPole:4, istReserve:false,
 });
 
-const mkFI = () => ({ id:uid(), bemessung:40, fiTyp:"A", fehlerstrom:30, pole:4, phasenschiene:true });
+const mkFI = () => ({ id:uid(), bemessung:40, fiTyp:"A", fehlerstrom:30, pole:4, phasenschiene:true, phasenschieneN:false });
 
 // ── Planverteilung ──
 function verteile(sicherungen, fiKonfigs) {
@@ -175,7 +175,8 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherung
     add(`fi_${fi.bemessung}_${fi.fiTyp}_${fi.fehlerstrom}_${fi.pole}`,`FI-Schutzschalter ${fiBeschreibung(fi)}`,1,"FI-Schutzschalter");
     // Phasenschiene
     if (fi.phasenschiene) {
-      add(`ps_${fi.pole}p`,`Phasenschiene ${fiPhasenschiene(fi.pole)}`,1,"Phasenschiene");
+      const psTypLabel = fi.pole>=4 ? (fi.phasenschieneN ? "3-phasig+N (4-Leiter)" : "3-phasig (3-Leiter)") : "1-phasig";
+      add(`ps_${fi.pole}p_${fi.phasenschieneN?"4l":"3l"}`,`Phasenschiene ${psTypLabel}`,1,"Phasenschiene");
       add("abdeckung_ps","Abdeckung Phasenschiene (links+rechts)",2,"Phasenschiene");
       const leer=Math.max(0,fiMaxTE(fi.pole)-fi.belegteTE);
       if (leer>0) add("abdeckkappe_pol","Abdeckkappe (leere Polstelle)",leer,"Phasenschiene");
@@ -189,9 +190,9 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherung
     });
     // Reihenklemmen pro FI-Block — exakt wie buildSeq
     if (mitRK) {
-      // Immer: PE-Einspeisung; N-Einspeisung nur wenn N-Brücke gewählt
+      // Immer: PE-Einspeisung + N-Einspeisung (Klemmsteine immer vorhanden)
       add("pe_einspeisung","PE-Einspeiseklemme (Erdung)",1,"Reihenklemmen");
-      if(mitNBruecke) add("n_einspeisung","N-Einspeiseklemme",1,"Reihenklemmen");
+      add("n_einspeisung","N-Einspeiseklemme",1,"Reihenklemmen");
       // Kabelklemmen
       let hatKlemmen=0;
       fi.stromkreise.forEach(sk => {
@@ -213,8 +214,8 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherung
       if (hatKlemmen>0||istKNX) {
         add("abdeckkappe_orange","Abdeckkappe orange (Endschutz Klemmenblock)",1,"Reihenklemmen");
       }
-      // N-Endklemme: nur wenn N-Brücke aktiv
-      if(mitNBruecke) add("n_endklemme","N-Endklemme",1,"Reihenklemmen");
+      // N-Endklemme: immer (Klemmstein immer vorhanden)
+      add("n_endklemme","N-Endklemme",1,"Reihenklemmen");
     }
   });
 
@@ -1293,7 +1294,7 @@ export default function Verteilerplaner({ onBack } = {}) {
     const addSpecial=(type,lbl=null)=>groups.push({kabelLabel:null,kabelColor:null,klemmen:[{type,label:lbl}]});
     if(!isFils){
       addSpecial("pe_einspeisung","PE-Einsp.");
-      if(mitNBruecke) addSpecial("n_einspeisung","N-Einsp.");
+      addSpecial("n_einspeisung","N-Einsp.");
       let hatKlemmen=0;
       stromkreise.forEach(sk=>{
         (sk.kabelIds||[]).forEach(kid=>{
@@ -1318,7 +1319,7 @@ export default function Verteilerplaner({ onBack } = {}) {
       if(hatKlemmen>0||istKNX){
         addSpecial("abdeckkappe_orange");
       }
-      if(mitNBruecke) addSpecial("n_endklemme","N-End.");
+      addSpecial("n_endklemme","N-End.");
     } else {
       // FILS: kein NE/NX, aber PE-Klemme am Anfang
       addSpecial("pe_einspeisung","FILS PE");
@@ -2374,43 +2375,53 @@ const stueckliste = (() => {
                     {fi.phasenschiene&&(()=>{
                       // DIN-Aderfarben: L1=braun, L2=schwarz, L3=grau, N=blau
                       const C={L1:"#a05428",L2:"#555555",L3:"#7a8899",N:"#1d6dbf"};
-                      const cycle=fi.pole>=4?["L1","L2","L3"]:["L1"];
+                      // 3-Leiter: LS-Bereich zyklisch L1/L2/L3
+                      // 4-Leiter+N: gesamte Schiene zyklisch L1/L2/L3/N
+                      const mit4L = fi.pole>=4 && fi.phasenschieneN;
+                      const lsCycle = fi.pole>=4
+                        ? (mit4L ? ["L1","L2","L3","N"] : ["L1","L2","L3"])
+                        : ["L1"];
                       let ci=0;
-                      // Pin helper
-                      const Pin=({l,dim,w=28})=>(
-                        <div style={{width:w,height:14,borderRadius:3,flexShrink:0,
+                      const Pin=({l,dim})=>(
+                        <div style={{width:28,height:14,borderRadius:3,flexShrink:0,
                           background:C[l]+(dim?"18":"33"),border:`1px solid ${C[l]}${dim?"44":"99"}`,
                           display:"flex",alignItems:"center",justifyContent:"center"}}>
                           <span style={{fontSize:7,color:C[l]+(dim?"88":""),fontWeight:800,fontFamily:"var(--mono)"}}>{l}</span>
                         </div>
                       );
-                      // FI-Schiene: L1,L2,L3,N für 4-pol / L1,N für 2-pol
+                      // FI-Pins: L1,L2,L3,N für 4-pol / L1,N für 2-pol
                       const fiPins=fi.pole>=4?["L1","L2","L3","N"]:["L1","N"];
+                      const fiW=(fi.pole||4)*28+((fi.pole||4)-1)*4;
                       // LS-Pins aufbauen
                       const lsPins=[];
-                      const fiW=(fi.pole||4)*28+((fi.pole||4)-1)*4;
                       fi.stromkreise.forEach(sk=>{
                         const sInfo=STD_SICHERUNGEN.find(s=>s.id===sk.sicherung);
                         const te=sInfo?.te||1;
-                        if(sk.istReserve){
-                          for(let j=0;j<te;j++){lsPins.push({l:cycle[ci%cycle.length],dim:true});ci++;}
-                        } else if(sk.is3p&&fi.pole>=4){
-                          lsPins.push({l:"L1",dim:false});lsPins.push({l:"L2",dim:false});lsPins.push({l:"L3",dim:false});
+                        if(!mit4L && sk.is3p && fi.pole>=4){
+                          // 3-Leiter: 3-phasige LS → L1,L2,L3
+                          lsPins.push({l:"L1",dim:sk.istReserve});
+                          lsPins.push({l:"L2",dim:sk.istReserve});
+                          lsPins.push({l:"L3",dim:sk.istReserve});
                           ci+=3;
                         } else {
-                          for(let j=0;j<te;j++){lsPins.push({l:cycle[ci%cycle.length],dim:false});ci++;}
+                          for(let j=0;j<te;j++){
+                            lsPins.push({l:lsCycle[ci%lsCycle.length],dim:!!sk.istReserve});
+                            ci++;
+                          }
                         }
                       });
                       // Leerstellen
                       const usedTE=fi.stromkreise.reduce((s,sk)=>{const inf=STD_SICHERUNGEN.find(x=>x.id===sk.sicherung);return s+(inf?.te||1);},0);
-                      for(let i=0;i<Math.max(0,fiMaxTE(fi.pole)-usedTE);i++){lsPins.push({l:cycle[ci%cycle.length],dim:true});ci++;}
+                      for(let i=0;i<Math.max(0,fiMaxTE(fi.pole)-usedTE);i++){
+                        lsPins.push({l:lsCycle[ci%lsCycle.length],dim:true});ci++;
+                      }
                       return(
                         <div style={{marginTop:3,display:"flex",gap:4,alignItems:"center",minWidth:"max-content"}}>
                           {/* FI-Pins */}
-                          <div style={{display:"flex",gap:4,width:fiW}}>
+                          <div style={{display:"flex",gap:4,width:fiW,flexShrink:0}}>
                             {fiPins.map((l,idx)=><Pin key={idx} l={l} dim={false}/>)}
                           </div>
-                          {/* Trennlinie (gleiche Breite wie im Plan) */}
+                          {/* Trennlinie (entspricht Separator im Plan) */}
                           <div style={{width:11,flexShrink:0}}/>
                           {/* LS-Pins */}
                           {lsPins.map((p,idx)=><Pin key={idx} l={p.l} dim={p.dim}/>)}
@@ -2918,6 +2929,23 @@ const stueckliste = (() => {
                     {fi.phasenschiene?"✓ Phasenschiene aktiv":"Phasenschiene aus"}
                   </button>
                 </F>
+                {fi.phasenschiene&&fi.pole>=4&&(
+                  <F label="Phasenschienen-Typ">
+                    <div style={{display:"flex",gap:4}}>
+                      {[{v:false,label:"3-Leiter",sub:"L1·L2·L3"},{v:true,label:"4-Leiter +N",sub:"L1·L2·L3·N"}].map(({v,label,sub})=>(
+                        <button key={String(v)} onClick={()=>updPlanFI(fi.id,"phasenschieneN",v)}
+                          style={{flex:1,padding:"7px 6px",borderRadius:7,
+                            border:`1px solid ${fi.phasenschieneN===v?"var(--blue)":"var(--border)"}`,
+                            background:fi.phasenschieneN===v?"rgba(33,150,201,0.1)":"transparent",
+                            color:fi.phasenschieneN===v?"var(--blue)":"var(--text3)",
+                            cursor:"pointer",textAlign:"center"}}>
+                          <div style={{fontSize:11,fontWeight:700}}>{label}</div>
+                          <div style={{fontSize:9,opacity:0.7,fontFamily:"var(--mono)",marginTop:1}}>{sub}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </F>
+                )}
                 <button onClick={closePlanEdit} style={{...bPrimary,width:"100%",marginTop:8}}>Fertig</button>
               </div>
             </div>
