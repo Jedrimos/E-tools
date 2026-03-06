@@ -6,6 +6,24 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.4] – 2026-03-06
+
+### ✨ Neu
+
+**Prüfprotokoll**
+- Fortschrittsring (SVG) im Editor-Header: zeigt % der gemessenen Stromkreise live an
+- Ctrl+S / Cmd+S speichert das Protokoll direkt aus dem Editor
+
+**Stundenbuch**
+- Ctrl+S / Cmd+S speichert den Stunden-Eintrag im offenen Formular
+- Feierabend-Hinweis: läuft der Timer ≥ 8h, erscheint eine diskrete Meldung mit der Gesamtzeit
+
+**Dashboard**
+- Live-Stats unterhalb des Titels: Verteiler-Anzahl, Protokoll-Anzahl, Arbeitsstunden diesen Monat
+- Stats aktualisieren sich automatisch beim Zurücknavigieren
+
+---
+
 ## [2026.3.3] – 2026-03-06
 
 ### ✨ Neu

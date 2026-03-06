@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Toast, { useToasts } from "./components/Toast.jsx";
 import {
   loadProtokolleDB, saveProtokollDB, deleteProtokollDB,
@@ -398,9 +398,34 @@ function SectionHead({ children }) {
 }
 
 // ── Protokoll-Editor ──────────────────────────────────────────────────────────
+// ── Fortschrittsring ─────────────────────────────────────────────────────────
+function FortschrittsRing({ gemessen, gesamt, size = 48 }) {
+  const pct = gesamt === 0 ? 0 : Math.round((gemessen / gesamt) * 100);
+  const r = (size - 6) / 2;
+  const umfang = 2 * Math.PI * r;
+  const dash = (pct / 100) * umfang;
+  const farbe = pct === 100 ? "var(--green)" : pct > 0 ? AMBER : "var(--border2)";
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={4} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={farbe} strokeWidth={4}
+          strokeDasharray={`${dash} ${umfang}`} strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 0.4s ease" }} />
+      </svg>
+      <div style={{
+        position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 800, color: farbe, fontFamily: "var(--mono)",
+      }}>{pct}%</div>
+    </div>
+  );
+}
+
 function ProtokollEditor({ protokoll, onSave, onBack, config }) {
   const [p, setP] = useState(protokoll);
   const [expanded, setExpanded] = useState(new Set());
+  const pRef = useRef(p);
+  pRef.current = p;
 
   function setField(key, val) { setP(x => ({ ...x, [key]: val })); }
 
@@ -423,23 +448,39 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
     setExpanded(e => { const n = new Set(e); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
+  // Ctrl+S speichert
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        onSave(pRef.current);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onSave]);
+
   const bestanden = p.stromkreise.every(s => evalStromkreis(s) !== "fail");
   const hatMessungen = p.stromkreise.some(s => evalStromkreis(s) !== "offen");
+  const gemessen = p.stromkreise.filter(s => evalStromkreis(s) !== "offen").length;
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px" }}>
       {/* Kopfzeile */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
         <button style={{ ...bSec, padding: "8px 12px" }} onClick={onBack}>← Zurück</button>
+        <FortschrittsRing gemessen={gemessen} gesamt={p.stromkreise.length} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800, fontSize: 17 }}>
             {p.auftraggeber || p.anlagenstandort || "Neues Protokoll"}
           </div>
-          <div style={{ fontSize: 12, color: "var(--text3)" }}>{p.datum}</div>
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>
+            {p.datum} · {gemessen}/{p.stromkreise.length} Stromkreise gemessen
+          </div>
         </div>
         {hatMessungen && <Badge status={bestanden ? "ok" : "fail"} />}
         <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => window.print()} title="Protokoll drucken (Strg+P)">🖨 Drucken</button>
-        <button style={bPrim} onClick={() => onSave(p)}>Speichern</button>
+        <button style={bPrim} onClick={() => onSave(p)} title="Speichern (Strg+S)">Speichern</button>
       </div>
 
       {/* Kopfdaten */}

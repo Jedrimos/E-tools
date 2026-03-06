@@ -27,6 +27,29 @@ function ladeAblaufInfo() {
   } catch { return { abgelaufen: 0, baldFaellig: 0 }; }
 }
 
+// ── Live-Stats ──
+function ladeLiveStats() {
+  try {
+    const projekte   = JSON.parse(localStorage.getItem("vp_projekte") || "[]");
+    const protokolle = JSON.parse(localStorage.getItem("elektronikertools_pruefprotokoll") || "[]");
+    const eintraege  = JSON.parse(localStorage.getItem("elektronikertools_stundenbuch") || "[]");
+    const monat = new Date().toISOString().slice(0, 7);
+    const minuten = eintraege
+      .filter(e => e.datum?.startsWith(monat))
+      .reduce((sum, e) => {
+        const von = e.von?.split(":").map(Number); const bis = e.bis?.split(":").map(Number);
+        if (!von || !bis) return sum;
+        return sum + Math.max(0, (bis[0]*60+bis[1]) - (von[0]*60+von[1]) - (e.pause||0));
+      }, 0);
+    return {
+      projekte: projekte.length,
+      protokolle: protokolle.length,
+      stundenMonat: Math.floor(minuten / 60),
+      minutenRest: minuten % 60,
+    };
+  } catch { return { projekte: 0, protokolle: 0, stundenMonat: 0, minutenRest: 0 }; }
+}
+
 // ── Backup / Restore ──
 const BACKUP_KEYS = [
   "elektronikertools_config",
@@ -122,11 +145,12 @@ export default function Dashboard() {
   const [ablauf, setAblauf] = useState({ abgelaufen: 0, baldFaellig: 0 });
   const [dbStatus, setDbStatus] = useState("unbekannt"); // "ok" | "fehler" | "unbekannt" | "nicht-konfiguriert"
   const [importMsg, setImportMsg] = useState("");
+  const [stats, setStats] = useState(ladeLiveStats);
 
   useEffect(() => { saveConfig(config); }, [config]);
 
-  // Ablauf-Info laden beim Start
-  useEffect(() => { setAblauf(ladeAblaufInfo()); }, []);
+  // Ablauf-Info + Stats laden beim Start und wenn zurück zum Dashboard
+  useEffect(() => { setAblauf(ladeAblaufInfo()); setStats(ladeLiveStats()); }, []);
 
   // Supabase-Ping
   useEffect(() => {
@@ -157,10 +181,16 @@ export default function Dashboard() {
   }
 
   // App rendern
+  function zurueck() {
+    setAktiveApp(null);
+    setAblauf(ladeAblaufInfo());
+    setStats(ladeLiveStats());
+  }
+
   if (aktiveApp === "verteilerplaner") {
     return (
       <div>
-        <Verteilerplaner onBack={() => setAktiveApp(null)} />
+        <Verteilerplaner onBack={zurueck} />
       </div>
     );
   }
@@ -168,7 +198,7 @@ export default function Dashboard() {
   if (aktiveApp === "stundenbuch") {
     return (
       <div>
-        <TopBar label="Stundenbuch" icon="⏱" farbe="#3dcc7e" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        <TopBar label="Stundenbuch" icon="⏱" farbe="#3dcc7e" onBack={zurueck} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Stundenbuch config={config} />
       </div>
@@ -178,7 +208,7 @@ export default function Dashboard() {
   if (aktiveApp === "pruefprotokoll") {
     return (
       <div>
-        <TopBar label="Prüfprotokoll" icon="📋" farbe="#f59e0b" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        <TopBar label="Prüfprotokoll" icon="📋" farbe="#f59e0b" onBack={zurueck} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Pruefprotokoll config={config} />
       </div>
@@ -188,7 +218,7 @@ export default function Dashboard() {
   if (aktiveApp === "wissen") {
     return (
       <div>
-        <TopBar label="Wissensdatenbank" icon="📚" farbe="#06b6d4" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        <TopBar label="Wissensdatenbank" icon="📚" farbe="#06b6d4" onBack={zurueck} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Wissensdatenbank config={config} />
       </div>
@@ -221,6 +251,30 @@ export default function Dashboard() {
         <div style={{ color: "var(--text3)", fontSize: 13, marginTop: 4 }}>
           Werkzeuge für Elektrofachkräfte
         </div>
+        {(stats.projekte > 0 || stats.protokolle > 0 || stats.stundenMonat > 0) && (
+          <div style={{ display: "flex", gap: 20, marginTop: 16, justifyContent: "center", flexWrap: "wrap" }}>
+            {stats.projekte > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#4bc8e8", fontFamily: "var(--mono)" }}>{stats.projekte}</div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>Verteiler</div>
+              </div>
+            )}
+            {stats.protokolle > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#f59e0b", fontFamily: "var(--mono)" }}>{stats.protokolle}</div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>Protokolle</div>
+              </div>
+            )}
+            {stats.stundenMonat > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--green)", fontFamily: "var(--mono)" }}>
+                  {stats.stundenMonat}h{stats.minutenRest > 0 ? ` ${stats.minutenRest}min` : ""}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>diesen Monat</div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* App-Karten */}

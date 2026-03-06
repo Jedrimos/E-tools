@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Toast, { useToasts } from "./components/Toast.jsx";
 import { loadStundenDB, saveEintragDB, deleteEintragDB } from "./lib/db_stundenbuch.js";
 
@@ -63,8 +63,22 @@ function saveData(data) {
 function EintragForm({ initial, onSave, onCancel, projekte }) {
   const [form, setForm] = useState(initial || mkEintrag());
   const netto = calcNetto(form);
+  const formRef = useRef(form);
+  formRef.current = form;
 
   function set(key, val) { setForm(f => ({ ...f, [key]: val })); }
+
+  // Ctrl+S speichert
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        onSave(formRef.current);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onSave]);
 
   return (
     <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 16 }}>
@@ -289,16 +303,27 @@ export default function Stundenbuch({ config = {} }) {
         <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 16px", fontSize: 13 }}>
           Diese Woche: <strong style={{ color: "var(--green)" }}>{formatDuration(aktuelleWocheMinuten(eintraege))}</strong>
         </div>
-        {timerStart ? (
-          <button onClick={timerStoppen} style={{ ...btnStyle("rgba(255,107,107,0.12)", "var(--red)"), display: "flex", alignItems: "center", gap: 8 }}>
-            ⏹ Stop
-            {timerNow && (
-              <span style={{ fontFamily: "var(--mono)", fontSize: 13 }}>
-                {Math.floor((timerNow - timerStart) / 60000)}:{String(Math.floor(((timerNow - timerStart) % 60000) / 1000)).padStart(2,"0")}
-              </span>
-            )}
-          </button>
-        ) : (
+        {timerStart ? (() => {
+          const vergangen = timerNow ? timerNow - timerStart : 0;
+          const minuten = Math.floor(vergangen / 60000);
+          const sek = Math.floor((vergangen % 60000) / 1000);
+          const istFeierabend = minuten >= 480; // 8h
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={timerStoppen} style={{ ...btnStyle("rgba(255,107,107,0.12)", "var(--red)"), display: "flex", alignItems: "center", gap: 8 }}>
+                ⏹ Stop
+                <span style={{ fontFamily: "var(--mono)", fontSize: 13 }}>
+                  {Math.floor(minuten / 60)}:{String(minuten % 60).padStart(2,"0")}:{String(sek).padStart(2,"0")}
+                </span>
+              </button>
+              {istFeierabend && (
+                <span style={{ fontSize: 12, color: "var(--green)", background: "rgba(82,217,138,0.08)", border: "1px solid rgba(82,217,138,0.2)", borderRadius: 8, padding: "4px 10px" }}>
+                  Feierabend? 🎯 {Math.floor(minuten / 60)}h {minuten % 60}min
+                </span>
+              )}
+            </div>
+          );
+        })() : (
           <button onClick={timerStarten} style={btnStyle("rgba(82,217,138,0.08)", "var(--green)")}>
             ▶ Timer starten
           </button>
