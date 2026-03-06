@@ -2,6 +2,10 @@
 
 Einfache Zeiterfassung für Elektriker, Monteure und Servicetechniker.
 
+**Version:** `2026.3.3` | **Farbe:** `#3dcc7e` (grün)
+
+---
+
 ## Felder pro Eintrag
 
 | Feld | Pflicht | Beschreibung |
@@ -55,3 +59,34 @@ CREATE TABLE stunden (
   updated_at  timestamptz DEFAULT now()
 );
 ```
+
+---
+
+## Roadmap
+
+### Kurzfristig
+- **Monatsübersicht / Diagramm** — Gestapeltes Balkendiagramm der Arbeitsstunden pro Projekt über den Monat.
+- **Tagesberichte** — Strukturierter Tagesbericht als Nachweis für den Auftraggeber (was wurde gemacht, welche Materialien verbraucht).
+
+### Mittelfristig
+- **Lohnabrechnung** — Stundenlohn hinterlegen, automatische Bruttolohn-Berechnung pro Monat, Export als PDF-Lohnzettel.
+- **Regiezettel / Rechnungsexport** — Aus Stunden + Materialien (vom Verteilerplaner) direkt eine Regie-Rechnung generieren.
+
+---
+
+## Changelog
+
+### [2026.3.3] – 2026-03-05
+#### ✨ Neu
+- **Supabase-Sync** — Beim Start automatisch aus Supabase laden, nach jedem Speichern/Löschen synchronisieren. `☁ Datenbank`-Indikator wenn aktiv.
+- `db_id` pro Eintrag für sicheres Update/Delete in Supabase.
+- **`src/lib/db_stundenbuch.js`** — DB-Layer für `stunden`-Tabelle (CRUD mit Supabase→localStorage-Fallback).
+
+---
+
+### [2026.3.0] – 2026-03-05
+#### 🎉 Erstveröffentlichung
+- Zeiterfassung mit Datum, Von/Bis, Pause, Projekt/Baustelle, Tätigkeit und Notiz
+- Monatsfilter, Projektfilter, Gesamtstunden-Anzeige
+- CSV-Export als Stundennachweis (Excel-kompatibel)
+- Speicherung in `localStorage`

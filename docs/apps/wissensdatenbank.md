@@ -2,6 +2,10 @@
 
 Firmeninternes Wissen strukturiert erfassen und im Team teilen. Checklisten, Herstellerhinweise, Montagetipps, Normen – alles an einem Ort.
 
+**Version:** `2026.3.4` | **Farbe:** `#06b6d4` (teal)
+
+---
+
 ## Anwendungsfälle
 
 - Inbetriebnahme-Checklisten für bestimmte Wechselrichter-/Anlagentypen
@@ -100,11 +104,30 @@ CREATE TABLE wissensdatenbank (
 );
 ```
 
-## Geplante Erweiterungen
+---
 
-Siehe [ROADMAP.md](../../ROADMAP.md):
-- Anhänge / Bilder in Artikeln
-- Versionierung von Artikeländerungen
-- Bewertungen / Hilfreich-Markierungen
-- Export als PDF
-- Verlinkung zwischen Artikeln
+## Roadmap
+
+### Kurzfristig
+- **Anhänge / Bilder in Artikeln** — Fotos oder PDFs an Artikel anhängen (Supabase Storage).
+- **Export als PDF** — Artikel als druckbares PDF exportieren.
+
+### Mittelfristig
+- **Verlinkung zwischen Artikeln** — `[[Artikelname]]`-Syntax oder ähnliches.
+- **Bewertungen / Hilfreich-Markierungen** — Artikel als hilfreich markieren, Sortierung nach Beliebtheit.
+- **Versionierung von Artikeländerungen** — Änderungshistorie pro Artikel.
+
+---
+
+## Changelog
+
+### [2026.3.4] – 2026-03-05
+#### 🎉 Erstveröffentlichung
+- Artikel mit Titel, Kategorie (10 Voreinstellungen), Tags, Autor und Markdown-Inhalt
+- Volltextsuche (Titel, Inhalt, Tags, Autor) + Kategoriefilter in Echtzeit
+- Artikel-Karten-Übersicht + Detailansicht mit gerendertem Markdown
+- Markdown-Renderer: Überschriften, fett, kursiv, code, Listen, Blockquote, Codeblöcke
+- Live-Vorschau im Editor
+- Team-Sharing via Supabase (`☁ Geteilt im Team`-Indikator)
+- Warnung wenn Supabase nicht konfiguriert
+- `src/lib/db_wissen.js` — Supabase CRUD für `wissensdatenbank`-Tabelle

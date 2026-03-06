@@ -1469,7 +1469,9 @@ const stueckliste = (() => {
       <div className="no-print" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
 
         {/* LEFT: Logo + Version */}
-        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+        <div onClick={()=>setShowStartScreen(true)} title="Zur Startseite" style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,cursor:"pointer",borderRadius:8,padding:"4px 6px",transition:"background 0.15s"}}
+          onMouseEnter={e=>e.currentTarget.style.background="var(--bg3)"}
+          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
           <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="0" y="0" width="12" height="12" rx="2.5" fill="#2196C9"/>
             <rect x="0" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>

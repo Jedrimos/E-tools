@@ -6,6 +6,17 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.5] – 2026-03-06
+
+### Verteilerplaner: Logo klickbar → Zurück zur Startauswahl
+
+### 🔧 Geändert
+- **Verteilerplaner:** Logo im Header ist jetzt klickbar — Klick auf das SVP-Logo bringt den Nutzer zurück zum Startfenster (Neues Projekt / Laden)
+- Hover-Effekt am Logo signalisiert die Klickbarkeit
+- `title="Zur Startseite"` als Tooltip
+
+---
+
 ## [2026.3.4] – 2026-03-05
 
 ### Neues Tool: Wissensdatenbank + docs/ Ordner + CLAUDE.md
