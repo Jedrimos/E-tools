@@ -230,15 +230,15 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherung
         `FI-Schutzschalter ${filsBem}A Typ ${filsTyp} ${filsFs}mA ${filsPole}P (FILS)`,1,"FILS");
     if (mitRK) {
       // FILS: PE-Einspeiseklemme, dann Kabelklemmen, dann Kappe wenn Klemmen vorhanden
+      // rk_n_fils = 3-pol (PE+L1+N direkt) → 1× pro Kabel, kein rk_mit_pe
       add("pe_einspeisung","PE-Einspeiseklemme (Erdung)",1,"Reihenklemmen");
       let hatKlemmen=0;
       (sk.kabelIds||[]).forEach(kid => {
         const k = alleKabel.find(x=>x.id===kid);
         if (!k) return;
-        const {mitPE,ohnePE} = klemmenFuerKabel(k.kabelAdern);
-        add("rk_mit_pe","Reihenklemme mit PE (3-polig)",mitPE,"Reihenklemmen");
+        const {ohnePE} = klemmenFuerKabel(k.kabelAdern);
+        add("rk_n_fils","N-Klemme FILS (3-polig, PE+L1+N)",1,"Reihenklemmen"); // 1× pro Kabel
         if (ohnePE>0) add("rk_ohne_pe","Reihenklemme ohne PE (2-polig)",ohnePE,"Reihenklemmen");
-        add("rk_n_fils","N-Klemme FILS (2-polig)",1,"Reihenklemmen"); // N-Klemme pro Kabel bei FILS
         hatKlemmen++;
       });
       if (hatKlemmen>0) add("abdeckkappe_orange","Abdeckkappe orange (Endschutz Klemmenblock)",1,"Reihenklemmen");
@@ -1283,7 +1283,7 @@ export default function Verteilerplaner({ onBack } = {}) {
     "pe_einspeisung": {bg:"rgba(82,217,138,0.12)",border:"rgba(82,217,138,0.5)",label:"PE",color:"var(--green)",w:22},
     "rk_mit_pe":     {bg:"#1a2e1a",border:"rgba(82,217,138,0.25)",label:"PE",color:"var(--green)",w:22},
     "rk_ohne_pe":    {bg:"#181818",border:"#44444466",label:"",color:"var(--text3)",w:22},
-    "rk_n_fils":     {bg:"rgba(33,150,201,0.08)",border:"rgba(33,150,201,0.3)",label:"N",color:"var(--blue)",w:22},
+    "rk_n_fils":     {bg:"rgba(33,150,201,0.12)",border:"rgba(33,150,201,0.45)",label:"N",color:"var(--blue)",w:22},
     "n_einspeisung": {bg:"rgba(33,150,201,0.1)",border:"rgba(33,150,201,0.35)",label:"NE",color:"var(--blue)",w:22},
     "n_endklemme":   {bg:"rgba(33,150,201,0.05)",border:"rgba(33,150,201,0.2)",label:"NX",color:"var(--text3)",w:22},
     "rk_reserve_knx":{bg:"#2a1a2a",border:"#d45db5",label:"R",color:"#d45db5",w:22},
@@ -1308,7 +1308,7 @@ export default function Verteilerplaner({ onBack } = {}) {
           const klemmen=[];
           for(let i=0;i<mitPE;i++) klemmen.push({type:"rk_mit_pe",label:lbl});
           for(let i=0;i<ohnePE;i++) klemmen.push({type:"rk_ohne_pe",label:lbl});
-          groups.push({kabelLabel:lbl, kabelColor:col, klemmen, sicherung:sk.sicherung});
+          groups.push({kabelLabel:lbl, kabelColor:col, klemmen, sicherung:sk.sicherung, skId:sk.id});
           hatKlemmen++;
         });
       });
@@ -1324,19 +1324,18 @@ export default function Verteilerplaner({ onBack } = {}) {
       addSpecial("n_endklemme","N-End.");
     } else {
       // FILS: kein NE/NX, aber PE-Klemme am Anfang
-      // Pro Kabel: rk_mit_pe (L1+PE) + rk_ohne_pe (L2+L3 bei 5×) + rk_n_fils (N, da keine N-Schiene)
+      // Pro Kabel: rk_n_fils (3-pol: PE+L1+N direkt) + rk_ohne_pe (L2+L3 bei 5×)
       addSpecial("pe_einspeisung","FILS PE");
       let hatKlemmen=0;
       (filsSk.kabelIds||[]).forEach(kid=>{
         const k=kabel.find(x=>x.id===kid);
         if(!k)return;
-        const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
+        const {ohnePE}=klemmenFuerKabel(k.kabelAdern);
         const lbl=k.bezeichnung||k.raum||"?";
         const col=swColor(k.stockwerk);
         const klemmen=[];
-        for(let i=0;i<mitPE;i++) klemmen.push({type:"rk_mit_pe",label:lbl});
-        for(let i=0;i<ohnePE;i++) klemmen.push({type:"rk_ohne_pe",label:lbl});
-        klemmen.push({type:"rk_n_fils",label:lbl}); // N-Klemme immer bei FILS
+        klemmen.push({type:"rk_n_fils",label:lbl}); // 3-pol: PE+L1+N (immer bei FILS)
+        for(let i=0;i<ohnePE;i++) klemmen.push({type:"rk_ohne_pe",label:lbl}); // L2+L3 bei 5×
         groups.push({kabelLabel:lbl, kabelColor:col, klemmen});
         hatKlemmen++;
       });
@@ -1367,16 +1366,16 @@ export default function Verteilerplaner({ onBack } = {}) {
     return seq;
   };
 
-  // Flache Klemmensequenz für FILS (inkl. N-Klemme pro Kabel)
+  // Flache Klemmensequenz für FILS
+  // rk_n_fils ist 3-pol (PE+L1+N) → immer 'N' pro Kabel; rk_ohne_pe (L2+L3) → 'LL'
   const buildKlemmenSeqFILS = (kids) => {
     const seq=[];
     kids.forEach(kid=>{
       const k=kabel.find(x=>x.id===kid);
       if(!k) return;
-      const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
-      for(let i=0;i<mitPE;i++) seq.push('L');   // L1+PE
+      const {ohnePE}=klemmenFuerKabel(k.kabelAdern);
+      seq.push('N');                              // rk_n_fils: PE+L1+N (3-pol)
       for(let i=0;i<ohnePE;i++) seq.push('LL'); // L2+L3
-      seq.push('N');                              // N-Klemme (immer bei FILS)
     });
     return seq;
   };
@@ -1416,9 +1415,8 @@ export default function Verteilerplaner({ onBack } = {}) {
       });
     });
 
-    // FILS → L-Bridge + N-Bridge
-    // Keine N-Schiene → N-Klemmen müssen extra gebrückt werden
-    // Pins anderer Klemmentypen im Span → abzwicken
+    // FILS → N-Bridge (rk_n_fils = 3-pol PE+L1+N, kein rk_mit_pe mehr)
+    // Bei 5×-Kabeln: LL-Klemmen (L2+L3) im N-Bridge Span → abzwicken
     plan.fils.forEach((sk,i)=>{
       const kids=sk.kabelIds||[];
       if(kids.length<2) return;
@@ -1426,10 +1424,6 @@ export default function Verteilerplaner({ onBack } = {}) {
       const fLabel=`Q${plan.gruppen.length+i+1} FILS`;
       const skLabel=kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean)
                        .map(k=>k.bezeichnung||k.raum||'?').join(' + ');
-      const lBridge=berechneBridge(seq,'L');
-      if(lBridge&&lBridge.count>=2)
-        result.push({fLabel,skLabel,ports:lBridge.ports,clipPins:lBridge.clipPins,
-                     count:lBridge.count,typ:'L',color:'#ff6b6b',fils:true});
       const nBridge=berechneBridge(seq,'N');
       if(nBridge&&nBridge.count>=2)
         result.push({fLabel,skLabel,ports:nBridge.ports,clipPins:nBridge.clipPins,
@@ -1461,7 +1455,8 @@ const stueckliste = (() => {
     // N-Brücke: Länge = (alle Klemmen im Block + Abdeckkappen) × Rastermaß 6,2mm
     // + 1× Abdeckung gleicher Länge je Block (identische Länge)
     if(mitNBruecke && plan.gruppen.length>0) {
-      plan.gruppen.forEach((fi,fiIdx) => {
+      const laengenMap = {};
+      plan.gruppen.forEach(fi => {
         let klemmenAnzahl = 2; // PE-Einspeisung + N-Einspeisung
         let kappenAnzahl  = 0;
         fi.stromkreise.forEach(sk => {
@@ -1472,12 +1467,15 @@ const stueckliste = (() => {
             klemmenAnzahl += mitPE + ohnePE;
           });
         });
-        if(istKNX){ klemmenAnzahl+=1; kappenAnzahl+=1; } // Reserve-Klemme + Trennkappe
-        if(klemmenAnzahl>2) kappenAnzahl+=1;              // Abdeckkappe nach Kabelklemmen
-        klemmenAnzahl+=1;                                 // N-Endklemme
+        if(istKNX){ klemmenAnzahl+=1; kappenAnzahl+=1; }
+        if(klemmenAnzahl>2) kappenAnzahl+=1;
+        klemmenAnzahl+=1; // N-Endklemme
         const laengeMM = Math.ceil((klemmenAnzahl * 6.2) + (kappenAnzahl * 2));
-        base.push({label:`N-Brücke ${laengeMM}mm (NE→NX, Q${fiIdx+1})`, menge:1, kat:"Reihenklemmen"});
-        base.push({label:`Abdeckung N-Brücke ${laengeMM}mm (Q${fiIdx+1})`, menge:1, kat:"Reihenklemmen"});
+        laengenMap[laengeMM] = (laengenMap[laengeMM]||0) + 1;
+      });
+      Object.entries(laengenMap).sort(([a],[b])=>Number(a)-Number(b)).forEach(([mm,cnt])=>{
+        base.push({label:`N-Brücke ${mm}mm (NE→NX)`, menge:cnt, kat:"Reihenklemmen"});
+        base.push({label:`Abdeckung N-Brücke ${mm}mm`, menge:cnt, kat:"Reihenklemmen"});
       });
     }
     return base;
@@ -2720,20 +2718,47 @@ const stueckliste = (() => {
                           </div>
                         ); })}
                       </div>
-                      {/* ── N-Schiene ── */}
-                      {(()=>{
+                      {/* ── N-Schiene (nur wenn aktiviert) ── */}
+                      {mitNBruecke&&(()=>{
                         const neIdx=groups.findIndex(g=>g.klemmen[0]?.type==="n_einspeisung");
                         const nxIdx=groups.findIndex(g=>g.klemmen[0]?.type==="n_endklemme");
                         if(neIdx<0||nxIdx<0) return null;
                         const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
                         const left=groups.slice(0,neIdx).reduce((s,g)=>s+gw(g)+4,0);
                         const width=groups.slice(neIdx,nxIdx+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
+                        const klemCnt=groups.slice(neIdx,nxIdx+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type!=="abdeckkappe_orange").length,0);
+                        const kapCnt=groups.slice(neIdx,nxIdx+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type==="abdeckkappe_orange").length,0);
+                        const laengeMM=Math.ceil(klemCnt*6.2+kapCnt*2);
                         return(
                           <div style={{marginTop:4,marginLeft:left,width:width,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
                             <div style={{height:6,background:"rgba(33,150,201,0.75)",borderRadius:3,boxShadow:"0 0 6px rgba(33,150,201,0.35)"}}/>
-                            <div style={{fontSize:7,color:"rgba(33,150,201,0.7)",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:2,letterSpacing:"0.5px"}}>N-Schiene</div>
+                            <div style={{fontSize:7,color:"rgba(33,150,201,0.7)",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:2,letterSpacing:"0.5px"}}>N-Schiene · {laengeMM}mm</div>
                           </div>
                         );
+                      })()}
+                      {/* ── QV-Brücken Overlay ── */}
+                      {mitQV&&(()=>{
+                        const bySkId={};
+                        groups.forEach((grp,gi)=>{
+                          if(!grp.skId) return;
+                          if(!bySkId[grp.skId]) bySkId[grp.skId]=[];
+                          bySkId[grp.skId].push(gi);
+                        });
+                        const bridges=Object.values(bySkId).filter(idxs=>idxs.length>=2);
+                        if(!bridges.length) return null;
+                        const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
+                        return(<>{bridges.map((idxs,bi)=>{
+                          const first=idxs[0],last=idxs[idxs.length-1];
+                          const leftPx=groups.slice(0,first).reduce((s,g)=>s+gw(g)+4,0);
+                          const widthPx=groups.slice(first,last+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
+                          const lCount=groups.slice(first,last+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type==="rk_mit_pe").length,0);
+                          return(
+                            <div key={bi} style={{marginTop:3,marginLeft:leftPx,width:widthPx,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
+                              <div style={{height:3,background:"#ff6b6b",borderRadius:2,opacity:0.85}}/>
+                              <div style={{fontSize:7,color:"#ff6b6b",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:1,letterSpacing:"0.5px"}}>{lCount}-fach QV</div>
+                            </div>
+                          );
+                        })}</>);
                       })()}
                     </div>
                   </div>
@@ -2801,6 +2826,22 @@ const stueckliste = (() => {
                           </div>
                         ); })}
                       </div>
+                      {/* ── FILS QV-Brücken Overlay ── */}
+                      {mitQV&&(()=>{
+                        const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
+                        const cableIdxs=groups.map((g,i)=>g.kabelLabel?i:-1).filter(i=>i>=0);
+                        if(cableIdxs.length<2) return null;
+                        const first=cableIdxs[0],last=cableIdxs[cableIdxs.length-1];
+                        const leftPx=groups.slice(0,first).reduce((s,g)=>s+gw(g)+4,0);
+                        const widthPx=groups.slice(first,last+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
+                        const nCount=groups.slice(first,last+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type==="rk_n_fils").length,0);
+                        return(<>
+                          {nCount>=2&&<div style={{marginTop:3,marginLeft:leftPx,width:widthPx,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
+                            <div style={{height:3,background:"rgba(33,150,201,0.8)",borderRadius:2}}/>
+                            <div style={{fontSize:7,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:1,letterSpacing:"0.5px"}}>{nCount}-fach QV</div>
+                          </div>}
+                        </>);
+                      })()}
                     </div>
                   </div>
                 );
