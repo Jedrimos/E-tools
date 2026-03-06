@@ -77,11 +77,12 @@ const mkFI = () => ({ id:uid(), bemessung:40, fiTyp:"A", fehlerstrom:30, pole:4,
 
 // ── Planverteilung ──
 function verteile(sicherungen, fiKonfigs) {
-  const normal = sicherungen.filter(s => !s.istFILS && !s.istReserve);
-  const fils   = sicherungen.filter(s =>  s.istFILS && !s.istReserve);
+  const normal  = sicherungen.filter(s => !s.istFILS && !s.istReserve);
+  const fils    = sicherungen.filter(s =>  s.istFILS && !s.istReserve);
+  const reserve = sicherungen.filter(s => !s.istFILS &&  s.istReserve);
   const warnungen = [];
   const gruppen = fiKonfigs.map(f => ({ ...f, stromkreise:[], belegteTE:0, lastA:0, phasen:{L1:0,L2:0,L3:0} }));
-  if (!fiKonfigs.length || !normal.length) return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
+  if (!fiKonfigs.length) return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
 
   const swFIs={}, raumFIs={};
   const sortiert = [...normal].sort((a,b) => {
@@ -121,6 +122,20 @@ function verteile(sicherungen, fiKonfigs) {
     if (!raumFIs[rKey]) raumFIs[rKey]=new Set();
     raumFIs[rKey].add(ziel);
   }
+  // Reserve-Sicherungen IMMER ans Ende der Gruppen (nach allen normalen)
+  if (gruppen.length > 0) {
+    reserve.forEach(sk => {
+      const sInfo = STD_SICHERUNGEN.find(s => s.id === sk.sicherung);
+      const te = sInfo?.te || 1;
+      let ziel = gruppen.findIndex(g => fiMaxTE(g.pole) - g.belegteTE >= te);
+      if (ziel < 0) {
+        warnungen.push(`⚠️ Kein Platz für Reserveplatz "${sk.sicherung}" – TE-Limit!`);
+        ziel = gruppen.reduce((b,g,i) => g.belegteTE < gruppen[b].belegteTE ? i : b, 0);
+      }
+      gruppen[ziel].stromkreise.push({ ...sk, assignedPhase:"—", is3p:false, istReserve:true, overflow:false });
+      gruppen[ziel].belegteTE += te;
+    });
+  }
   return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
 }
 
@@ -149,7 +164,7 @@ function klemmenFuerKabel(adern) {
   return { mitPE:1, ohnePE:Math.floor((a-3)/2) };
 }
 
-function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherungen=[]) {
+function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherungen=[], mitNBruecke=false) {
   if (!plan) return [];
   const items={};
   const add=(key,label,menge,kat)=>{ if(!items[key])items[key]={label,menge:0,kat}; items[key].menge+=menge; };
@@ -174,9 +189,9 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherung
     });
     // Reihenklemmen pro FI-Block — exakt wie buildSeq
     if (mitRK) {
-      // Immer: PE-Einspeisung + N-Einspeisung
+      // Immer: PE-Einspeisung; N-Einspeisung nur wenn N-Brücke gewählt
       add("pe_einspeisung","PE-Einspeiseklemme (Erdung)",1,"Reihenklemmen");
-      add("n_einspeisung","N-Einspeiseklemme",1,"Reihenklemmen");
+      if(mitNBruecke) add("n_einspeisung","N-Einspeiseklemme",1,"Reihenklemmen");
       // Kabelklemmen
       let hatKlemmen=0;
       fi.stromkreise.forEach(sk => {
@@ -198,8 +213,8 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherung
       if (hatKlemmen>0||istKNX) {
         add("abdeckkappe_orange","Abdeckkappe orange (Endschutz Klemmenblock)",1,"Reihenklemmen");
       }
-      // N-Endklemme: immer (weil N-Einspeisung immer da ist)
-      add("n_endklemme","N-Endklemme",1,"Reihenklemmen");
+      // N-Endklemme: nur wenn N-Brücke aktiv
+      if(mitNBruecke) add("n_endklemme","N-Endklemme",1,"Reihenklemmen");
     }
   });
 
@@ -1277,9 +1292,8 @@ export default function Verteilerplaner({ onBack } = {}) {
     const groups=[];
     const addSpecial=(type,lbl=null)=>groups.push({kabelLabel:null,kabelColor:null,klemmen:[{type,label:lbl}]});
     if(!isFils){
-      // Immer: PE-Einspeisung + N-Einspeisung pro FI-Block
       addSpecial("pe_einspeisung","PE-Einsp.");
-      addSpecial("n_einspeisung","N-Einsp.");
+      if(mitNBruecke) addSpecial("n_einspeisung","N-Einsp.");
       let hatKlemmen=0;
       stromkreise.forEach(sk=>{
         (sk.kabelIds||[]).forEach(kid=>{
@@ -1304,8 +1318,7 @@ export default function Verteilerplaner({ onBack } = {}) {
       if(hatKlemmen>0||istKNX){
         addSpecial("abdeckkappe_orange");
       }
-      // N-Endklemme: immer (weil N-Einspeisung immer da ist)
-      addSpecial("n_endklemme","N-End.");
+      if(mitNBruecke) addSpecial("n_endklemme","N-End.");
     } else {
       // FILS: kein NE/NX, aber PE-Klemme am Anfang
       addSpecial("pe_einspeisung","FILS PE");
@@ -1370,10 +1383,10 @@ export default function Verteilerplaner({ onBack } = {}) {
                     || kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean).map(k=>k.bezeichnung||k.raum||'?').join(' + ');
       if(mitPE_total>=2){
         result.push({fLabel, skLabel, ports:mitPE_total, typ:'L', color:'#ff6b6b', fils:true});
-        result.push({fLabel, skLabel, ports:mitPE_total, typ:'N', color:'rgba(33,150,201,0.9)', fils:true});
       }
+      // N-Querverbinder nur wenn eigene N-Klemmen (ohnePE) vorhanden
       if(ohnePE_total>=2){
-        result.push({fLabel, skLabel, ports:ohnePE_total, typ:'N (2-pol)', color:'rgba(33,150,201,0.6)', fils:true});
+        result.push({fLabel, skLabel, ports:ohnePE_total, typ:'N', color:'rgba(33,150,201,0.9)', fils:true});
       }
     });
 
@@ -1391,7 +1404,7 @@ export default function Verteilerplaner({ onBack } = {}) {
   })();
 const stueckliste = (() => {
     if(!plan) return [];
-    const base = berechneStueckliste(plan,mitRK,kabel,istKNX,sicherungen);
+    const base = berechneStueckliste(plan,mitRK,kabel,istKNX,sicherungen,mitNBruecke);
     if(!mitRK) return base;
     // Querverbinder hinzufügen wenn aktiviert
     if(mitQV && querverbinder.length>0) {
@@ -2304,6 +2317,16 @@ const stueckliste = (() => {
                         const siKabel=si.kabel||[];
                         const swColors=[...new Set(siKabel.map(k=>swColor(k.stockwerk)))];
                         const w=(sInfo?.te||1)*28+((sInfo?.te||1)-1)*4;
+                        if(si.istReserve) return(
+                          <div key={si.id} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                            <div style={{width:w,background:"rgba(255,200,40,0.03)",border:"1.5px dashed rgba(255,200,40,0.3)",borderRadius:6,height:90,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3}}>
+                              <div style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",fontWeight:700}}>{fLabel}</div>
+                              <div style={{fontSize:7,color:"rgba(255,200,40,0.5)",textTransform:"uppercase",letterSpacing:"0.5px"}}>Reserve</div>
+                              <div style={{fontSize:9,color:"rgba(255,200,40,0.4)",fontFamily:"var(--mono)"}}>{sInfo?.label}</div>
+                            </div>
+                            <div style={{fontSize:8,color:"var(--text3)",fontWeight:700,marginTop:3,fontFamily:"var(--mono)"}}>{fLabel}</div>
+                          </div>
+                        );
                         return(
                           <div key={si.id} draggable
                             onDragStart={e=>{onPlanDragStart(si.id,fi.id); e.currentTarget.style.opacity="0.4";}}
@@ -2347,25 +2370,53 @@ const stueckliste = (() => {
                         </div>
                       ))}
                     </div>
-                    {/* ── Phasenschiene ── */}
-                    {fi.phasenschiene&&(
-                      <div style={{marginTop:6,display:"flex",gap:3,alignItems:"center",minWidth:"max-content",padding:"5px 6px",background:"rgba(26,122,191,0.04)",borderRadius:6,border:"1px solid rgba(26,122,191,0.12)"}}>
-                        <span style={{fontSize:7,color:"var(--text3)",marginRight:4,flexShrink:0,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:700}}>Schiene</span>
-                        {(fi.pole>=4
-                          ? [{l:"L1",c:"#a05428"},{l:"L2",c:"#2d2d2d"},{l:"L3",c:"#6b7280"},{l:"N",c:"#1d6dbf"}]
-                          : [{l:"L1",c:"#a05428"},{l:"N",c:"#1d6dbf"}]
-                        ).map(({l,c})=>(
-                          <div key={l} style={{display:"flex",alignItems:"center",gap:3,background:c+"22",border:`1px solid ${c}55`,borderRadius:4,padding:"2px 6px 2px 4px"}}>
-                            <div style={{width:6,height:6,borderRadius:2,background:c,flexShrink:0}}/>
-                            <span style={{fontSize:8,color:c,fontFamily:"var(--mono)",fontWeight:800}}>{l}</span>
+                    {/* ── Phasenschiene – Pin-Sequenz ── */}
+                    {fi.phasenschiene&&(()=>{
+                      // DIN-Aderfarben: L1=braun, L2=schwarz, L3=grau, N=blau
+                      const C={L1:"#a05428",L2:"#555555",L3:"#7a8899",N:"#1d6dbf"};
+                      const cycle=fi.pole>=4?["L1","L2","L3"]:["L1"];
+                      let ci=0;
+                      // Pin helper
+                      const Pin=({l,dim,w=28})=>(
+                        <div style={{width:w,height:14,borderRadius:3,flexShrink:0,
+                          background:C[l]+(dim?"18":"33"),border:`1px solid ${C[l]}${dim?"44":"99"}`,
+                          display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <span style={{fontSize:7,color:C[l]+(dim?"88":""),fontWeight:800,fontFamily:"var(--mono)"}}>{l}</span>
+                        </div>
+                      );
+                      // FI-Schiene: L1,L2,L3,N für 4-pol / L1,N für 2-pol
+                      const fiPins=fi.pole>=4?["L1","L2","L3","N"]:["L1","N"];
+                      // LS-Pins aufbauen
+                      const lsPins=[];
+                      const fiW=(fi.pole||4)*28+((fi.pole||4)-1)*4;
+                      fi.stromkreise.forEach(sk=>{
+                        const sInfo=STD_SICHERUNGEN.find(s=>s.id===sk.sicherung);
+                        const te=sInfo?.te||1;
+                        if(sk.istReserve){
+                          for(let j=0;j<te;j++){lsPins.push({l:cycle[ci%cycle.length],dim:true});ci++;}
+                        } else if(sk.is3p&&fi.pole>=4){
+                          lsPins.push({l:"L1",dim:false});lsPins.push({l:"L2",dim:false});lsPins.push({l:"L3",dim:false});
+                          ci+=3;
+                        } else {
+                          for(let j=0;j<te;j++){lsPins.push({l:cycle[ci%cycle.length],dim:false});ci++;}
+                        }
+                      });
+                      // Leerstellen
+                      const usedTE=fi.stromkreise.reduce((s,sk)=>{const inf=STD_SICHERUNGEN.find(x=>x.id===sk.sicherung);return s+(inf?.te||1);},0);
+                      for(let i=0;i<Math.max(0,fiMaxTE(fi.pole)-usedTE);i++){lsPins.push({l:cycle[ci%cycle.length],dim:true});ci++;}
+                      return(
+                        <div style={{marginTop:3,display:"flex",gap:4,alignItems:"center",minWidth:"max-content"}}>
+                          {/* FI-Pins */}
+                          <div style={{display:"flex",gap:4,width:fiW}}>
+                            {fiPins.map((l,idx)=><Pin key={idx} l={l} dim={false}/>)}
                           </div>
-                        ))}
-                        {fi.pole>=4&&<div style={{display:"flex",alignItems:"center",gap:3,background:"#4ade8022",border:"1px solid #4ade8055",borderRadius:4,padding:"2px 6px 2px 4px"}}>
-                          <div style={{width:6,height:6,borderRadius:2,background:"#22c55e",flexShrink:0}}/>
-                          <span style={{fontSize:8,color:"#4ade80",fontFamily:"var(--mono)",fontWeight:800}}>PE</span>
-                        </div>}
-                      </div>
-                    )}
+                          {/* Trennlinie (gleiche Breite wie im Plan) */}
+                          <div style={{width:11,flexShrink:0}}/>
+                          {/* LS-Pins */}
+                          {lsPins.map((p,idx)=><Pin key={idx} l={p.l} dim={p.dim}/>)}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
