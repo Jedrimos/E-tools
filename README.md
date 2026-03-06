@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.3.5-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.3.2-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
