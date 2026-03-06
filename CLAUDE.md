@@ -15,6 +15,11 @@ Diese Datei enthält verbindliche Regeln die bei jeder Änderung am Projekt einz
 
 Versionsschema: **`JAHR.MONAT.PATCH`** — z.B. `2026.3.4` = März 2026, fünftes Release.
 
+**Wann die Version erhöhen:**
+- ✅ Bei größeren Features oder mehreren kleinen Änderungen zusammen
+- ✅ Wenn ein sinnvoller Release-Punkt erreicht ist
+- ❌ **Nicht** bei jeder kleinen Bugfix- oder Textänderung einzeln
+
 ---
 
 ## Neue App hinzufügen — Checkliste
