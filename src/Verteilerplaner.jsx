@@ -238,6 +238,7 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherung
         const {mitPE,ohnePE} = klemmenFuerKabel(k.kabelAdern);
         add("rk_mit_pe","Reihenklemme mit PE (3-polig)",mitPE,"Reihenklemmen");
         if (ohnePE>0) add("rk_ohne_pe","Reihenklemme ohne PE (2-polig)",ohnePE,"Reihenklemmen");
+        add("rk_n_fils","N-Klemme FILS (2-polig)",1,"Reihenklemmen"); // N-Klemme pro Kabel bei FILS
         hatKlemmen++;
       });
       if (hatKlemmen>0) add("abdeckkappe_orange","Abdeckkappe orange (Endschutz Klemmenblock)",1,"Reihenklemmen");
@@ -1282,6 +1283,7 @@ export default function Verteilerplaner({ onBack } = {}) {
     "pe_einspeisung": {bg:"rgba(82,217,138,0.12)",border:"rgba(82,217,138,0.5)",label:"PE",color:"var(--green)",w:22},
     "rk_mit_pe":     {bg:"#1a2e1a",border:"rgba(82,217,138,0.25)",label:"PE",color:"var(--green)",w:22},
     "rk_ohne_pe":    {bg:"#181818",border:"#44444466",label:"",color:"var(--text3)",w:22},
+    "rk_n_fils":     {bg:"rgba(33,150,201,0.08)",border:"rgba(33,150,201,0.3)",label:"N",color:"var(--blue)",w:22},
     "n_einspeisung": {bg:"rgba(33,150,201,0.1)",border:"rgba(33,150,201,0.35)",label:"NE",color:"var(--blue)",w:22},
     "n_endklemme":   {bg:"rgba(33,150,201,0.05)",border:"rgba(33,150,201,0.2)",label:"NX",color:"var(--text3)",w:22},
     "rk_reserve_knx":{bg:"#2a1a2a",border:"#d45db5",label:"R",color:"#d45db5",w:22},
@@ -1322,6 +1324,7 @@ export default function Verteilerplaner({ onBack } = {}) {
       addSpecial("n_endklemme","N-End.");
     } else {
       // FILS: kein NE/NX, aber PE-Klemme am Anfang
+      // Pro Kabel: rk_mit_pe (L1+PE) + rk_ohne_pe (L2+L3 bei 5×) + rk_n_fils (N, da keine N-Schiene)
       addSpecial("pe_einspeisung","FILS PE");
       let hatKlemmen=0;
       (filsSk.kabelIds||[]).forEach(kid=>{
@@ -1333,6 +1336,7 @@ export default function Verteilerplaner({ onBack } = {}) {
         const klemmen=[];
         for(let i=0;i<mitPE;i++) klemmen.push({type:"rk_mit_pe",label:lbl});
         for(let i=0;i<ohnePE;i++) klemmen.push({type:"rk_ohne_pe",label:lbl});
+        klemmen.push({type:"rk_n_fils",label:lbl}); // N-Klemme immer bei FILS
         groups.push({kabelLabel:lbl, kabelColor:col, klemmen});
         hatKlemmen++;
       });
@@ -1342,36 +1346,51 @@ export default function Verteilerplaner({ onBack } = {}) {
   };
 
   // ── Querverbinder-Berechnung ──
-  // Baut die reale Klemmensequenz pro Stromkreis auf (L=rk_mit_pe, N=rk_ohne_pe),
-  // berechnet den genauen Bridge-Span und markiert Pins die abgezwickt werden müssen.
-  // Normaler FI-Block: nur L-Querverbinder (N läuft über gemeinsame N-Schiene)
-  // FILS: L- UND N-Querverbinder wenn eigene N-Klemmen vorhanden
+  // Klemmentypen in der Sequenz:
+  //   'L'  = rk_mit_pe   (L1 + PE + N-Schieber zur N-Schiene)
+  //   'LL' = rk_ohne_pe  (L2 + L3, 2-polig, kein N/PE — bei 5× und mehr)
+  //   'N'  = rk_n_fils   (N-Klemme, nur bei FILS — da keine N-Schiene vorhanden)
+  //
+  // Normale FI-Kreise: nur L-Bridge nötig ('LL'-Klemmen zwischen L1-Klemmen → abzwicken)
+  // FILS: L-Bridge + N-Bridge; 'LL'/'L' zwischen N-Klemmen → abzwicken (und umgekehrt)
 
-  // Hilfsfunktion: flache Klemmensequenz für eine Liste von Kabel-IDs
-  const buildKlemmenSeq = (kids) => {
+  // Flache Klemmensequenz für normale FI-Kreise
+  const buildKlemmenSeqNormal = (kids) => {
     const seq=[];
     kids.forEach(kid=>{
       const k=kabel.find(x=>x.id===kid);
       if(!k) return;
       const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
-      for(let i=0;i<mitPE;i++) seq.push('L');
-      for(let i=0;i<ohnePE;i++) seq.push('N');
+      for(let i=0;i<mitPE;i++) seq.push('L');   // L1+PE+N-Schieber
+      for(let i=0;i<ohnePE;i++) seq.push('LL'); // L2+L3 (2-polig)
     });
     return seq;
   };
 
-  // Hilfsfunktion: berechnet Bridge-Span und abzuzwickende Pins
-  // targetType='L'|'N', gibt null zurück wenn weniger als 2 target-Positionen
+  // Flache Klemmensequenz für FILS (inkl. N-Klemme pro Kabel)
+  const buildKlemmenSeqFILS = (kids) => {
+    const seq=[];
+    kids.forEach(kid=>{
+      const k=kabel.find(x=>x.id===kid);
+      if(!k) return;
+      const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
+      for(let i=0;i<mitPE;i++) seq.push('L');   // L1+PE
+      for(let i=0;i<ohnePE;i++) seq.push('LL'); // L2+L3
+      seq.push('N');                              // N-Klemme (immer bei FILS)
+    });
+    return seq;
+  };
+
+  // Berechnet Bridge-Span und Pins die abgezwickt werden müssen.
+  // targetType: 'L'|'N' — alle anderen Typen im Span werden als clipPins markiert.
   const berechneBridge = (seq, targetType) => {
-    const otherType = targetType==='L' ? 'N' : 'L';
     const targetIdx=seq.map((t,i)=>t===targetType?i:-1).filter(i=>i>=0);
     if(targetIdx.length<2) return null;
     const firstPos=targetIdx[0], lastPos=targetIdx[targetIdx.length-1];
-    // Bridge-Span: von firstPos bis lastPos (inkl. dazwischen liegende N-Klemmen)
     const span=lastPos-firstPos+1;
-    // Pins die abgezwickt werden müssen: andere Klemmen innerhalb des Spans (1-indiziert)
+    // Pins abzwicken: jede Nicht-Ziel-Klemme zwischen erster und letzter Ziel-Klemme (1-indiziert)
     const clipPins=seq.slice(firstPos,lastPos+1)
-      .map((t,i)=>t===otherType?(i+1):-1).filter(i=>i>=0);
+      .map((t,i)=>t!==targetType?(i+1):-1).filter(i=>i>=0);
     return {ports:span, clipPins, count:targetIdx.length};
   };
 
@@ -1380,38 +1399,41 @@ export default function Verteilerplaner({ onBack } = {}) {
     const result=[];
 
     // Normale FI-Gruppen → nur L-Bridge
+    // ('LL'-Klemmen zwischen L1-Klemmen müssen abgezwickt werden)
     plan.gruppen.forEach((fi,fiIdx)=>{
       fi.stromkreise.forEach((sk,skIdx)=>{
         if(sk.istReserve) return;
         const kids=sk.kabelIds||[];
         if(kids.length<2) return;
-        const seq=buildKlemmenSeq(kids);
+        const seq=buildKlemmenSeqNormal(kids);
         const bridge=berechneBridge(seq,'L');
         if(!bridge||bridge.count<2) return;
         const fLabel=`Q${fiIdx+1}F${skIdx+1}`;
         const skLabel=kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean)
                          .map(k=>k.bezeichnung||k.raum||'?').join(' + ');
         result.push({fLabel, skLabel, ports:bridge.ports, clipPins:bridge.clipPins,
-                     lCount:bridge.count, typ:'L', color:'#ff6b6b', fils:false});
+                     count:bridge.count, typ:'L', color:'#ff6b6b', fils:false});
       });
     });
 
-    // FILS → L-Bridge + N-Bridge (keine gemeinsame N-Schiene vorhanden)
+    // FILS → L-Bridge + N-Bridge
+    // Keine N-Schiene → N-Klemmen müssen extra gebrückt werden
+    // Pins anderer Klemmentypen im Span → abzwicken
     plan.fils.forEach((sk,i)=>{
       const kids=sk.kabelIds||[];
       if(kids.length<2) return;
-      const seq=buildKlemmenSeq(kids);
+      const seq=buildKlemmenSeqFILS(kids);
       const fLabel=`Q${plan.gruppen.length+i+1} FILS`;
       const skLabel=kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean)
                        .map(k=>k.bezeichnung||k.raum||'?').join(' + ');
       const lBridge=berechneBridge(seq,'L');
       if(lBridge&&lBridge.count>=2)
         result.push({fLabel,skLabel,ports:lBridge.ports,clipPins:lBridge.clipPins,
-                     lCount:lBridge.count,typ:'L',color:'#ff6b6b',fils:true});
+                     count:lBridge.count,typ:'L',color:'#ff6b6b',fils:true});
       const nBridge=berechneBridge(seq,'N');
       if(nBridge&&nBridge.count>=2)
         result.push({fLabel,skLabel,ports:nBridge.ports,clipPins:nBridge.clipPins,
-                     lCount:nBridge.count,typ:'N',color:'rgba(33,150,201,0.9)',fils:true});
+                     count:nBridge.count,typ:'N',color:'#1d6dbf',fils:true});
     });
 
     return result;
@@ -2576,23 +2598,49 @@ const stueckliste = (() => {
                 <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid var(--border)"}}>
                   <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:10,fontWeight:700}}>Benötigte Querverbinder</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                    {querverbinder.map((qv,i)=>(
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:10,background:"var(--bg)",border:`1px solid ${qv.color}55`,borderRadius:10,padding:"8px 12px",minWidth:180}}>
-                        <div style={{position:"relative",flexShrink:0}}>
+                    {querverbinder.map((qv,i)=>{
+                      const hasClips=qv.clipPins&&qv.clipPins.length>0;
+                      const clipSet=new Set(qv.clipPins||[]);
+                      return(
+                      <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,background:"var(--bg)",border:`1px solid ${hasClips?"#f59e0b55":qv.color+"55"}`,borderRadius:10,padding:"8px 12px",minWidth:200}}>
+                        <div style={{flexShrink:0}}>
+                          {/* Brücken-Balken oben */}
+                          <div style={{height:5,background:qv.color,borderRadius:"3px 3px 0 0",opacity:0.85,
+                            // Unterbrochene Linie bei geclippten Pins andeuten
+                            background:hasClips
+                              ? `repeating-linear-gradient(90deg,${qv.color} 0px,${qv.color} 8px,transparent 8px,transparent 12px)`
+                              : qv.color,
+                            width:(qv.ports*10+(qv.ports-1)*3)}}/>
+                          {/* Pins */}
                           <div style={{display:"flex",gap:3,alignItems:"flex-end"}}>
-                            {Array.from({length:Math.min(qv.ports,6)}).map((_,pi)=>(
-                              <div key={pi} style={{width:10,height:28,borderRadius:3,background:qv.color+"22",border:`1.5px solid ${qv.color}88`,flexShrink:0}}/>
-                            ))}
+                            {Array.from({length:qv.ports}).map((_,pi)=>{
+                              const pinNr=pi+1;
+                              const clip=clipSet.has(pinNr);
+                              return(
+                                <div key={pi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                                  <div style={{width:10,height:clip?14:22,borderRadius:3,
+                                    background:clip?"#44444433":qv.color+"22",
+                                    border:`1.5px solid ${clip?"#55555588":qv.color+"88"}`,
+                                    flexShrink:0,position:"relative"}}>
+                                    {clip&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:8,color:"#f59e0b",fontWeight:900,lineHeight:1}}>✂</div>}
+                                  </div>
+                                  {clip&&<div style={{fontSize:6,color:"#f59e0b",fontWeight:800,fontFamily:"var(--mono)",lineHeight:1}}>{pinNr}</div>}
+                                </div>
+                              );
+                            })}
                           </div>
-                          <div style={{position:"absolute",top:0,left:0,right:0,height:5,background:qv.color,borderRadius:"3px 3px 0 0",opacity:0.8}}/>
                         </div>
                         <div>
                           <div style={{fontSize:12,fontWeight:800,color:"var(--text)",fontFamily:"var(--mono)"}}>{qv.ports}-fach</div>
                           <div style={{fontSize:10,fontWeight:600,color:qv.color,marginTop:1}}>{qv.typ}-Querverbinder{qv.fils?" (FILS)":""}</div>
                           <div style={{fontSize:9,color:"var(--text3)",marginTop:2}}>{qv.fLabel}</div>
+                          {hasClips&&<div style={{fontSize:9,color:"#f59e0b",marginTop:3,fontWeight:600}}>
+                            ✂ Pin {qv.clipPins.join(", ")} abzwicken
+                          </div>}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div style={{marginTop:10,display:"flex",flexWrap:"wrap",gap:6}}>
                     <span style={{fontSize:10,color:"var(--text3)"}}>Gesamt:</span>
