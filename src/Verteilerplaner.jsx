@@ -2605,8 +2605,7 @@ const stueckliste = (() => {
                       <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,background:"var(--bg)",border:`1px solid ${hasClips?"#f59e0b55":qv.color+"55"}`,borderRadius:10,padding:"8px 12px",minWidth:200}}>
                         <div style={{flexShrink:0}}>
                           {/* Brücken-Balken oben */}
-                          <div style={{height:5,background:qv.color,borderRadius:"3px 3px 0 0",opacity:0.85,
-                            // Unterbrochene Linie bei geclippten Pins andeuten
+                          <div style={{height:5,borderRadius:"3px 3px 0 0",opacity:0.85,
                             background:hasClips
                               ? `repeating-linear-gradient(90deg,${qv.color} 0px,${qv.color} 8px,transparent 8px,transparent 12px)`
                               : qv.color,
@@ -2673,8 +2672,12 @@ const stueckliste = (() => {
                     </div>
                     <div style={{padding:"14px 16px",overflowX:"auto"}}>
                       <div style={{display:"flex",flexWrap:"nowrap",gap:4,alignItems:"flex-end",minWidth:"max-content"}}>
-                        {groups.map((grp,gi)=>(
-                          <div key={gi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+                        {groups.map((grp,gi)=>{
+                          const isKappeGrp=grp.klemmen[0]?.type==="abdeckkappe_orange";
+                          const prevIsKappeGrp=gi>0&&groups[gi-1].klemmen[0]?.type==="abdeckkappe_orange";
+                          return(
+                          <div key={gi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0,
+                            marginLeft:isKappeGrp||prevIsKappeGrp?-3:0}}>
                             {grp.kabelLabel
                               ? <div style={{fontSize:7,color:grp.kabelColor||"var(--text2)",fontWeight:700,fontFamily:"var(--mono)",
                                   maxWidth:Math.max(24,grp.klemmen.length*26)+"px",
@@ -2694,7 +2697,10 @@ const stueckliste = (() => {
                                     style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
                                       display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
                                       boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
-                                    {(s.type==="pe_einspeisung"||s.type==="rk_mit_pe")&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
+                                    {s.type==="pe_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
+                                    {s.type==="rk_mit_pe"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>3pol</span>}
+                                    {s.type==="rk_ohne_pe"&&<span style={{fontSize:7,color:"var(--text3)",fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>2pol</span>}
+                                    {s.type==="rk_n_fils"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>N</span>}
                                     {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
                                     {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
                                     {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
@@ -2712,7 +2718,7 @@ const stueckliste = (() => {
                               : <div style={{height:4}}/>
                             }
                           </div>
-                        ))}
+                        ); })}
                       </div>
                       {/* ── N-Schiene ── */}
                       {(()=>{
@@ -2747,8 +2753,12 @@ const stueckliste = (() => {
                     </div>
                     <div style={{padding:"14px 16px",overflowX:"auto"}}>
                       <div style={{display:"flex",flexWrap:"nowrap",gap:4,alignItems:"flex-end",minWidth:"max-content"}}>
-                        {groups.map((grp,gi)=>(
-                          <div key={gi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+                        {groups.map((grp,gi)=>{
+                          const isKappeGrp=grp.klemmen[0]?.type==="abdeckkappe_orange";
+                          const prevIsKappeGrp=gi>0&&groups[gi-1].klemmen[0]?.type==="abdeckkappe_orange";
+                          return(
+                          <div key={gi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0,
+                            marginLeft:isKappeGrp||prevIsKappeGrp?-3:0}}>
                             {grp.kabelLabel
                               ? <div style={{fontSize:7,color:grp.kabelColor||"var(--text2)",fontWeight:700,fontFamily:"var(--mono)",
                                   maxWidth:Math.max(24,grp.klemmen.length*26)+"px",
@@ -2768,7 +2778,10 @@ const stueckliste = (() => {
                                     style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
                                       display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
                                       boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
-                                    {(s.type==="pe_einspeisung"||s.type==="rk_mit_pe")&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
+                                    {s.type==="pe_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
+                                    {s.type==="rk_mit_pe"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>3pol</span>}
+                                    {s.type==="rk_ohne_pe"&&<span style={{fontSize:7,color:"var(--text3)",fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>2pol</span>}
+                                    {s.type==="rk_n_fils"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>N</span>}
                                     {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
                                     {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
                                     {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
@@ -2786,7 +2799,7 @@ const stueckliste = (() => {
                               : <div style={{height:4}}/>
                             }
                           </div>
-                        ))}
+                        ); })}
                       </div>
                     </div>
                   </div>
