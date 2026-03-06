@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Toast, { useToasts } from "./components/Toast.jsx";
 import { loadStundenDB, saveEintragDB, deleteEintragDB } from "./lib/db_stundenbuch.js";
-
-// ── Helpers ──
-function uid() { return Math.random().toString(36).slice(2, 9); }
+import { uid } from "./lib/utils.js";
 
 function formatDuration(minutes) {
   const h = Math.floor(minutes / 60);
@@ -160,6 +158,88 @@ function aktuelleWocheMinuten(eintraege) {
     .reduce((sum, e) => sum + calcNetto(e), 0);
 }
 
+// ── Monats-Chart ─────────────────────────────────────────────────────────────
+function MonatsChart({ eintraege, monat }) {
+  const [jahr, mon] = monat.split("-").map(Number);
+  const tageImMonat = new Date(jahr, mon, 0).getDate();
+  const heute = new Date().toISOString().slice(0, 10);
+
+  // Minuten pro Tag
+  const perTag = {};
+  eintraege.forEach(e => {
+    if (!e.datum?.startsWith(monat)) return;
+    const tag = parseInt(e.datum.slice(8), 10);
+    perTag[tag] = (perTag[tag] || 0) + calcNetto(e);
+  });
+
+  const maxMin = Math.max(...Object.values(perTag), 480); // min. 8h Skalierung
+  const W = 28;  // Balkenbreite
+  const GAP = 4;
+  const H = 80;  // max Balkenhöhe
+  const svgW = tageImMonat * (W + GAP);
+
+  if (Object.keys(perTag).length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 20, background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px" }}>
+      <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8, fontWeight: 600 }}>
+        Stunden pro Tag — {monat}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <svg width={svgW} height={H + 20} style={{ display: "block", minWidth: svgW }}>
+          {Array.from({ length: tageImMonat }, (_, i) => {
+            const tag = i + 1;
+            const min = perTag[tag] || 0;
+            const barH = min > 0 ? Math.max(4, Math.round((min / maxMin) * H)) : 0;
+            const x = i * (W + GAP);
+            const datumStr = `${monat}-${String(tag).padStart(2, "0")}`;
+            const istHeute = datumStr === heute;
+            const h8 = Math.round((480 / maxMin) * H); // 8h-Linie
+            return (
+              <g key={tag}>
+                {/* 8h-Referenzlinie */}
+                {i === 0 && (
+                  <line x1={0} y1={H - h8} x2={svgW} y2={H - h8}
+                    stroke="var(--border2)" strokeWidth={1} strokeDasharray="3 3" />
+                )}
+                {/* Balken */}
+                {barH > 0 && (
+                  <rect x={x} y={H - barH} width={W} height={barH} rx={4}
+                    fill={min >= 480 ? "var(--green)" : min >= 240 ? "#4bc8e8" : "var(--text3)"}
+                    opacity={0.85}
+                  />
+                )}
+                {/* Heute-Marker */}
+                {istHeute && (
+                  <rect x={x} y={0} width={W} height={H} rx={4}
+                    fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
+                )}
+                {/* Tag-Zahl */}
+                <text x={x + W / 2} y={H + 14} textAnchor="middle"
+                  fontSize={9} fill={istHeute ? "var(--text)" : "var(--text3)"} fontWeight={istHeute ? 700 : 400}>
+                  {tag}
+                </text>
+                {/* Stunden-Label wenn > 0 */}
+                {barH > 14 && (
+                  <text x={x + W / 2} y={H - barH + 11} textAnchor="middle"
+                    fontSize={9} fill="var(--bg)" fontWeight={700}>
+                    {Math.floor(min / 60)}h
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 11, color: "var(--text3)" }}>
+        <span><span style={{ color: "var(--green)" }}>■</span> ≥ 8h</span>
+        <span><span style={{ color: "#4bc8e8" }}>■</span> 4–8h</span>
+        <span style={{ marginLeft: "auto" }}>— 8h-Linie</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Haupt-Komponente ──
 export default function Stundenbuch({ config = {} }) {
   const [eintraege, setEintraegeLive] = useState(loadData);
@@ -168,6 +248,7 @@ export default function Stundenbuch({ config = {} }) {
   const [filter, setFilter] = useState({ monat: new Date().toISOString().slice(0, 7), projekt: "" });
   const [timerStart, setTimerStart] = useState(null);
   const [timerNow, setTimerNow] = useState(null);
+  const [timerVorbelegung, setTimerVorbelegung] = useState(null);
   const { toasts, addToast } = useToasts();
 
   // Timer-Tick jede Sekunde
@@ -190,13 +271,10 @@ export default function Stundenbuch({ config = {} }) {
     const datum = timerStart.toISOString().slice(0, 10);
     setTimerStart(null);
     setTimerNow(null);
+    setTimerVorbelegung({ datum, von: vonStr, bis: bisStr });
     setEditId(null);
     setShowForm(true);
-    // Prefill form via global state — wir übergeben es als initiales Formular
-    setTimerVorbelegung({ datum, von: vonStr, bis: bisStr });
   }
-
-  const [timerVorbelegung, setTimerVorbelegung] = useState(null);
 
   function setEintraege(fn) {
     setEintraegeLive(prev => {
@@ -339,6 +417,9 @@ export default function Stundenbuch({ config = {} }) {
           onCancel={() => { setShowForm(false); setEditId(null); setTimerVorbelegung(null); }}
         />
       )}
+
+      {/* Monats-Chart */}
+      {filter.monat && <MonatsChart eintraege={eintraege} monat={filter.monat} />}
 
       {/* Filter */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>

@@ -4,9 +4,8 @@ import {
   loadProtokolleDB, saveProtokollDB, deleteProtokollDB,
   loadProjekteForImport,
 } from "./lib/db_pruefprotokoll.js";
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function uid() { return Math.random().toString(36).slice(2, 9); }
+import { uid } from "./lib/utils.js";
+// jsPDF wird lazy geladen (nur bei PDF-Export, ~250kB gespart beim ersten Laden)
 
 const LS_KEY = "elektronikertools_pruefprotokoll";
 function load() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }
@@ -99,6 +98,146 @@ const mkProtokoll = () => ({
   stromkreise:       [mkStromkreis()],
   notiz:             "",
 });
+
+// ── PDF-Export ────────────────────────────────────────────────────────────────
+async function exportPDF(p, config = {}) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const BLAU  = [33,  150, 201];
+  const GRUEN = [61,  204, 126];
+  const ROT   = [220, 80,  60];
+  const GRAU  = [90,  95,  100];
+  const HELL  = [240, 242, 244];
+
+  const margin = 14;
+  let y = margin;
+
+  // ── Kopfzeile ──
+  doc.setFillColor(...BLAU);
+  doc.rect(0, 0, 210, 18, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text("ELEKTRO-PRÜFPROTOKOLL", margin, 12);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text("nach DIN VDE 0100-600 / VDE 0664", 210 - margin, 12, { align: "right" });
+  y = 24;
+
+  // ── Metadaten-Box ──
+  doc.setTextColor(0, 0, 0);
+  const meta = [
+    ["Auftraggeber",    p.auftraggeber || "—"],
+    ["Auftragsnummer",  p.auftragnummer || "—"],
+    ["Anlagenstandort", p.anlagenstandort || "—"],
+    ["Art der Anlage",  p.anlage_art || "—"],
+    ["Nennspannung",    p.nennspannung ? `${p.nennspannung} V` : "—"],
+    ["Prüfdatum",       p.datum || "—"],
+    ["Nächste Prüfung", p.naechste_pruefung || "—"],
+    ["Prüfer",          p.pruefer || config.mitarbeiter || "—"],
+    ["Firma",           config.firma || "—"],
+  ];
+
+  const col1 = margin;
+  const col2 = 65;
+  const col3 = 110;
+  const col4 = 160;
+
+  doc.setFillColor(...HELL);
+  doc.rect(margin - 2, y - 4, 210 - 2 * margin + 4, meta.length * 6 + 2, "F");
+  meta.forEach(([label, val], i) => {
+    const x = i % 2 === 0 ? col1 : col3;
+    const yy = y + Math.floor(i / 2) * 6;
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...GRAU);
+    doc.text(label, x, yy);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    const valX = i % 2 === 0 ? col2 : col4;
+    doc.text(String(val), valX, yy);
+  });
+  y += Math.ceil(meta.length / 2) * 6 + 6;
+
+  // ── Gesamtergebnis ──
+  const bestanden = p.stromkreise.every(sk => evalStromkreis(sk) !== "fail");
+  const hatMessungen = p.stromkreise.some(sk => evalStromkreis(sk) !== "offen");
+  if (hatMessungen) {
+    doc.setFillColor(...(bestanden ? GRUEN : ROT));
+    doc.rect(margin - 2, y - 4, 210 - 2 * margin + 4, 10, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(bestanden ? "PRÜFUNG BESTANDEN — Alle Grenzwerte eingehalten" : "PRÜFUNG NICHT BESTANDEN — Grenzwerte überschritten", 105, y + 2, { align: "center" });
+    y += 14;
+    doc.setTextColor(0, 0, 0);
+  }
+
+  // ── Stromkreis-Tabelle ──
+  const head = [["#", "Bezeichnung", "Sich.", "RPE (Ω)", "Riso min (MΩ)", "Zs (Ω)", "Ik (kA)", "FI-t (ms)", "FI-Ub (V)", "Ergebnis"]];
+  const body = p.stromkreise.map((sk, i) => {
+    const status = evalStromkreis(sk);
+    return [
+      i + 1,
+      (sk.bezeichnung || "—") + (sk.dreipolig ? " (3~)" : ""),
+      sk.nennstrom ? `${sk.sicherungstyp}${sk.nennstrom}` : "—",
+      sk.pe_widerstand || "—",
+      risoMin(sk) || "—",
+      sk.zs || "—",
+      sk.ik || "—",
+      sk.fi_vorhanden && sk.fi_t_nenn ? `${sk.fi_t_nenn} / ${sk.fi_t_5fach || "—"}` : (sk.fi_vorhanden ? "vorhanden" : "—"),
+      sk.fi_vorhanden && sk.fi_ub ? sk.fi_ub : "—",
+      status === "ok" ? "✓ OK" : status === "fail" ? "✗ FEHLER" : "offen",
+    ];
+  });
+
+  autoTable(doc, {
+    startY: y,
+    head,
+    body,
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 7.5, cellPadding: 2, overflow: "linebreak" },
+    headStyles: { fillColor: BLAU, textColor: 255, fontStyle: "bold", fontSize: 7.5 },
+    columnStyles: {
+      0:  { cellWidth: 8,  halign: "center" },
+      9:  { cellWidth: 22, halign: "center", fontStyle: "bold" },
+    },
+    didParseCell(data) {
+      if (data.section === "body" && data.column.index === 9) {
+        const v = String(data.cell.raw);
+        if (v.includes("OK"))     { data.cell.styles.textColor = GRUEN; }
+        if (v.includes("FEHLER")) { data.cell.styles.textColor = ROT; }
+      }
+    },
+    alternateRowStyles: { fillColor: [248, 249, 250] },
+  });
+
+  // ── Notizen ──
+  if (p.notiz) {
+    const finalY = doc.lastAutoTable.finalY + 8;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("Notizen:", margin, finalY);
+    doc.setFont("helvetica", "normal");
+    doc.text(p.notiz, margin, finalY + 5, { maxWidth: 210 - 2 * margin });
+  }
+
+  // ── Fußzeile ──
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(...GRAU);
+    doc.text(`Seite ${i}/${totalPages} · Erstellt mit Elektronikertools · ${new Date().toLocaleDateString("de-DE")}`, 105, 291, { align: "center" });
+  }
+
+  const datei = `Pruefprotokoll_${p.anlagenstandort || p.auftraggeber || "Protokoll"}_${p.datum || "kein-Datum"}.pdf`
+    .replace(/[^a-zA-Z0-9_\-\.äöüÄÖÜß]/g, "_");
+  doc.save(datei);
+}
 
 // ── Verteilerplaner → Prüfprotokoll Import ────────────────────────────────────
 function importAusVerteiler(projekt) {
@@ -309,7 +448,7 @@ function StromkreisForm({ sk, onChange, onDelete }) {
         <FL label="L1-PE (MΩ)">
           <input style={inp()} value={sk.riso_l1_pe} onChange={e => set("riso_l1_pe", e.target.value)} placeholder="1,00" />
         </FL>
-        <FL label={sk.dreipolig ? "L2-PE (MΩ)" : "L2-PE (MΩ)"}>
+        <FL label="L2-PE (MΩ)">
           <input style={inp({ opacity: sk.dreipolig ? 1 : 0.4 })} value={sk.riso_l2_pe}
             onChange={e => set("riso_l2_pe", e.target.value)} placeholder="—" disabled={!sk.dreipolig} />
         </FL>
@@ -479,6 +618,7 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
           </div>
         </div>
         {hatMessungen && <Badge status={bestanden ? "ok" : "fail"} />}
+        <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => exportPDF(p, config)} title="Als PDF herunterladen">⬇ PDF</button>
         <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => window.print()} title="Protokoll drucken (Strg+P)">🖨 Drucken</button>
         <button style={bPrim} onClick={() => onSave(p)} title="Speichern (Strg+S)">Speichern</button>
       </div>
@@ -628,7 +768,7 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
 }
 
 // ── Protokoll-Liste ───────────────────────────────────────────────────────────
-function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync }) {
+function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync, config }) {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px" }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 24, gap: 10, flexWrap: "wrap" }}>
@@ -708,6 +848,11 @@ function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync 
                       </span>
                     </div>
                   </div>
+                  <button
+                    style={{ ...bSec, padding: "5px 10px", fontSize: 11 }}
+                    onClick={e => { e.stopPropagation(); exportPDF(p, config); }}
+                    title="Als PDF herunterladen"
+                  >⬇ PDF</button>
                   <button
                     style={{ ...bDanger, padding: "5px 10px", fontSize: 11 }}
                     onClick={e => { e.stopPropagation(); onDelete(p.id); }}
@@ -804,6 +949,7 @@ export default function Pruefprotokoll({ config = {} }) {
           onImport={() => setShowImport(true)}
           onDelete={handleDelete}
           dbSync={dbSync}
+          config={config}
         />
       )}
       <Toast toasts={toasts} />

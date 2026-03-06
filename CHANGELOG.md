@@ -6,6 +6,36 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.5] – 2026-03-06
+
+### ✨ Neu
+
+**PDF-Export (Prüfprotokoll)**
+- Button "⬇ PDF" in der Protokollliste und im Editor
+- Erzeugt ein professionelles A4-PDF nach DIN VDE 0100-600 mit Kopfzeile, Metadaten-Box, Gesamtergebnis-Banner und Stromkreis-Tabelle
+- Lazy-geladen: jsPDF wird erst beim ersten PDF-Klick heruntergeladen (spart ~250kB beim Seitenstart)
+
+**PWA — App installierbar**
+- `public/manifest.json` mit Name, Icons, Theme-Color
+- Service Worker mit Cache-Strategie (Supabase-Requests nie gecacht)
+- Meta-Tags für iOS Safari; App kann auf Android/iOS als eigenständige App installiert werden
+
+**Stundenbuch: Monats-Chart**
+- SVG-Balkendiagramm direkt über der Eintrags-Liste
+- Stunden pro Tag, farbkodiert: grün ≥ 8h, blau 4–8h, grau < 4h
+- Gestrichelte 8h-Referenzlinie, heutiger Tag hervorgehoben
+
+### 🐛 Bugfixes
+
+- **Stundenbuch**: Timer-Prefill-State war nach der nutzenden Funktion deklariert — Reihenfolge korrigiert
+- **Prüfprotokoll**: Totes Ternary in L2-PE-Label entfernt
+
+### ♻ Refactoring
+
+- `uid()` in alle Dateien war dupliziert → `src/lib/utils.js` zentralisiert, alle Importe aktualisiert
+
+---
+
 ## [2026.3.4] – 2026-03-06
 
 ### ✨ Neu

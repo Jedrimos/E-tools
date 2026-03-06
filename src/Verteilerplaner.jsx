@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { isSupabaseConfigured } from "./lib/supabase.js";
 import { loadProjekteDB, saveProjektDB, deleteProjektDB } from "./lib/db.js";
 import Toast from "./components/Toast.jsx";
+import { uid } from "./lib/utils.js";
 
 // ── Stammdaten ──
 const STD_SICHERUNGEN = [
@@ -59,7 +60,6 @@ const PH_COLOR = { L1:"#ff6b6b", L2:"#f5a040", L3:"#4bc8e8" };
 const PH_BG    = { L1:"rgba(255,107,107,0.12)", L2:"rgba(245,160,64,0.12)", L3:"rgba(75,200,232,0.12)" };
 const PH_BORDER= { L1:"rgba(255,107,107,0.4)",  L2:"rgba(245,160,64,0.4)",  L3:"rgba(75,200,232,0.4)" };
 
-function uid() { return Math.random().toString(36).slice(2,9); }
 
 // Kabel = einzelne Ader/Leitung ohne Sicherungs-Zuordnung
 const mkKabel = (sw="EG") => ({

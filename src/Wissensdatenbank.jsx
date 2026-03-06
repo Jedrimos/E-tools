@@ -2,9 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Toast, { useToasts } from "./components/Toast.jsx";
 import { loadWissenDB, saveArtikelDB, deleteArtikelDB } from "./lib/db_wissen.js";
 import { isSupabaseConfigured } from "./lib/supabase.js";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function uid() { return Math.random().toString(36).slice(2, 9); }
+import { uid } from "./lib/utils.js";
 
 const LS_KEY = "elektronikertools_wissen";
 function load() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }

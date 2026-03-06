@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
-
-function uid() { return Math.random().toString(36).slice(2, 9); }
+import { uid } from "../lib/utils.js";
 
 export function useToasts() {
   const [toasts, setToasts] = useState([]);
