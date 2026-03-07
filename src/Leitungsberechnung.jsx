@@ -638,11 +638,34 @@ function TabAbstandsrechner() {
   const [laenge,      setLaenge]      = useState("");
   const [anzahl,      setAnzahl]      = useState("3");
   const [modus,       setModus]       = useState("sym");
-  const [wandabstand, setWandabstand] = useState("0.5");
+  const [wandabstand, setWandabstand] = useState("");
   const [einheit,     setEinheit]     = useState("m");
   const [objekt,      setObjekt]      = useState("Lampe");
 
   const erg = berechneAbstand({ laenge, anzahl, modus, wandabstand });
+
+  const MODI = [
+    {
+      wert: "sym",
+      icon: "↔",
+      titel: "Auto-Abstand",
+      beschr: "Alles gleichmäßig verteilt, Randabstand automatisch",
+    },
+    {
+      wert: "rand",
+      icon: "⇥",
+      titel: "Wand zu Wand",
+      beschr: "Erstes & letztes Objekt direkt an der Wand",
+    },
+    {
+      wert: "frei",
+      icon: "→◉",
+      titel: "Eigener Randabstand",
+      beschr: "Du gibst vor, wie weit das erste von der Wand weg ist",
+    },
+  ];
+
+  const OBJEKTE = ["Lampe", "Steckdose", "Leuchte", "Rohrschelle", "Befestigung", "Dübel"];
 
   return (
     <div>
@@ -651,27 +674,58 @@ function TabAbstandsrechner() {
       </div>
 
       {/* Eingaben */}
-      <div style={{ ...card(), marginBottom: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
-          <NumInput label="Gesamtlänge / Raummaß" unit={einheit} value={laenge} onChange={setLaenge} placeholder="z.B. 5.4" />
-          <NumInput label="Anzahl Objekte" unit="Stück" value={anzahl} onChange={setAnzahl} placeholder="z.B. 3" step="1" min="1" />
+      <div style={{ ...card(), marginBottom: 16 }}>
+        {/* Basis-Felder */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 18 }}>
+          <NumInput label="Gesamtlänge / Raummaß" unit={einheit} value={laenge} onChange={setLaenge} placeholder="z.B. 4.60" />
+          <NumInput label="Anzahl Objekte" unit="Stück" value={anzahl} onChange={setAnzahl} placeholder="3" step="1" min="1" />
           <SelectInput label="Einheit" value={einheit} onChange={setEinheit} options={[{ wert: "m", label: "Meter (m)" }, { wert: "cm", label: "Zentimeter (cm)" }]} />
-          <SelectInput label="Verteilungs-Modus" value={modus} onChange={setModus} options={[
-            { wert: "sym",  label: "Gleichmäßig inkl. Randabstand" },
-            { wert: "rand", label: "Wand zu Wand (erstes/letztes an Wand)" },
-            { wert: "frei", label: "Frei — Wandabstand vorgeben" },
-          ]} />
-          {modus === "frei" && (
-            <NumInput label="Wandabstand" unit={einheit} value={wandabstand} onChange={setWandabstand} placeholder="z.B. 0.5" />
-          )}
-          <SelectInput label="Objekt-Bezeichnung" value={objekt} onChange={setObjekt} options={["Lampe", "Rohrschelle", "Steckdose", "Leuchte", "Befestigung", "Dübel"].map(o => ({ wert: o, label: o }))} />
         </div>
+
+        {/* Objekt-Typ als Chip-Reihe */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={lbl}>Objekt-Typ</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {OBJEKTE.map(o => (
+              <button key={o} onClick={() => setObjekt(o)} style={{
+                padding: "6px 12px", borderRadius: 20, border: `1px solid ${objekt === o ? AKZENT : "var(--border)"}`,
+                background: objekt === o ? `${AKZENT}18` : "var(--bg)",
+                color: objekt === o ? AKZENT : "var(--text2)", cursor: "pointer", fontSize: 12,
+                fontWeight: objekt === o ? 700 : 400,
+              }}>{o}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Modus-Wahl als sichtbare Karten */}
+        <div style={lbl}>Verteilungs-Modus</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: modus === "frei" ? 14 : 0 }}>
+          {MODI.map(m => (
+            <button key={m.wert} onClick={() => setModus(m.wert)} style={{
+              background: modus === m.wert ? `${AKZENT}18` : "var(--bg)",
+              border: `2px solid ${modus === m.wert ? AKZENT : "var(--border)"}`,
+              borderRadius: 10, padding: "10px 10px", cursor: "pointer", textAlign: "left",
+              transition: "border-color 0.15s",
+            }}>
+              <div style={{ fontSize: 16, marginBottom: 3 }}>{m.icon}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: modus === m.wert ? AKZENT : "var(--text)", marginBottom: 2 }}>{m.titel}</div>
+              <div style={{ fontSize: 10, color: "var(--text3)", lineHeight: 1.3 }}>{m.beschr}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Wandabstand-Eingabe nur bei "frei" */}
+        {modus === "frei" && (
+          <div style={{ marginTop: 14, maxWidth: 220 }}>
+            <NumInput label="Abstand 1. Objekt von Wand" unit={einheit} value={wandabstand} onChange={setWandabstand} placeholder="z.B. 0.30" />
+          </div>
+        )}
       </div>
 
       {/* Ergebnis */}
       {!erg && (
         <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--text3)", fontSize: 13 }}>
-          Gesamtlänge und Anzahl eingeben
+          Gesamtlänge und Anzahl eingeben — Ergebnis erscheint sofort
         </div>
       )}
 
@@ -679,10 +733,16 @@ function TabAbstandsrechner() {
         <>
           {/* Kennwerte */}
           <div style={resultBox()}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
+            {/* Formel-Zeile */}
+            <div style={{ marginBottom: 14, padding: "8px 12px", background: "var(--bg)", borderRadius: 8, fontSize: 12, color: "var(--text3)", fontFamily: "var(--mono)" }}>
+              {modus === "sym" && `Abstand = ${laenge} / (${anzahl} + 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
+              {modus === "rand" && parseInt(anzahl) >= 2 && `Abstand = ${laenge} / (${anzahl} − 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
+              {modus === "frei" && `Abstand = (${laenge} − 2 × ${wandabstand}) / (${anzahl} − 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 16 }}>
               {[
                 { label: `Abstand zwischen ${objekt}n`, value: erg.abstand > 0 ? erg.abstand.toFixed(3) : "–", unit: einheit, color: AKZENT },
-                { label: "Wandabstand (Rand)", value: erg.wandOffset > 0 ? erg.wandOffset.toFixed(3) : "0", unit: einheit, color: "var(--text2)" },
+                { label: modus === "frei" ? "1. Objekt von Wand" : "Randabstand (auto)", value: erg.wandOffset > 0 ? erg.wandOffset.toFixed(3) : "0", unit: einheit, color: modus === "frei" ? AKZENT : "var(--text2)" },
                 { label: "Anzahl Objekte", value: erg.N, unit: "Stk.", color: "var(--text2)" },
               ].map(({ label, value, unit, color }) => (
                 <div key={label} style={{ textAlign: "center", padding: "8px 0" }}>
@@ -718,12 +778,6 @@ function TabAbstandsrechner() {
             </div>
           </div>
 
-          {/* Modi-Erklärung */}
-          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 20 }}>
-            {modus === "sym" && `Abstand = Gesamtlänge / (Anzahl + 1) = ${laenge} / (${anzahl} + 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
-            {modus === "rand" && parseInt(anzahl) >= 2 && `Abstand = Gesamtlänge / (Anzahl − 1) = ${laenge} / (${anzahl} − 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
-            {modus === "frei" && `Abstand = (Gesamtlänge − 2 × Wandabstand) / (Anzahl − 1) = (${laenge} − 2 × ${wandabstand}) / (${anzahl} − 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
-          </div>
         </>
       )}
 
