@@ -790,6 +790,7 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
 
 // ── Protokoll-Liste ───────────────────────────────────────────────────────────
 function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync, config }) {
+  const [showInfo, setShowInfo] = useState(false);
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px" }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 24, gap: 10, flexWrap: "wrap" }}>
@@ -801,7 +802,47 @@ function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync,
         {dbSync && <span style={{ fontSize: 11, color: "var(--text3)", background: "var(--bg3)", borderRadius: 6, padding: "3px 8px" }}>☁ Datenbank</span>}
         <button style={{ ...bSec }} onClick={onImport}>⚡ Aus Verteilerplaner</button>
         <button style={bPrim} onClick={onNew}>+ Neues Protokoll</button>
+        <button onClick={() => setShowInfo(true)} title="Info" style={{...bSec,padding:"6px 10px"}}>ℹ</button>
       </div>
+
+      {showInfo && (
+        <div onClick={() => setShowInfo(false)} style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.94)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e => e.stopPropagation()} style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:20,padding:28,maxWidth:480,width:"100%",position:"relative",maxHeight:"90vh",overflowY:"auto"}}>
+            <button onClick={() => setShowInfo(false)} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"var(--text2)",fontSize:18,cursor:"pointer",padding:4,lineHeight:1}}>✕</button>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
+              <div style={{fontSize:28}}>📋</div>
+              <div>
+                <div style={{fontSize:20,fontWeight:800}}>Prüfprotokoll</div>
+                <div style={{fontSize:12,color:"#f59e0b"}}>Version 2026.3 · by Jedrimos</div>
+              </div>
+            </div>
+            <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>
+              VDE-konforme Messprotokollierung nach DIN VDE 0100-600. Prüfprotokolle erstellen, Messwerte erfassen, automatisch bewerten und als PDF exportieren.
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:24}}>
+              {[
+                ["📏","Messwerte","PE, Riso, Schleife, FI/RCD"],
+                ["🚦","Ampelbewertung","Automatisch nach VDE-Grenzwerten"],
+                ["⚡","Import","Stromkreise aus Verteilerplaner"],
+                ["⬇","PDF-Export","Professionelles A4-PDF"],
+                ["⏰","Prüffristen","Ablauf-Badges & Warnungen"],
+                ["🖨","Drucken","Direkt aus dem Browser"],
+              ].map(([icon,titel,sub])=>(
+                <div key={titel} style={{display:"flex",alignItems:"flex-start",gap:10,background:"var(--bg3)",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontSize:16,lineHeight:1}}>{icon}</div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700}}>{titel}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{borderTop:"1px solid var(--border)",paddingTop:16,fontSize:11,color:"var(--text3)",textAlign:"center"}}>
+              Lokale Datenspeicherung · Keine Cloud erforderlich · Keine Werbung · © 2026 Jedrimos
+            </div>
+          </div>
+        </div>
+      )}
 
       {protokolle.length === 0 ? (
         <div style={{

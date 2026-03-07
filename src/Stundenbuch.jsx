@@ -249,6 +249,7 @@ export default function Stundenbuch({ config = {} }) {
   const [timerStart, setTimerStart] = useState(null);
   const [timerNow, setTimerNow] = useState(null);
   const [timerVorbelegung, setTimerVorbelegung] = useState(null);
+  const [showInfo, setShowInfo] = useState(false);
   const { toasts, addToast } = useToasts();
 
   // Timer-Tick jede Sekunde
@@ -383,7 +384,47 @@ export default function Stundenbuch({ config = {} }) {
         <button onClick={() => { setEditId(null); setTimerVorbelegung(null); setShowForm(s => !s); }} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>
           {showForm && !editId ? "✕ Schließen" : "+ Neuer Eintrag"}
         </button>
+        <button onClick={() => setShowInfo(true)} title="Info" style={{...btnStyle("rgba(82,217,138,0.08)","var(--green)"),padding:"6px 10px"}}>ℹ</button>
       </div>
+
+      {showInfo && (
+        <div onClick={() => setShowInfo(false)} style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.94)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e => e.stopPropagation()} style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:20,padding:28,maxWidth:480,width:"100%",position:"relative",maxHeight:"90vh",overflowY:"auto"}}>
+            <button onClick={() => setShowInfo(false)} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"var(--text2)",fontSize:18,cursor:"pointer",padding:4,lineHeight:1}}>✕</button>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
+              <div style={{fontSize:28}}>⏱</div>
+              <div>
+                <div style={{fontSize:20,fontWeight:800}}>Stundenbuch</div>
+                <div style={{fontSize:12,color:"var(--green)"}}>Version 2026.3 · by Jedrimos</div>
+              </div>
+            </div>
+            <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>
+              Digitale Zeiterfassung für Elektrofachkräfte. Einträge mit Datum, Von/Bis, Pause, Projekt und Tätigkeit — mit optionalem Supabase-Sync für das ganze Team.
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:24}}>
+              {[
+                ["⏱","Timer","Start/Stop direkt im Header"],
+                ["📅","Monats-Filter","Filtern nach Monat und Projekt"],
+                ["📊","Chart","SVG-Balkendiagramm pro Tag"],
+                ["⬇","CSV-Export","Stundennachweis als CSV-Datei"],
+                ["💾","Auto-Save","Lokal + optional in Supabase"],
+                ["⌨","Shortcut","Ctrl+S speichert den Eintrag"],
+              ].map(([icon,titel,sub])=>(
+                <div key={titel} style={{display:"flex",alignItems:"flex-start",gap:10,background:"var(--bg3)",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontSize:16,lineHeight:1}}>{icon}</div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700}}>{titel}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{borderTop:"1px solid var(--border)",paddingTop:16,fontSize:11,color:"var(--text3)",textAlign:"center"}}>
+              Lokale Datenspeicherung · Keine Cloud erforderlich · Keine Werbung · © 2026 Jedrimos
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Wochenstunden + Timer */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>

@@ -228,6 +228,7 @@ function ArtikelView({ artikel, onBack, onEdit, onDelete }) {
 function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
   const [suche, setSuche] = useState("");
   const [kat, setKat] = useState("Alle");
+  const [showInfo, setShowInfo] = useState(false);
 
   const gefiltert = useMemo(() => {
     const q = suche.toLowerCase();
@@ -263,7 +264,47 @@ function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
           </span>
         )}
         <button style={bPrim} onClick={onNew}>+ Neuer Artikel</button>
+        <button onClick={() => setShowInfo(true)} title="Info" style={{...bPrim,background:"transparent",border:"1px solid var(--border2)",color:"var(--text2)",padding:"6px 10px"}}>ℹ</button>
       </div>
+
+      {showInfo && (
+        <div onClick={() => setShowInfo(false)} style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.94)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e => e.stopPropagation()} style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:20,padding:28,maxWidth:480,width:"100%",position:"relative",maxHeight:"90vh",overflowY:"auto"}}>
+            <button onClick={() => setShowInfo(false)} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"var(--text2)",fontSize:18,cursor:"pointer",padding:4,lineHeight:1}}>✕</button>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
+              <div style={{fontSize:28}}>📚</div>
+              <div>
+                <div style={{fontSize:20,fontWeight:800}}>Wissensdatenbank</div>
+                <div style={{fontSize:12,color:TEAL}}>Version 2026.3 · by Jedrimos</div>
+              </div>
+            </div>
+            <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>
+              Firmenwissen strukturiert erfassen und im Team teilen. Artikel mit Markdown-Inhalt, Kategorien und Tags — durchsuchbar und via Supabase teamweit verfügbar.
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:24}}>
+              {[
+                ["📝","Markdown","Volle Markdown-Formatierung"],
+                ["🔍","Volltextsuche","In Titel, Inhalt, Tags, Autor"],
+                ["🏷","Kategorien","Thematisch strukturiert"],
+                ["👥","Team-Sharing","Sync via Supabase"],
+                ["👁","Vorschau","Live Markdown-Vorschau"],
+                ["📱","Responsive","Mobile-optimiert"],
+              ].map(([icon,titel,sub])=>(
+                <div key={titel} style={{display:"flex",alignItems:"flex-start",gap:10,background:"var(--bg3)",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontSize:16,lineHeight:1}}>{icon}</div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700}}>{titel}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{borderTop:"1px solid var(--border)",paddingTop:16,fontSize:11,color:"var(--text3)",textAlign:"center"}}>
+              Lokale Datenspeicherung · Keine Cloud erforderlich · Keine Werbung · © 2026 Jedrimos
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Suche + Filter */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>

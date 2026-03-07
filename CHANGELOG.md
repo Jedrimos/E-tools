@@ -6,7 +6,7 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
-## [2026.3.6] – 2026-03-07
+## [2026.3.2] – 2026-03-07
 
 ### ✨ Neu
 
@@ -33,8 +33,12 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 - *Stundenbuch:* Eintrags-Karten responsives 2-Spalten-Grid auf < 600 px; Pause-Spalte automatisch ausgeblendet
 - *Prüfprotokoll:* Stromkreis-Tabelle mit horizontalem Scroll auf Mobile; StromkreisForm 2-spaltig; Anlagendaten-Grid 2-spaltig; Header-Aktionsbuttons wrappen in neue Zeile
 
+**Info-Buttons — alle Tools**
+- ℹ️-Button in Stundenbuch, Prüfprotokoll und Wissensdatenbank (analog zum Verteilerplaner)
+- Jede App zeigt ein App-spezifisches Info-Modal mit Beschreibung, Features und Versionsnummer
+
 **Todo.md**
-- Neue Datei `Todo.md` im Repository: zentrale Aufgabenliste für Ideen die während der Arbeit einfallen; aus `origin/main` übernommen
+- Neue Datei `Todo.md` im Repository: zentrale Aufgabenliste für Ideen die während der Arbeit einfallen
 
 ### 🐛 Bugfixes
 
@@ -44,7 +48,7 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
-## [2026.3.5] – 2026-03-06
+## [2026.3.1] – 2026-03-06
 
 ### ✨ Neu
 
@@ -63,6 +67,31 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 - Stunden pro Tag, farbkodiert: grün ≥ 8h, blau 4–8h, grau < 4h
 - Gestrichelte 8h-Referenzlinie, heutiger Tag hervorgehoben
 
+**Prüfprotokoll**
+- Fortschrittsring (SVG) im Editor-Header: zeigt % der gemessenen Stromkreise live an
+- Ctrl+S / Cmd+S speichert das Protokoll direkt aus dem Editor
+- Drucken-Button im Protokoll-Editor (`window.print()`)
+- Ablaufwarnung direkt an jedem Protokoll in der Liste: roter Badge bei abgelaufener Prüffrist, gelber Badge bei Fälligkeit in 30 Tagen
+- Print-CSS verbessert: saubere Druckansicht, Buttons werden ausgeblendet, helle Hintergrundfarben
+
+**Stundenbuch**
+- Ctrl+S / Cmd+S speichert den Stunden-Eintrag im offenen Formular
+- Feierabend-Hinweis: läuft der Timer ≥ 8h, erscheint eine diskrete Meldung mit der Gesamtzeit
+- Wochenstunden-Anzeige: Netto-Stunden der aktuellen Woche direkt im Header
+- Start/Stop-Timer: Zeitmessung per Klick, füllt beim Stopp automatisch Von/Bis-Felder im neuen Eintrag
+
+**Dashboard**
+- Live-Stats unterhalb des Titels: Verteiler-Anzahl, Protokoll-Anzahl, Arbeitsstunden diesen Monat
+- Stats aktualisieren sich automatisch beim Zurücknavigieren
+- Ablaufdatum-Badge auf der Prüfprotokoll-Karte: zeigt Anzahl abgelaufener und bald fälliger Protokolle
+- Supabase-Verbindungsstatus-Indikator (grün/rot/grau) direkt im Dashboard
+- Backup-Export: alle App-Daten als JSON-Datei herunterladen
+- Backup-Import: JSON-Backup einlesen und localStorage wiederherstellen
+
+**Verteilerplaner**
+- Projekt-Suche in beiden Lade-Dialogen (StartScreen + Mid-Session-Modal), erscheint ab 4 Projekten
+- Reserveplatz-Markierung: Sicherung als "Reserve" flaggen (erscheint grau/gedimmt), wird in der Stückliste als "Reserveplatz (leer)" aufgeführt
+
 ### 🐛 Bugfixes
 
 - **Stundenbuch**: Timer-Prefill-State war nach der nutzenden Funktion deklariert — Reihenfolge korrigiert
@@ -74,50 +103,7 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
-## [2026.3.4] – 2026-03-06
-
-### ✨ Neu
-
-**Prüfprotokoll**
-- Fortschrittsring (SVG) im Editor-Header: zeigt % der gemessenen Stromkreise live an
-- Ctrl+S / Cmd+S speichert das Protokoll direkt aus dem Editor
-
-**Stundenbuch**
-- Ctrl+S / Cmd+S speichert den Stunden-Eintrag im offenen Formular
-- Feierabend-Hinweis: läuft der Timer ≥ 8h, erscheint eine diskrete Meldung mit der Gesamtzeit
-
-**Dashboard**
-- Live-Stats unterhalb des Titels: Verteiler-Anzahl, Protokoll-Anzahl, Arbeitsstunden diesen Monat
-- Stats aktualisieren sich automatisch beim Zurücknavigieren
-
----
-
-## [2026.3.3] – 2026-03-06
-
-### ✨ Neu
-
-**Dashboard**
-- Ablaufdatum-Badge auf der Prüfprotokoll-Karte: zeigt Anzahl abgelaufener und bald fälliger Protokolle
-- Supabase-Verbindungsstatus-Indikator (grün/rot/grau) direkt im Dashboard
-- Backup-Export: alle App-Daten als JSON-Datei herunterladen
-- Backup-Import: JSON-Backup einlesen und localStorage wiederherstellen
-
-**Stundenbuch**
-- Wochenstunden-Anzeige: Netto-Stunden der aktuellen Woche direkt im Header
-- Start/Stop-Timer: Zeitmessung per Klick, füllt beim Stopp automatisch Von/Bis-Felder im neuen Eintrag
-
-**Verteilerplaner**
-- Projekt-Suche in beiden Lade-Dialogen (StartScreen + Mid-Session-Modal), erscheint ab 4 Projekten
-- Reserveplatz-Markierung: Sicherung als "Reserve" flaggen (erscheint grau/gedimmt), wird in der Stückliste als "Reserveplatz (leer)" aufgeführt
-
-**Prüfprotokoll**
-- Drucken-Button im Protokoll-Editor (`window.print()`)
-- Ablaufwarnung direkt an jedem Protokoll in der Liste: roter Badge bei abgelaufener Prüffrist, gelber Badge bei Fälligkeit in 30 Tagen
-- Print-CSS verbessert: saubere Druckansicht, Buttons werden ausgeblendet, helle Hintergrundfarben
-
----
-
-## [2026.3.2] – 2026-03-06
+## [2026.3.0] – 2026-03-06
 
 ### 🎉 Elektronikertools – Erster vollständiger Release
 
