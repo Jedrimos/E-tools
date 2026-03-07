@@ -1558,16 +1558,42 @@ const stueckliste = (() => {
         .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:0.85;transform:scale(1.05);box-shadow:0 8px 32px rgba(0,0,0,0.5);}
         @media(max-width:640px){
           .step3-grid{grid-template-columns:1fr;}
-          .header-nav button{padding:5px 8px!important;font-size:10px!important;}
-          .nav-label-long{display:none;}
-          .nav-label-short{display:inline!important;}
           .main-wrap{padding:10px 8px;}
-          .header-actions .btn-label{display:none;}
           select{min-height:40px;font-size:14px!important;}
           .mobile-stack{flex-direction:column!important;}
           .mobile-full{width:100%!important;flex:1 1 100%!important;}
           .mobile-hide{display:none!important;}
           .step-label{display:none;}
+          /* Header 2-Zeilen Layout auf Handy */
+          .header-outer{
+            flex-wrap:wrap!important;
+            height:auto!important;
+            padding:7px 10px 0!important;
+            gap:0!important;
+          }
+          .header-center-nav{
+            order:10;
+            flex:none!important;
+            width:100%!important;
+            max-width:none!important;
+            margin-left:0!important;
+            overflow-x:auto;
+            -webkit-overflow-scrolling:touch;
+            scrollbar-width:none;
+            padding:5px 0 7px!important;
+            border-top:1px solid var(--border);
+            justify-content:flex-start!important;
+            gap:5px!important;
+          }
+          .header-center-nav::-webkit-scrollbar{display:none;}
+          .header-center-nav button{padding:6px 10px!important;font-size:11px!important;white-space:nowrap!important;}
+          .header-logo-text{display:none!important;}
+          .header-version{display:none!important;}
+          .header-photo-btn{display:none!important;}
+          .header-settings-btn{display:none!important;}
+          .header-info-btn{display:none!important;}
+          .nav-label-long{display:none;}
+          .nav-label-short{display:inline!important;}
         }
         @media(min-width:641px){
           .nav-label-short{display:none;}
@@ -1579,7 +1605,7 @@ const stueckliste = (() => {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div className="no-print" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
+      <div className="no-print header-outer" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
 
         {/* LEFT: Dashboard-Back + Logo */}
         <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
@@ -1601,15 +1627,15 @@ const stueckliste = (() => {
               <rect x="14" y="0" width="12" height="5" rx="1.5" fill="#2196C9" opacity="0.4"/>
               <rect x="14" y="7" width="8" height="5" rx="1.5" fill="#2196C9" opacity="0.25"/>
             </svg>
-            <div>
+            <div className="header-logo-text">
               <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>Verteilerplaner</div>
             </div>
-            <span style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3</span>
+            <span className="header-version" style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3</span>
           </div>
         </div>
 
         {/* CENTER: Step Navigation */}
-        <div className="header-nav" style={{flex:1,justifyContent:"center",maxWidth:520}}>
+        <div className="header-nav header-center-nav" style={{flex:1,justifyContent:"center",maxWidth:520}}>
           {[["1","Projekt","Proj"],["2","Kabel","Kabel"],["3","Sicherungen","Sich"],["4","FI","FI"],["5","Plan","Plan"]].map(([n,l,s])=>{
             const ni=Number(n); const active=step===ni; const done=step>ni;
             const erreichbar = ni<=2 || ni<=step || (ni===3&&kabel.length>0) || (ni===4&&kabel.length>0) || (ni===5&&!!plan);
@@ -1655,14 +1681,17 @@ const stueckliste = (() => {
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>💾</button>
           <div style={{width:1,height:18,background:"var(--border)",margin:"0 3px"}}/>
           <button onClick={()=>setShowFoto(true)} title="Kabelliste aus Foto importieren"
+            className="header-photo-btn"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>📷</button>
           <button onClick={()=>setShowSettings(true)} title="Einstellungen"
+            className="header-settings-btn"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>⚙️</button>
           <button onClick={()=>setShowInfo(true)} title="Über Verteilerplaner"
+            className="header-info-btn"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>ℹ️</button>
@@ -1670,8 +1699,8 @@ const stueckliste = (() => {
       </div>
 
       <div className="main-wrap">
-        {/* Step progress bar */}
-        <div className="no-print" style={{display:"flex",alignItems:"center",gap:0,marginBottom:20}}>
+        {/* Step progress bar – auf Mobile ausgeblendet (Header-Nav übernimmt) */}
+        <div className="no-print mobile-hide" style={{display:"flex",alignItems:"center",gap:0,marginBottom:20}}>
           {[1,2,3,4,5].map((n,i)=>{
             const active=step===n; const done=step>n;
             const labels=["Projekt","Kabel","Sicherungen","FI-Planung","Belegungsplan"];
@@ -1827,10 +1856,10 @@ const stueckliste = (() => {
               <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.3px"}}>🔌 Kabel erfassen</div>
               <div style={{fontSize:11,color:"var(--text3)",marginTop:1,display:"flex",gap:10}}><span>{kabel.length} Kabel</span>{sicherungen.length>0&&<span style={{color:"var(--blue)"}}>· {kabel.filter(k=>sicherungen.some(s=>s.kabelIds.includes(k.id))).length} zugewiesen</span>}</div>
             </div>
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button onClick={()=>setStep(1)} style={bSec}>← Zurück</button>
-              <button onClick={()=>setShowFoto(true)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>📷 Foto</button>
-              <button onClick={()=>setStep(3)} style={bPrimary}>Weiter → Sicherungen planen</button>
+              <button onClick={()=>setShowFoto(true)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>📷 <span className="nav-label-long">Foto</span></button>
+              <button onClick={()=>setStep(3)} style={{...bPrimary,flex:"1 1 auto",whiteSpace:"nowrap"}}>Weiter →<span className="nav-label-long"> Sicherungen planen</span></button>
             </div>
           </div>
 
@@ -2684,6 +2713,16 @@ const stueckliste = (() => {
                 const groups=buildSeq(fi.stromkreise,false,null);
                 const klemmenAnzahl=groups.reduce((n,g)=>n+g.klemmen.length,0);
                 const kabelKlemmen=groups.filter(g=>g.kabelLabel).reduce((n,g)=>n+g.klemmen.length,0);
+                // Klemmenbezeichnungen: X1, X1.1, X1.2 ...
+                const xNr=fiIdx+1;
+                let xCounter=0;
+                const xLabels=new Map();
+                groups.forEach((grp,gi)=>{grp.klemmen.forEach((kl,ki)=>{
+                  if(kl.type==='pe_einspeisung') xLabels.set(`${gi}-${ki}`,`X${xNr}`);
+                  else if(['rk_mit_pe','rk_ohne_pe','rk_n_fils'].includes(kl.type)){
+                    xCounter++; xLabels.set(`${gi}-${ki}`,`X${xNr}.${xCounter}`);
+                  }
+                });});
                 return(
                   <div key={fi.id} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
                     <div style={{padding:"10px 16px",background:"var(--bg3)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderBottom:"1px solid var(--border)"}}>
@@ -2739,18 +2778,22 @@ const stueckliste = (() => {
                               {grp.klemmen.map((s,si)=>{
                                 const st=KLEMME_STYLES[s.type]||{bg:"var(--bg2)",border:"var(--text3)",label:"?",color:"var(--text3)",w:22};
                                 const isKappe=s.type==="abdeckkappe_orange";
+                                const xl=xLabels?.get(`${gi}-${si}`);
                                 return(
-                                  <div key={si} title={s.label||s.type}
-                                    style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
-                                      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
-                                      boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
-                                    {s.type==="pe_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
-                                    {s.type==="rk_mit_pe"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>3pol</span>}
-                                    {s.type==="rk_ohne_pe"&&<span style={{fontSize:7,color:"var(--text3)",fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>2pol</span>}
-                                    {s.type==="rk_n_fils"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>N</span>}
-                                    {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
-                                    {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
-                                    {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
+                                  <div key={si} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+                                    <div title={xl||s.label||s.type}
+                                      style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
+                                        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
+                                        boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
+                                      {s.type==="pe_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
+                                      {s.type==="rk_mit_pe"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>3pol</span>}
+                                      {s.type==="rk_ohne_pe"&&<span style={{fontSize:7,color:"var(--text3)",fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>2pol</span>}
+                                      {s.type==="rk_n_fils"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>N</span>}
+                                      {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
+                                      {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
+                                      {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
+                                    </div>
+                                    {xl&&<span style={{fontSize:5.5,color:s.type==="pe_einspeisung"?"var(--blue)":"var(--text3)",fontFamily:"var(--mono)",fontWeight:700,marginTop:2,letterSpacing:0,lineHeight:1,userSelect:"none"}}>{xl}</span>}
                                   </div>
                                 );
                               })}
@@ -2794,6 +2837,16 @@ const stueckliste = (() => {
               {plan.fils.map((sk,i)=>{
                 const groups=buildSeq(null,true,sk);
                 const klemmenAnzahl=groups.reduce((n,g)=>n+g.klemmen.length,0);
+                // Klemmenbezeichnungen für FILS: X(n+1)
+                const xNr=plan.gruppen.length+i+1;
+                let xCounter=0;
+                const xLabels=new Map();
+                groups.forEach((grp,gi)=>{grp.klemmen.forEach((kl,ki)=>{
+                  if(kl.type==='pe_einspeisung') xLabels.set(`${gi}-${ki}`,`X${xNr}`);
+                  else if(['rk_mit_pe','rk_ohne_pe','rk_n_fils'].includes(kl.type)){
+                    xCounter++; xLabels.set(`${gi}-${ki}`,`X${xNr}.${xCounter}`);
+                  }
+                });});
                 return(
                   <div key={sk.id} style={{background:"#14121e",border:"1px solid rgba(167,139,250,0.15)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
                     <div style={{padding:"10px 16px",background:"rgba(167,139,250,0.05)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderBottom:"1px solid rgba(167,139,250,0.1)"}}>
@@ -2823,18 +2876,22 @@ const stueckliste = (() => {
                               {grp.klemmen.map((s,si)=>{
                                 const st=KLEMME_STYLES[s.type]||{bg:"var(--bg2)",border:"var(--text3)",label:"?",color:"var(--text3)",w:22};
                                 const isKappe=s.type==="abdeckkappe_orange";
+                                const xl=xLabels?.get(`${gi}-${si}`);
                                 return(
-                                  <div key={si} title={s.label||s.type}
-                                    style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
-                                      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
-                                      boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
-                                    {s.type==="pe_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
-                                    {s.type==="rk_mit_pe"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>3pol</span>}
-                                    {s.type==="rk_ohne_pe"&&<span style={{fontSize:7,color:"var(--text3)",fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>2pol</span>}
-                                    {s.type==="rk_n_fils"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>N</span>}
-                                    {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
-                                    {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
-                                    {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
+                                  <div key={si} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+                                    <div title={xl||s.label||s.type}
+                                      style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
+                                        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
+                                        boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
+                                      {s.type==="pe_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
+                                      {s.type==="rk_mit_pe"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>3pol</span>}
+                                      {s.type==="rk_ohne_pe"&&<span style={{fontSize:7,color:"var(--text3)",fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>2pol</span>}
+                                      {s.type==="rk_n_fils"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>N</span>}
+                                      {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
+                                      {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
+                                      {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
+                                    </div>
+                                    {xl&&<span style={{fontSize:5.5,color:s.type==="pe_einspeisung"?"var(--blue)":"var(--text3)",fontFamily:"var(--mono)",fontWeight:700,marginTop:2,letterSpacing:0,lineHeight:1,userSelect:"none"}}>{xl}</span>}
                                   </div>
                                 );
                               })}
@@ -2896,15 +2953,37 @@ const stueckliste = (() => {
             const alleZeilen=[];
             plan.gruppen.forEach((fi,fiIdx)=>{
               const qNr=fiIdx+1;
-              alleZeilen.push({typ:"fi",qNr,fi});
+              const xNr=fiIdx+1;
+              alleZeilen.push({typ:"fi",qNr,fi,xLabel:`X${xNr}`});
+              // X-Klemmenbezeichnungen: Terminal-Zähler pro FI
+              const grps=buildSeq(fi.stromkreise,false,null);
+              const skToX={};
+              let xC=0;
+              grps.forEach(grp=>{
+                if(!grp.skId)return;
+                const first=xC+1;
+                grp.klemmen.forEach(kl=>{if(['rk_mit_pe','rk_ohne_pe'].includes(kl.type))xC++;});
+                if(!skToX[grp.skId]) skToX[grp.skId]={from:first,to:xC};
+                else skToX[grp.skId].to=xC;
+              });
               fi.stromkreise.forEach((si,siIdx)=>{
-                alleZeilen.push({typ:"ls",qNr,fNr:siIdx+1,si});
+                const x=skToX[si.id];
+                const xLabel=x?(x.from===x.to?`X${xNr}.${x.from}`:`X${xNr}.${x.from}–${x.to}`):"";
+                alleZeilen.push({typ:"ls",qNr,fNr:siIdx+1,si,xLabel});
               });
             });
             plan.fils.forEach((si,i)=>{
               const qNr=plan.gruppen.length+i+1;
-              alleZeilen.push({typ:"fi",qNr,fils:true,si});
-              alleZeilen.push({typ:"ls",qNr,fNr:1,si});
+              const xNr=qNr;
+              alleZeilen.push({typ:"fi",qNr,fils:true,si,xLabel:`X${xNr}`});
+              // FILS Terminals: rk_n_fils + rk_ohne_pe
+              const grps=buildSeq(null,true,si);
+              let xC=0;
+              grps.forEach(grp=>{
+                grp.klemmen.forEach(kl=>{if(['rk_n_fils','rk_ohne_pe'].includes(kl.type))xC++;});
+              });
+              const xLabel=xC>0?(xC===1?`X${xNr}.1`:`X${xNr}.1–${xNr}.${xC}`):"";
+              alleZeilen.push({typ:"ls",qNr,fNr:1,si,xLabel});
             });
             return <>
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:500,overflowY:"auto",padding:"20px 16px"}} onClick={()=>setShowBeschriftung(false)}>
@@ -2935,7 +3014,7 @@ const stueckliste = (() => {
                       const filsBem=z.si?.filsBemessung||40, filsTyp=z.si?.filsTyp||"A", filsFs=z.si?.filsFehlerstrom||30, filsPole=z.si?.filsPole||4;
                       return(
                         <tr key={`q${z.qNr}`} style={{background:"#1a1a2e",borderBottom:"1px solid #2a2a3a"}}>
-                          <td style={{padding:"8px 12px",fontFamily:"var(--mono)",fontWeight:900,fontSize:14,color:z.fils?"var(--purple)":"var(--blue)"}}>Q{z.qNr}</td>
+                          <td style={{padding:"8px 12px",fontFamily:"var(--mono)",fontWeight:900,fontSize:14,color:z.fils?"var(--purple)":"var(--blue)"}}>Q{z.qNr}{z.xLabel&&<span style={{fontSize:9,color:"var(--text3)",fontWeight:500,marginLeft:6}}>{z.xLabel}</span>}</td>
                           <td style={{padding:"8px 12px",color:"var(--text2)",fontStyle:"italic",fontSize:11}}>
                             {z.fils?`FILS – FI/RCD ${filsBem}A Typ ${filsTyp} ${filsFs}mA ${filsPole}P`:`FI-Schutzschalter · ${z.fi?fiBeschreibung(z.fi):""}`}
                           </td>
@@ -2952,7 +3031,10 @@ const stueckliste = (() => {
                     const swColors=[...new Set(siKabel.map(k=>k.stockwerk))];
                     return(
                       <tr key={fLabel} style={{borderBottom:"1px solid #161616",background:"var(--bg2)"}}>
-                        <td style={{padding:"7px 12px",fontFamily:"var(--mono)",fontWeight:800,fontSize:13,color:"var(--text)"}}>{fLabel}</td>
+                        <td style={{padding:"7px 12px",fontFamily:"var(--mono)",fontWeight:800,fontSize:13,color:"var(--text)"}}>
+                          {fLabel}
+                          {z.xLabel&&<div style={{fontSize:9,color:"var(--text3)",fontWeight:500,marginTop:1}}>{z.xLabel}</div>}
+                        </td>
                         <td style={{padding:"7px 12px",fontWeight:600,color:"var(--text2)"}}>{siKabel.map(k=>k.bezeichnung||k.raum||"?").join(" + ")||"—"}</td>
                         <td style={{padding:"7px 12px",color:"var(--text3)"}}>{[...new Set(siKabel.map(k=>k.raum).filter(Boolean))].join(", ")||"—"}</td>
                         <td style={{padding:"7px 12px"}}>{swColors.map(sw=><span key={sw} style={{background:swColor(sw)+"22",color:swColor(sw),borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700,marginRight:3}}>{sw}</span>)}</td>

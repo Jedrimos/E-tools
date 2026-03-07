@@ -361,6 +361,15 @@ export default function Stundenbuch({ config = {} }) {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px", color: "var(--text)" }}>
+      <style>{`
+        .stunden-eintrag{display:grid;grid-template-columns:110px 80px 80px 70px 1fr auto;gap:12px;align-items:center;font-size:14px;}
+        @media(max-width:600px){
+          .stunden-eintrag{grid-template-columns:1fr 1fr;gap:6px 10px;font-size:13px;}
+          .stunden-eintrag .se-pause{display:none;}
+          .stunden-eintrag .se-info{grid-column:1/-1;font-size:12px;}
+          .stunden-eintrag .se-btns{justify-self:end;}
+        }
+      `}</style>
       <Toast toasts={toasts} />
 
       {/* Header */}
@@ -452,24 +461,20 @@ export default function Stundenbuch({ config = {} }) {
           {gefiltert.map(e => {
             const netto = calcNetto(e);
             return (
-              <div key={e.id} style={{
+              <div key={e.id} className="stunden-eintrag" style={{
                 background: "var(--bg2)", border: "1px solid var(--border)",
                 borderRadius: 10, padding: "12px 16px",
-                display: "grid", gridTemplateColumns: "110px 80px 80px 70px 1fr auto",
-                gap: 12, alignItems: "center", fontSize: 14
               }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{formatDate(e.datum)}</div>
-                </div>
+                <div style={{ fontWeight: 600 }}>{formatDate(e.datum)}</div>
                 <div style={{ color: "var(--text2)" }}>{e.von} – {e.bis}</div>
-                <div style={{ color: "var(--text2)" }}>-{e.pause}min Pause</div>
+                <div className="se-pause" style={{ color: "var(--text2)" }}>-{e.pause}min Pause</div>
                 <div style={{ fontWeight: 700, color: "var(--green)" }}>{formatDuration(netto)}</div>
-                <div>
+                <div className="se-info">
                   {e.projekt && <span style={{ background: "var(--bg3)", color: "var(--blue)", borderRadius: 6, padding: "2px 8px", fontSize: 12, marginRight: 6 }}>{e.projekt}</span>}
                   {e.taetigkeit && <span style={{ color: "var(--text2)" }}>{e.taetigkeit}</span>}
                   {e.notiz && <span style={{ color: "var(--text3)", fontSize: 12, display: "block", marginTop: 2 }}>{e.notiz}</span>}
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div className="se-btns" style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => handleEdit(e)} style={iconBtn("var(--bg3)")}>✎</button>
                   <button onClick={() => handleDelete(e.id)} style={iconBtn("rgba(255,107,107,0.1)")}>✕</button>
                 </div>

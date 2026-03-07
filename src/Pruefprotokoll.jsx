@@ -411,7 +411,7 @@ function StromkreisForm({ sk, onChange, onDelete }) {
   return (
     <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginTop: 4 }}>
       {/* Grunddaten */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 8, marginBottom: 12 }}>
+      <div className="sk-form-grid">
         <FL label="Bezeichnung">
           <input style={inp()} value={sk.bezeichnung} onChange={e => set("bezeichnung", e.target.value)} placeholder="z.B. L1 Küche" />
         </FL>
@@ -423,12 +423,14 @@ function StromkreisForm({ sk, onChange, onDelete }) {
             {["B","C","D","K","gG"].map(t => <option key={t}>{t}</option>)}
           </select>
         </FL>
-        <FL label="3-polig">
-          <label style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 6, cursor: "pointer" }}>
-            <input type="checkbox" checked={sk.dreipolig} onChange={e => set("dreipolig", e.target.checked)} />
-            <span style={{ fontSize: 12, color: "var(--text2)" }}>Ja</span>
-          </label>
-        </FL>
+        <div className="sk-3pol">
+          <FL label="3-polig">
+            <label style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 6, cursor: "pointer" }}>
+              <input type="checkbox" checked={sk.dreipolig} onChange={e => set("dreipolig", e.target.checked)} />
+              <span style={{ fontSize: 12, color: "var(--text2)" }}>Ja</span>
+            </label>
+          </FL>
+        </div>
       </div>
 
       {/* PE-Durchgangswiderstand */}
@@ -605,8 +607,23 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px" }}>
+      <style>{`
+        .pp-kopfzeile{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;}
+        .pp-kopfzeile-actions{display:flex;gap:8px;flex-wrap:wrap;}
+        .pp-kopf-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+        .sk-form-grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin-bottom:12px;}
+        .sk-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        .sk-table-header,.sk-table-row{display:grid;grid-template-columns:2fr 70px 70px 80px 70px 80px 100px;gap:4px;min-width:520px;}
+        @media(max-width:600px){
+          .pp-kopfzeile{gap:8px;flex-wrap:wrap;}
+          .pp-kopfzeile-actions{width:100%;justify-content:flex-end;display:flex;gap:6px;flex-wrap:wrap;}
+          .pp-kopf-grid{grid-template-columns:1fr 1fr;}
+          .sk-form-grid{grid-template-columns:1fr 1fr;}
+          .sk-form-grid .sk-3pol{grid-column:1/-1;}
+        }
+      `}</style>
       {/* Kopfzeile */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+      <div className="pp-kopfzeile">
         <button style={{ ...bSec, padding: "8px 12px" }} onClick={onBack}>← Zurück</button>
         <FortschrittsRing gemessen={gemessen} gesamt={p.stromkreise.length} />
         <div style={{ flex: 1 }}>
@@ -617,16 +634,18 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
             {p.datum} · {gemessen}/{p.stromkreise.length} Stromkreise gemessen
           </div>
         </div>
-        {hatMessungen && <Badge status={bestanden ? "ok" : "fail"} />}
-        <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => exportPDF(p, config)} title="Als PDF herunterladen">⬇ PDF</button>
-        <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => window.print()} title="Protokoll drucken (Strg+P)">🖨 Drucken</button>
-        <button style={bPrim} onClick={() => onSave(p)} title="Speichern (Strg+S)">Speichern</button>
+        <div className="pp-kopfzeile-actions">
+          {hatMessungen && <Badge status={bestanden ? "ok" : "fail"} />}
+          <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => exportPDF(p, config)} title="Als PDF herunterladen">⬇ PDF</button>
+          <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => window.print()} title="Protokoll drucken (Strg+P)">🖨</button>
+          <button style={bPrim} onClick={() => onSave(p)} title="Speichern (Strg+S)">Speichern</button>
+        </div>
       </div>
 
       {/* Kopfdaten */}
       <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
         <div style={{ fontSize: 11, color: AMBER, textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: 700, marginBottom: 12 }}>Anlagendaten</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        <div className="pp-kopf-grid">
           <FL label="Auftraggeber / Kunde">
             <input style={inp()} value={p.auftraggeber} onChange={e => setField("auftraggeber", e.target.value)} placeholder="Mustermann GmbH" />
           </FL>
@@ -670,9 +689,10 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
           <button style={bPrim} onClick={addStromkreis}>+ Stromkreis</button>
         </div>
 
+        {/* Tabellen (horizontal scrollbar auf Mobile) */}
+        <div className="sk-table-wrap">
         {/* Tabellen-Header */}
-        <div style={{
-          display: "grid", gridTemplateColumns: "2fr 70px 70px 80px 70px 80px 100px",
+        <div className="sk-table-header" style={{
           gap: 4, padding: "6px 10px",
           fontSize: 10, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.6px",
           borderBottom: "1px solid var(--border)",
@@ -700,8 +720,8 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
               {/* Tabellenzeile */}
               <div
                 onClick={() => toggleExpand(sk.id)}
+                className="sk-table-row"
                 style={{
-                  display: "grid", gridTemplateColumns: "2fr 70px 70px 80px 70px 80px 100px",
                   gap: 4, padding: "9px 10px", cursor: "pointer",
                   borderBottom: open ? "none" : "1px solid var(--border)",
                   background: open ? "rgba(245,158,11,0.04)" : "transparent",
@@ -756,6 +776,7 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
             </div>
           );
         })}
+        </div>{/* end sk-table-wrap */}
       </div>
 
       {/* Fußzeile */}
