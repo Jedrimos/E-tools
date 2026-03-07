@@ -8,6 +8,25 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ## [2026.3.6] – 2026-03-07
 
+### ✨ Neu — KNX-Planer (neue App)
+
+- **GA-Planer**: Gruppenadresse anlegen (HG/MG/UG), Funktionstyp, DPT, Raum-Zuweisung, Notiz — sortierte Liste nach Adresse, Filter nach Funktion/HG/Suche, CSV-Export
+- **Raumplan**: Räume nach Etage anlegen (Name, Etage, Typ), GA-Chips per Raum, direkte Zuweisung/Entfernung
+- **Inbetriebnahme-Checkliste**: Vorgaben-Templates (Licht, Dimmen, Jalousie, Heizung, Szene, Allgemein), eigene Prüfpunkte, Gesamt-Fortschrittsbalken, Raum-Fortschritt
+- **KNX-Rechner**: Physikalische Adresse (Bereich.Linie.Gerät → Dez/Hex/Binär), GA↔Dezimal-Umrechnung, Projekt-Statistik, DPT-Kurzreferenz
+- localStorage-Datenspeicherung mit Supabase-Fallback (Tabellen: `knx_gruppen`, `knx_raeume`, `knx_checkliste`)
+- App-Farbe: `#e11d48` (rose-red, KNX-Branding)
+- KNX-Daten in Backup/Restore integriert
+
+### Geändert
+- Abstandsrechner: Modus-Dropdown → visuelle 3-Karten-Auswahl (intuitiver)
+- Abstandsrechner: Objekt-Typ als Chip-Reihe statt Dropdown
+- Abstandsrechner: Formel wird direkt im Ergebnis-Block angezeigt
+
+---
+
+## [2026.3.6] – 2026-03-07 (vorher)
+
 ### ✨ Neu
 
 **Elektrorechner — neuer Tab Abstandsrechner**

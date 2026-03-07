@@ -5,6 +5,7 @@ import Pruefprotokoll from "./Pruefprotokoll.jsx";
 import Wissensdatenbank from "./Wissensdatenbank.jsx";
 import Wartungsprotokoll from "./Wartungsprotokoll.jsx";
 import Leitungsberechnung from "./Leitungsberechnung.jsx";
+import KNXPlaner from "./KNXPlaner.jsx";
 import { isSupabaseConfigured, supabase } from "./lib/supabase.js";
 
 // ── Lokaler Speicher für Konfiguration ──
@@ -60,6 +61,9 @@ const BACKUP_KEYS = [
   "elektronikertools_wissen",
   "elektronikertools_wartung",
   "vp_projekte",
+  "knx_gruppen",
+  "knx_raeume",
+  "knx_checkliste",
 ];
 
 function exportBackup() {
@@ -158,6 +162,14 @@ const APPS = [
     beschreibung: "Rechner und Formelsammlung: Leitungsberechnung, Strom & Leistung, Motorstrom, cos φ-Korrektur, VDE-Formelreferenz.",
     farbe: "#f97316",
     bg: "#1a0e00",
+  },
+  {
+    id: "knxplaner",
+    name: "KNX-Planer",
+    icon: "🏡",
+    beschreibung: "KNX-Gruppenadress-Planer, Raumplan mit GA-Zuordnung, Inbetriebnahme-Checkliste und Adress-/DPT-Rechner.",
+    farbe: "#e11d48",
+    bg: "#1a0008",
   },
 ];
 
@@ -282,6 +294,16 @@ export default function Dashboard() {
         <TopBar label="Elektrorechner" icon="⚡" farbe="#f97316" onBack={zurueck} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Leitungsberechnung />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "knxplaner") {
+    return (
+      <div>
+        <TopBar label="KNX-Planer" icon="🏡" farbe="#e11d48" onBack={zurueck} config={config} onConfig={openConfig} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <KNXPlaner />
       </div>
     );
   }
