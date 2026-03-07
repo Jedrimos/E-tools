@@ -1003,6 +1003,8 @@ export default function Verteilerplaner({ onBack } = {}) {
     db_id:    currentDbId,
     projekt:  { ...projekt, name: name || projekt.name },
     kabel, sicherungen, fiKonfigs, stockwerke, raeume, swColorMap,
+    plan,
+    uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
   });
 
   // ── Speichern (lokal + optional Supabase) ─────────────────────────────────
@@ -1031,6 +1033,7 @@ export default function Verteilerplaner({ onBack } = {}) {
       datum: new Date().toLocaleDateString("de-DE"),
       projekt: { ...projekt, name: nameToSave },
       fiKonfigs, kabel, sicherungen, stockwerke, raeume, swColorMap,
+      plan, uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
     };
     const neu = [entry, ...projekte.filter(p => p.name !== nameToSave && p.id !== entry.id)];
     setProjekte(neu); saveProjekte(neu); setShowSave(false); setSaveName("");
@@ -1052,6 +1055,7 @@ export default function Verteilerplaner({ onBack } = {}) {
       id: currentDbId || uid(), db_id: currentDbId,
       name: projekt.name, datum: new Date().toLocaleDateString("de-DE"),
       projekt, fiKonfigs, kabel, sicherungen, stockwerke, raeume, swColorMap,
+      plan, uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
     };
     const neu = [entry, ...projekte.filter(p => p.name !== projekt.name && p.id !== entry.id)];
     setProjekte(neu); saveProjekte(neu);
@@ -1082,7 +1086,17 @@ export default function Verteilerplaner({ onBack } = {}) {
     setStockwerke(p.stockwerke||[]);
     if(p.swColorMap) setSwColorMap({...SW_COLOR_DEFAULT,...p.swColorMap});
     setRaeume(p.raeume||[]);
-    setPlan(null); setMitRK(false); setStep(1); setShowLoad(false);
+    // UI-Zustand wiederherstellen
+    const ui = p.uiState || {};
+    setPlan(p.plan || null);
+    setStep(ui.step || 1);
+    setActiveTab(ui.activeTab || "plan");
+    setPlanTyp(ui.planTyp || "visuell");
+    setMitRK(ui.mitRK || false);
+    setMitQV(ui.mitQV || false);
+    setMitNBruecke(ui.mitNBruecke || false);
+    setIstKNX(ui.istKNX || false);
+    setShowLoad(false);
     setShowStartScreen(false);
   };
 
@@ -1415,8 +1429,9 @@ export default function Verteilerplaner({ onBack } = {}) {
       });
     });
 
-    // FILS → N-Bridge (rk_n_fils = 3-pol PE+L1+N, kein rk_mit_pe mehr)
-    // Bei 5×-Kabeln: LL-Klemmen (L2+L3) im N-Bridge Span → abzwicken
+    // FILS → L-Bridge + N-Bridge (rk_n_fils = 3-pol PE+L1+N)
+    // Beide Brücken haben gleichen Span (L und N Seite der 3-pol Klemme)
+    // Bei 5×-Kabeln: zusätzlich LL-Bridge für rk_ohne_pe (L2+L3)
     plan.fils.forEach((sk,i)=>{
       const kids=sk.kabelIds||[];
       if(kids.length<2) return;
@@ -1425,9 +1440,19 @@ export default function Verteilerplaner({ onBack } = {}) {
       const skLabel=kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean)
                        .map(k=>k.bezeichnung||k.raum||'?').join(' + ');
       const nBridge=berechneBridge(seq,'N');
-      if(nBridge&&nBridge.count>=2)
+      if(nBridge&&nBridge.count>=2){
+        // L-QV: L1-Seite der 3-pol Klemmen brücken
+        result.push({fLabel,skLabel,ports:nBridge.ports,clipPins:nBridge.clipPins,
+                     count:nBridge.count,typ:'L',color:'#ff6b6b',fils:true});
+        // N-QV: N-Seite der 3-pol Klemmen brücken
         result.push({fLabel,skLabel,ports:nBridge.ports,clipPins:nBridge.clipPins,
                      count:nBridge.count,typ:'N',color:'#1d6dbf',fils:true});
+      }
+      // Bei 5×-Kabeln: LL-Bridge für rk_ohne_pe (L2+L3)
+      const llBridge=berechneBridge(seq,'LL');
+      if(llBridge&&llBridge.count>=2)
+        result.push({fLabel,skLabel,ports:llBridge.ports,clipPins:llBridge.clipPins,
+                     count:llBridge.count,typ:'LL',color:'#ff8c00',fils:true});
     });
 
     return result;
@@ -2669,6 +2694,30 @@ const stueckliste = (() => {
                       </span>
                     </div>
                     <div style={{padding:"14px 16px",overflowX:"auto"}}>
+                      {/* ── QV-Brücken Overlay (über den Klemmen) ── */}
+                      {mitQV&&(()=>{
+                        const bySkId={};
+                        groups.forEach((grp,gi)=>{
+                          if(!grp.skId) return;
+                          if(!bySkId[grp.skId]) bySkId[grp.skId]=[];
+                          bySkId[grp.skId].push(gi);
+                        });
+                        const bridges=Object.values(bySkId).filter(idxs=>idxs.length>=2);
+                        if(!bridges.length) return null;
+                        const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
+                        return(<div style={{marginBottom:4}}>{bridges.map((idxs,bi)=>{
+                          const first=idxs[0],last=idxs[idxs.length-1];
+                          const leftPx=groups.slice(0,first).reduce((s,g)=>s+gw(g)+4,0);
+                          const widthPx=groups.slice(first,last+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
+                          const lCount=groups.slice(first,last+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type==="rk_mit_pe").length,0);
+                          return(
+                            <div key={bi} style={{marginBottom:2,marginLeft:leftPx,width:widthPx,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
+                              <div style={{fontSize:7,color:"#ff6b6b",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginBottom:1,letterSpacing:"0.5px"}}>{lCount}-fach QV</div>
+                              <div style={{height:4,background:"#ff6b6b",borderRadius:"2px 2px 0 0",opacity:0.85}}/>
+                            </div>
+                          );
+                        })}</div>);
+                      })()}
                       <div style={{display:"flex",flexWrap:"nowrap",gap:4,alignItems:"flex-end",minWidth:"max-content"}}>
                         {groups.map((grp,gi)=>{
                           const isKappeGrp=grp.klemmen[0]?.type==="abdeckkappe_orange";
@@ -2735,30 +2784,6 @@ const stueckliste = (() => {
                             <div style={{fontSize:7,color:"rgba(33,150,201,0.7)",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:2,letterSpacing:"0.5px"}}>N-Schiene · {laengeMM}mm</div>
                           </div>
                         );
-                      })()}
-                      {/* ── QV-Brücken Overlay ── */}
-                      {mitQV&&(()=>{
-                        const bySkId={};
-                        groups.forEach((grp,gi)=>{
-                          if(!grp.skId) return;
-                          if(!bySkId[grp.skId]) bySkId[grp.skId]=[];
-                          bySkId[grp.skId].push(gi);
-                        });
-                        const bridges=Object.values(bySkId).filter(idxs=>idxs.length>=2);
-                        if(!bridges.length) return null;
-                        const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
-                        return(<>{bridges.map((idxs,bi)=>{
-                          const first=idxs[0],last=idxs[idxs.length-1];
-                          const leftPx=groups.slice(0,first).reduce((s,g)=>s+gw(g)+4,0);
-                          const widthPx=groups.slice(first,last+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
-                          const lCount=groups.slice(first,last+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type==="rk_mit_pe").length,0);
-                          return(
-                            <div key={bi} style={{marginTop:3,marginLeft:leftPx,width:widthPx,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
-                              <div style={{height:3,background:"#ff6b6b",borderRadius:2,opacity:0.85}}/>
-                              <div style={{fontSize:7,color:"#ff6b6b",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:1,letterSpacing:"0.5px"}}>{lCount}-fach QV</div>
-                            </div>
-                          );
-                        })}</>);
                       })()}
                     </div>
                   </div>
