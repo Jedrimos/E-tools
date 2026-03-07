@@ -3,6 +3,8 @@ import Verteilerplaner from "./Verteilerplaner.jsx";
 import Stundenbuch from "./Stundenbuch.jsx";
 import Pruefprotokoll from "./Pruefprotokoll.jsx";
 import Wissensdatenbank from "./Wissensdatenbank.jsx";
+import Wartungsprotokoll from "./Wartungsprotokoll.jsx";
+import Leitungsberechnung from "./Leitungsberechnung.jsx";
 import { isSupabaseConfigured, supabase } from "./lib/supabase.js";
 
 // ── Lokaler Speicher für Konfiguration ──
@@ -56,6 +58,7 @@ const BACKUP_KEYS = [
   "elektronikertools_pruefprotokoll",
   "elektronikertools_stundenbuch",
   "elektronikertools_wissen",
+  "elektronikertools_wartung",
   "vp_projekte",
 ];
 
@@ -139,6 +142,22 @@ const APPS = [
     beschreibung: "Firmeninternes Wissen teilen: Checklisten, Herstellerhinweise, Montagetipps, Normen. Für alle Techniker im Team verfügbar.",
     farbe: "#06b6d4",
     bg: "#001a1f",
+  },
+  {
+    id: "wartung",
+    name: "Wartungsprotokoll",
+    icon: "🔧",
+    beschreibung: "Wiederkehrende Wartungen verwalten: E-Check, Blitzschutz, Notbeleuchtung. Intervalle, Fälligkeiten und Zuständigkeiten im Blick.",
+    farbe: "#a855f7",
+    bg: "#140d1f",
+  },
+  {
+    id: "leitungsberechnung",
+    name: "Leitungsberechnung",
+    icon: "📐",
+    beschreibung: "Querschnittsberechnung nach VDE 0100-520: Strom, Länge, Verlegeart → Mindest-Querschnitt und Spannungsfall-Tabelle.",
+    farbe: "#f97316",
+    bg: "#1a0e00",
   },
 ];
 
@@ -243,6 +262,26 @@ export default function Dashboard() {
         <TopBar label="Wissensdatenbank" icon="📚" farbe="#06b6d4" onBack={zurueck} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Wissensdatenbank config={config} />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "wartung") {
+    return (
+      <div>
+        <TopBar label="Wartungsprotokoll" icon="🔧" farbe="#a855f7" onBack={zurueck} config={config} onConfig={openConfig} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <Wartungsprotokoll config={config} />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "leitungsberechnung") {
+    return (
+      <div>
+        <TopBar label="Leitungsberechnung" icon="📐" farbe="#f97316" onBack={zurueck} config={config} onConfig={openConfig} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <Leitungsberechnung />
       </div>
     );
   }

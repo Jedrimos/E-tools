@@ -64,8 +64,8 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - 🏗 **Kabelrouten / Trassierung** — Gebäudeplan hochladen, Kabeltrassen einzeichnen.
 
 ### Neue Tools
-- 🏗 **🔧 Wartungsprotokoll** — Wiederkehrende Wartungen (E-Check, Blitzschutz, Notbeleuchtung) mit Intervallen und Fälligkeits-Berechnung.
-- 🔨 **📐 Leitungsberechnung** — Eigenständiges Tool: Strom + Länge + Verlegeart → Querschnitts-Empfehlung nach VDE 0100-520.
+- ✅ ~~**🔧 Wartungsprotokoll**~~ — Umgesetzt: Kategorien, Intervalle, Fälligkeits-Automatik, Erledigt-Button, Supabase-Sync.
+- ✅ ~~**📐 Leitungsberechnung**~~ — Umgesetzt: Strom + Länge + Verlegeart (B1/B2/C/E) + Material + cos φ → Querschnitt + Spannungsfall-Tabelle (VDE 0100-520).
 - 🏗 **📦 Materialverwaltung** — Fahrzeug-/Lagerbestand, Verbrauch pro Baustelle, Mindestbestand-Warnung.
 - 🔨 **🔌 Betriebsmittelkennzeichnung** — QR-Code-Generator für Betriebsmittel, QR-Code öffnet das Prüfprotokoll.
 
@@ -99,9 +99,9 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - 🔨 **Mehrere Verteiler pro Projekt** — Haupt- und Unterverteiler mit Verbindungskabel.
 
 ### Neue Tools
-- 🔨 **📐 Leitungsberechnung (eigenständig)** — Vollständiges Rechentool: Strom, Länge, Verlegeart, cos φ, Spannungsfall, Kurzschlussstrom-Check.
+- ✅ ~~**📐 Leitungsberechnung (eigenständig)**~~ — Umgesetzt: Strom, Länge, Verlegeart, cos φ, Spannungsfall-Tabelle (VDE 0100-520).
 - 🔨 **🔌 Betriebsmittelkennzeichnung** — QR-Code-Generator, QR-Scan öffnet direkt das passende Prüfprotokoll.
-- 🏗 **🔧 Wartungsprotokoll** — Wiederkehrende Wartungen (E-Check, Blitzschutz, Notbeleuchtung) mit Intervallen und Fälligkeits-Berechnung.
+- ✅ ~~**🔧 Wartungsprotokoll**~~ — Umgesetzt: Kategorien, Intervalle, Fälligkeits-Automatik, Erledigt-Button, Supabase-Sync.
 - 🏗 **📦 Materialverwaltung** — Fahrzeug-/Lagerbestand, Verbrauch pro Baustelle, Mindestbestand-Warnung.
 - 🏗 **⚖ Angebotskalkulation** — Stunden + Material + Aufschlag = Angebot als PDF.
 

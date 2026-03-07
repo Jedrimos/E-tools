@@ -14,6 +14,8 @@ Browserbasierte Werkzeuge für Elektrofachkräfte.
 | [⏱ Stundenbuch](apps/stundenbuch.md) | Zeiterfassung, CSV-Export |
 | [📋 Prüfprotokoll](apps/pruefprotokoll.md) | VDE-Messungen, Grenzwerte, Verteilerplaner-Import |
 | [📚 Wissensdatenbank](apps/wissensdatenbank.md) | Team-Wissen, Markdown, Supabase-Sync |
+| [🔧 Wartungsprotokoll](apps/wartungsprotokoll.md) | Wiederkehrende Wartungen, Fälligkeiten |
+| [📐 Leitungsberechnung](apps/leitungsberechnung.md) | Querschnittsberechnung VDE 0100-520 |
 
 ## Schnellstart
 

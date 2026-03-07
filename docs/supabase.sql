@@ -80,6 +80,23 @@ ALTER TABLE wissensdatenbank ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON wissensdatenbank FOR ALL USING (true) WITH CHECK (true);
 
 
+-- ── 5. Wartungsprotokoll ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS wartungsaufgaben (
+  id          text PRIMARY KEY,
+  bezeichnung text NOT NULL,
+  kategorie   text DEFAULT '',
+  intervall   text DEFAULT 'jaehrlich',
+  letzte      text DEFAULT '',
+  naechste    text DEFAULT '',
+  zustaendig  text DEFAULT '',
+  notiz       text DEFAULT '',
+  created_at  timestamptz DEFAULT now()
+);
+
+ALTER TABLE wartungsaufgaben ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON wartungsaufgaben FOR ALL USING (true) WITH CHECK (true);
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Optional: updated_at Trigger (automatisch bei UPDATE setzen)
 -- ══════════════════════════════════════════════════════════════════════════════

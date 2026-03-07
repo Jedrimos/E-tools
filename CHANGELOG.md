@@ -6,6 +6,28 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.4] – 2026-03-07
+
+### ✨ Neu
+
+**Wartungsprotokoll (neue App)**
+- Wiederkehrende Wartungsaufgaben erfassen: E-Check, Blitzschutz, Notbeleuchtung, Brandschutz u.v.m.
+- Kategorien, Intervalle (monatlich / vierteljährlich / halbjährlich / jährlich / 2-jährlich)
+- Fälligkeits-Automatik: „Zuletzt durchgeführt" → Nächster Termin wird automatisch berechnet
+- Farbkodierter Status: überfällig (rot), bald fällig (gelb), OK (grün)
+- „Erledigt"-Button setzt Datum auf heute und berechnet Fälligkeit neu
+- Supabase-Sync + localStorage-Fallback; im Backup-Export enthalten
+
+**Leitungsberechnung (neue App)**
+- Eigenständiges Berechnungstool nach VDE 0100-520
+- Eingaben: Strom (A), Länge (m), Verlegeart (B1/B2/C/E), Material (Cu/Al), Phasenzahl (1P/3P), cos φ
+- Empfehlung des Mindest-Querschnitts (nächste Normstufe ≥ rechnerischer Wert)
+- Spannungsfall-Tabelle: ΔU (V), ΔU (%), max. Belastungsstrom, max. Leitungslänge für alle Normstufen
+- Grenzwert ΔU ≤ 3 % nach VDE 0100-520, Überschreitung farbkodiert
+- Kein Datenbankzugriff – reines Rechentool
+
+---
+
 ## [2026.3.3] – 2026-03-07
 
 ### ✨ Neu

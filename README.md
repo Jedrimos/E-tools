@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.3.3-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.3.4-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -100,6 +100,34 @@ VDE-konforme Messprotokollierung für Erst- und Wiederholungsprüfungen nach VDE
 - Drucken via `window.print()` + Print-CSS
 - Optionale Synchronisierung mit Supabase
 - **Mobiloptimiert:** Stromkreis-Tabelle horizontal scrollbar, Formulare 2-spaltig, Header-Buttons wrappend
+
+---
+
+### 🔧 Wartungsprotokoll
+
+Wiederkehrende Wartungsaufgaben verwalten und nachverfolgen.
+
+**Features:**
+- Aufgaben anlegen mit Kategorie (E-Check, Blitzschutz, Notbeleuchtung, Brandschutz, Aufzug u.a.), Intervall und Zuständigem
+- Intervalle: monatlich, vierteljährlich, halbjährlich, jährlich, 2-jährlich
+- „Zuletzt durchgeführt"-Datum → nächster Termin wird automatisch berechnet
+- Farbkodierter Status: rot = überfällig, gelb = in ≤ 30 Tagen fällig, grün = OK
+- „✓ Erledigt"-Button setzt Datum auf heute und berechnet Fälligkeit neu
+- Filter nach Kategorie und Suche; Sortierung nach Fälligkeit, Name oder Kategorie
+- Supabase-Sync + localStorage-Fallback; im Backup-Export enthalten
+
+---
+
+### 📐 Leitungsberechnung
+
+Eigenständiges Berechnungstool für Leitungsquerschnitte nach VDE 0100-520.
+
+**Features:**
+- Eingaben: Strom (A), Länge (m), Verlegeart (B1/B2/C/E), Material (Cu/Al), Phasenzahl (1P/3P), cos φ
+- Empfehlung des Mindest-Querschnitts (nächste Normstufe ≥ rechnerischer Wert)
+- Spannungsfall-Tabelle für alle Normstufen 1,5 … 120 mm²: ΔU (V), ΔU (%), max. Belastungsstrom, max. Länge
+- Grenzwert ΔU ≤ 3 % nach VDE 0100-520 farbkodiert; Überschreitung sofort erkennbar
+- Kein Datenbankzugriff — reines Rechentool, funktioniert vollständig offline
 
 ---
 
@@ -209,6 +237,21 @@ CREATE TABLE stunden (
 );
 ALTER TABLE stunden ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON stunden FOR ALL USING (true) WITH CHECK (true);
+
+-- Wartungsprotokoll
+CREATE TABLE wartungsaufgaben (
+  id          text PRIMARY KEY,
+  bezeichnung text NOT NULL,
+  kategorie   text DEFAULT '',
+  intervall   text DEFAULT 'jaehrlich',
+  letzte      text DEFAULT '',
+  naechste    text DEFAULT '',
+  zustaendig  text DEFAULT '',
+  notiz       text DEFAULT '',
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE wartungsaufgaben ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON wartungsaufgaben FOR ALL USING (true) WITH CHECK (true);
 ```
 
 4. Environment Variables setzen:
