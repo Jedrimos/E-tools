@@ -1958,9 +1958,9 @@ const stueckliste = (() => {
                     style={{flexShrink:0,width:30,height:30,borderRadius:6,border:"1px solid var(--border2)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}
                     onMouseEnter={e=>e.currentTarget.style.color="var(--red)"} onMouseLeave={e=>e.currentTarget.style.color="var(--text3)"}>✕</button>
                 </div>
-                <div style={{display:"flex",gap:6,alignItems:"flex-end",paddingLeft:34}}>
+                <div style={{display:"flex",gap:6,alignItems:"flex-end",flexWrap:"wrap"}}>
                   {/* Kabeltyp */}
-                  <div style={{flex:"0 0 90px"}}>
+                  <div style={{flex:"1 1 80px",minWidth:75}}>
                     <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>Kabeltyp</div>
                     <select value={k.kabelTyp||"NYM-J"} onChange={e=>updKabel(k.id,"kabelTyp",e.target.value)}
                       style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",color:"var(--text2)",fontSize:11,appearance:"none",WebkitAppearance:"none"}}>
@@ -1968,7 +1968,7 @@ const stueckliste = (() => {
                     </select>
                   </div>
                   {/* Adern */}
-                  <div style={{flex:"0 0 90px"}}>
+                  <div style={{flex:"1 1 90px",minWidth:80}}>
                     <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>Adern</div>
                     <div style={{display:"flex",gap:2,marginBottom:3}}>
                       {STD_ADERN.map(a=>(
@@ -1983,7 +1983,7 @@ const stueckliste = (() => {
                       style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 8px",color:"var(--text)",fontSize:12,fontWeight:700,fontFamily:"var(--mono)",textAlign:"center"}}/>
                   </div>
                   {/* mm² */}
-                  <div style={{flex:"0 0 80px"}}>
+                  <div style={{flex:"1 1 68px",minWidth:62}}>
                     <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>mm²</div>
                     <select value={k.kabelQs||"1.5"} onChange={e=>updKabel(k.id,"kabelQs",e.target.value)}
                       style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",color:"var(--text2)",fontSize:12,fontWeight:700,fontFamily:"var(--mono)",appearance:"none",WebkitAppearance:"none"}}>
@@ -1991,7 +1991,7 @@ const stueckliste = (() => {
                     </select>
                   </div>
                   {/* Länge */}
-                  <div style={{flex:"0 0 70px"}}>
+                  <div style={{flex:"1 1 62px",minWidth:56}}>
                     <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>Länge (m)</div>
                     <input type="number" min={0} placeholder="—" value={k.kabelLaenge||""} onChange={e=>updKabel(k.id,"kabelLaenge",e.target.value)}
                       style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",color:"var(--text)",fontSize:12,fontFamily:"var(--mono)"}} />

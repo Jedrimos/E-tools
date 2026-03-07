@@ -758,141 +758,420 @@ function TabAbstandsrechner() {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Tab 6: Formelsammlung
-// ══════════════════════════════════════════════════════════════════════════════
 
-const FORMELN = [
-  {
-    gruppe: "Ohmsches Gesetz",
-    icon: "⚡",
-    items: [
-      { formel: "U = R × I",               einheit: "Volt",     beschr: "Spannung" },
-      { formel: "I = U / R",               einheit: "Ampere",   beschr: "Strom" },
-      { formel: "R = U / I",               einheit: "Ohm",      beschr: "Widerstand" },
-      { formel: "P = U × I = I² × R = U²/R", einheit: "Watt", beschr: "Leistung (Gleichstrom/ohmsch)" },
-    ],
-  },
-  {
-    gruppe: "Wechselstrom (1-phasig, 230 V)",
-    icon: "🔌",
-    items: [
-      { formel: "P = U × I × cos φ",       einheit: "W",    beschr: "Wirkleistung" },
-      { formel: "S = U × I",               einheit: "VA",   beschr: "Scheinleistung" },
-      { formel: "Q = U × I × sin φ",       einheit: "VAr",  beschr: "Blindleistung" },
-      { formel: "I = P / (U × cos φ)",     einheit: "A",    beschr: "Strom aus Leistung" },
-      { formel: "cos φ = P / S",           einheit: "–",    beschr: "Leistungsfaktor" },
-      { formel: "S² = P² + Q²",           einheit: "",     beschr: "Scheinleistungs-Dreieck" },
-    ],
-  },
-  {
-    gruppe: "Drehstrom (3-phasig, 400 V)",
-    icon: "🔁",
-    items: [
-      { formel: "P = √3 × U × I × cos φ", einheit: "W",    beschr: "Wirkleistung (U = Leiterspannung)" },
-      { formel: "I = P / (√3 × U × cos φ × η)", einheit: "A", beschr: "Nennstrom Motor" },
-      { formel: "U_Str = U_L / √3",       einheit: "V",    beschr: "Strangspannung ≈ 230 V" },
-      { formel: "√3 ≈ 1,732",             einheit: "",     beschr: "Umrechnungsfaktor" },
-    ],
-  },
-  {
-    gruppe: "Leitungsberechnung (VDE 0100-520)",
-    icon: "📏",
-    items: [
-      { formel: "A_min = 2 × I × L × cos φ / (κ × ΔU_zul)",   einheit: "mm²", beschr: "Mindestquerschnitt einphasig" },
-      { formel: "A_min = √3 × I × L × cos φ / (κ × ΔU_zul)",  einheit: "mm²", beschr: "Mindestquerschnitt Drehstrom" },
-      { formel: "ΔU_zul = 3 % × U_N",                          einheit: "V",   beschr: "Max. Spannungsfall (VDE 0100-520)" },
-      { formel: "κ(Cu) = 56 m/(Ω·mm²)",                        einheit: "",    beschr: "Spezif. Leitfähigkeit Kupfer" },
-      { formel: "κ(Al) = 35 m/(Ω·mm²)",                        einheit: "",    beschr: "Spezif. Leitfähigkeit Aluminium" },
-      { formel: "L_max = κ × A × ΔU_zul / (Faktor × I × cos φ)", einheit: "m", beschr: "Max. Leitungslänge" },
-    ],
-  },
-  {
-    gruppe: "Blindleistungskompensation",
-    icon: "🔋",
-    items: [
-      { formel: "Q_C = P × (tan φ₁ − tan φ₂)",     einheit: "kVAr", beschr: "Benötigte Kompensationsleistung" },
-      { formel: "C = Q_C × 1000 / (2π × f × U²)",  einheit: "µF",   beschr: "Kondensatorgröße (Δ-Schaltung)" },
-      { formel: "tan φ = sin φ / cos φ",             einheit: "–",    beschr: "Tangens des Phasenwinkels" },
-    ],
-  },
-  {
-    gruppe: "Schutzmaßnahmen (VDE 0100-410 / -600)",
-    icon: "🛡",
-    items: [
-      { formel: "R_iso ≥ 1 MΩ",            einheit: "",    beschr: "Isolationswiderstand (VDE 0100-600 §61.3.3)" },
-      { formel: "t(FI) ≤ 300 ms @ I_ΔN",   einheit: "",    beschr: "FI-Abschaltzeit Typ AC/A" },
-      { formel: "t(FI) ≤ 500 ms @ I_ΔN",   einheit: "",    beschr: "FI-Abschaltzeit Typ S (selektiv)" },
-      { formel: "t(FI) ≤ 40 ms @ 5×I_ΔN",  einheit: "",    beschr: "FI-Abschaltzeit 5-facher Nennfehlerstrom" },
-      { formel: "U_B ≤ 50 V AC",            einheit: "",    beschr: "Berührungsspannung AC (trockene Räume)" },
-    ],
-  },
-  {
-    gruppe: "Nützliche Konstanten",
-    icon: "📊",
-    items: [
-      { formel: "f = 50 Hz",               einheit: "",    beschr: "Netzfrequenz Europa" },
-      { formel: "U_N = 230/400 V",         einheit: "",    beschr: "Nennspannung (Strang/Leiter)" },
-      { formel: "√2 ≈ 1,414",             einheit: "",    beschr: "Scheitelwert: U_peak = √2 × U_eff" },
-      { formel: "√3 ≈ 1,732",             einheit: "",    beschr: "Drehstromfaktor" },
-      { formel: "1 kWh = 3,6 MJ",         einheit: "",    beschr: "Energieumrechnung" },
-      { formel: "ρ(Cu) = 0,0178 Ω·mm²/m", einheit: "",    beschr: "Spez. Widerstand Kupfer bei 20 °C" },
-    ],
-  },
+function FormelCard({ titel, icon, formel, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", marginBottom: 10 }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: "100%", background: "none", border: "none", padding: "14px 18px",
+        display: "flex", alignItems: "center", gap: 10, cursor: "pointer", color: "var(--text)", textAlign: "left",
+      }}>
+        <span style={{ fontSize: 18 }}>{icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>{titel}</div>
+          <code style={{ fontSize: 11, color: AKZENT, fontFamily: "var(--mono)" }}>{formel}</code>
+        </div>
+        <span style={{ color: "var(--text3)", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && <div style={{ borderTop: "1px solid var(--border)", padding: "16px 18px" }}>{children}</div>}
+    </div>
+  );
+}
+
+function ResultChip({ label, value, unit, color }) {
+  return (
+    <div style={{ textAlign: "center", background: "var(--bg)", border: `1px solid ${color || AKZENT}40`, borderRadius: 10, padding: "10px 8px", minWidth: 90 }}>
+      <div style={{ fontSize: 10, color: "var(--text3)", marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: color || AKZENT, fontFamily: "var(--mono)" }}>
+        {value}<span style={{ fontSize: 11, fontWeight: 400, marginLeft: 2 }}>{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function MiniInput({ label, value, onChange, unit, placeholder }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 90px", minWidth: 80 }}>
+      <span style={{ fontSize: 10, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}{unit && ` (${unit})`}</span>
+      <input type="number" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={inp({ padding: "7px 10px", fontSize: 13, width: "100%", boxSizing: "border-box" })} />
+    </label>
+  );
+}
+
+function MiniSelect({ label, value, onChange, options }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 110px", minWidth: 100 }}>
+      <span style={{ fontSize: 10, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
+      <select value={value} onChange={e => onChange(e.target.value)} style={inp({ padding: "7px 10px", fontSize: 13, width: "100%", boxSizing: "border-box" })}>
+        {options.map(o => <option key={o.wert ?? o} value={o.wert ?? o}>{o.label ?? o}</option>)}
+      </select>
+    </label>
+  );
+}
+
+// ── Ohmsches Gesetz ─────────────────────────────────────────────────────────
+function RechnerOhm() {
+  const [solve, setSolve] = useState("R");
+  const [u, setU] = useState(""); const [i, setI] = useState(""); const [r, setR] = useState("");
+  const U = parseFloat(u), I = parseFloat(i), R = parseFloat(r);
+  let erg = null;
+  if (solve === "R" && U > 0 && I > 0) erg = { R: (U / I), U, I };
+  else if (solve === "U" && I > 0 && R > 0) erg = { U: I * R, I, R };
+  else if (solve === "I" && U > 0 && R > 0) erg = { I: U / R, U, R };
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <MiniSelect label="Gesucht" value={solve} onChange={setSolve} options={[{ wert: "R", label: "R — Widerstand (Ω)" }, { wert: "U", label: "U — Spannung (V)" }, { wert: "I", label: "I — Strom (A)" }]} />
+        {solve !== "U" && <MiniInput label="U" unit="V" value={u} onChange={setU} placeholder="z.B. 230" />}
+        {solve !== "I" && <MiniInput label="I" unit="A" value={i} onChange={setI} placeholder="z.B. 16" />}
+        {solve !== "R" && <MiniInput label="R" unit="Ω" value={r} onChange={setR} placeholder="z.B. 14.4" />}
+      </div>
+      {erg ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {solve === "R" && <ResultChip label="Widerstand R" value={erg.R.toFixed(4)} unit="Ω" />}
+          {solve === "U" && <ResultChip label="Spannung U" value={erg.U.toFixed(3)} unit="V" />}
+          {solve === "I" && <ResultChip label="Strom I" value={erg.I.toFixed(4)} unit="A" />}
+          <ResultChip label="P = U·I" value={(((erg.U ?? U) * (erg.I ?? I))).toFixed(1)} unit="W" color="var(--text2)" />
+        </div>
+      ) : <div style={{ fontSize: 12, color: "var(--text3)" }}>Werte eingeben</div>}
+    </div>
+  );
+}
+
+// ── 1-phasiger Wechselstrom ──────────────────────────────────────────────────
+function Rechner1P() {
+  const [solve, setSolve] = useState("I");
+  const [p, setP] = useState(""); const [u, setU] = useState("230"); const [i, setI] = useState(""); const [cos, setCos] = useState("1");
+  const P = parseFloat(p) * 1000, U = parseFloat(u), I = parseFloat(i), c = parseFloat(cos) || 1;
+  let erg = null;
+  if (solve === "I" && P > 0 && U > 0) erg = { I: P / (U * c), P, U, c };
+  else if (solve === "P" && U > 0 && I > 0) erg = { P: U * I * c, U, I, c };
+  else if (solve === "U" && P > 0 && I > 0) erg = { U: P / (I * c), P, I, c };
+  const sinPhi = erg ? Math.sqrt(Math.max(0, 1 - erg.c * erg.c)) : 0;
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <MiniSelect label="Gesucht" value={solve} onChange={setSolve} options={[{ wert: "I", label: "I — Strom (A)" }, { wert: "P", label: "P — Leistung (kW)" }, { wert: "U", label: "U — Spannung (V)" }]} />
+        {solve !== "P" && <MiniInput label="P" unit="kW" value={p} onChange={setP} placeholder="z.B. 2.3" />}
+        {solve !== "U" && <MiniInput label="U" unit="V" value={u} onChange={setU} placeholder="230" />}
+        {solve !== "I" && <MiniInput label="I" unit="A" value={i} onChange={setI} placeholder="z.B. 10" />}
+        <MiniSelect label="cos φ" value={cos} onChange={setCos} options={[{ wert: "1", label: "1,0" }, { wert: "0.95", label: "0,95" }, { wert: "0.9", label: "0,90" }, { wert: "0.85", label: "0,85" }, { wert: "0.8", label: "0,80" }]} />
+      </div>
+      {erg ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {solve === "I" && <ResultChip label="Strom I" value={erg.I.toFixed(3)} unit="A" />}
+          {solve === "P" && <ResultChip label="Leistung P" value={(erg.P / 1000).toFixed(3)} unit="kW" />}
+          {solve === "U" && <ResultChip label="Spannung U" value={erg.U.toFixed(1)} unit="V" />}
+          <ResultChip label="S Schein" value={((erg.P ?? P) / erg.c / 1000).toFixed(3)} unit="kVA" color="#a855f7" />
+          <ResultChip label="Q Blind" value={((erg.P ?? P) / erg.c * sinPhi / 1000).toFixed(3)} unit="kVAr" color="#f59e0b" />
+        </div>
+      ) : <div style={{ fontSize: 12, color: "var(--text3)" }}>Werte eingeben</div>}
+    </div>
+  );
+}
+
+// ── 3-phasiger Drehstrom ─────────────────────────────────────────────────────
+function Rechner3P() {
+  const [solve, setSolve] = useState("I");
+  const [p, setP] = useState(""); const [u, setU] = useState("400"); const [i, setI] = useState(""); const [cos, setCos] = useState("0.9");
+  const P = parseFloat(p) * 1000, U = parseFloat(u), I = parseFloat(i), c = parseFloat(cos) || 1;
+  const sq3 = Math.sqrt(3);
+  let erg = null;
+  if (solve === "I" && P > 0 && U > 0) erg = { I: P / (sq3 * U * c), P, U, c };
+  else if (solve === "P" && U > 0 && I > 0) erg = { P: sq3 * U * I * c, U, I, c };
+  else if (solve === "U" && P > 0 && I > 0) erg = { U: P / (sq3 * I * c), P, I, c };
+  const UStr = erg ? (erg.U ?? U) / sq3 : null;
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <MiniSelect label="Gesucht" value={solve} onChange={setSolve} options={[{ wert: "I", label: "I — Strom (A)" }, { wert: "P", label: "P — Leistung (kW)" }, { wert: "U", label: "U_L — Leiterspannung (V)" }]} />
+        {solve !== "P" && <MiniInput label="P" unit="kW" value={p} onChange={setP} placeholder="z.B. 11" />}
+        {solve !== "U" && <MiniInput label="U_L" unit="V" value={u} onChange={setU} placeholder="400" />}
+        {solve !== "I" && <MiniInput label="I" unit="A" value={i} onChange={setI} placeholder="z.B. 20" />}
+        <MiniSelect label="cos φ" value={cos} onChange={setCos} options={[{ wert: "1", label: "1,0" }, { wert: "0.95", label: "0,95" }, { wert: "0.9", label: "0,90" }, { wert: "0.85", label: "0,85" }, { wert: "0.8", label: "0,80" }]} />
+      </div>
+      {erg ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {solve === "I" && <ResultChip label="Strom I" value={erg.I.toFixed(3)} unit="A" />}
+          {solve === "P" && <ResultChip label="Leistung P" value={(erg.P / 1000).toFixed(3)} unit="kW" />}
+          {solve === "U" && <ResultChip label="U_Leiter" value={erg.U.toFixed(1)} unit="V" />}
+          <ResultChip label="U_Strang" value={UStr.toFixed(1)} unit="V" color="var(--text2)" />
+          <ResultChip label="S Schein" value={((erg.P ?? P) / erg.c / 1000).toFixed(3)} unit="kVA" color="#a855f7" />
+        </div>
+      ) : <div style={{ fontSize: 12, color: "var(--text3)" }}>Werte eingeben</div>}
+    </div>
+  );
+}
+
+// ── Leitungsquerschnitt (mini) ───────────────────────────────────────────────
+function RechnerQuerschnitt() {
+  const [i, setI] = useState(""); const [l, setL] = useState(""); const [ph, setPh] = useState("1P"); const [mat, setMat] = useState("Cu");
+  const I = parseFloat(i), L = parseFloat(l);
+  const kappa = KAPPA[mat], UN = U_N[ph], fak = FAKTOR[ph];
+  const duZul = 0.03 * UN;
+  const aMin = (I > 0 && L > 0) ? (fak * I * L) / (kappa * duZul) : null;
+  const empf = aMin ? QS_STUFEN.find(q => q >= aMin) ?? QS_STUFEN[QS_STUFEN.length - 1] : null;
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <MiniInput label="I" unit="A" value={i} onChange={setI} placeholder="z.B. 16" />
+        <MiniInput label="L" unit="m" value={l} onChange={setL} placeholder="z.B. 20" />
+        <MiniSelect label="Phase" value={ph} onChange={setPh} options={[{ wert: "1P", label: "1P — 230 V" }, { wert: "3P", label: "3P — 400 V" }]} />
+        <MiniSelect label="Material" value={mat} onChange={setMat} options={[{ wert: "Cu", label: "Kupfer (κ=56)" }, { wert: "Al", label: "Aluminium (κ=35)" }]} />
+      </div>
+      {aMin ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <ResultChip label="Mindest-QS" value={`${aMin.toFixed(2)}`} unit="mm²" color="var(--text2)" />
+          <ResultChip label="Empfohlener QS" value={empf} unit="mm²" />
+          <ResultChip label="ΔU_zul" value={(duZul).toFixed(1)} unit="V" color="var(--green)" />
+        </div>
+      ) : <div style={{ fontSize: 12, color: "var(--text3)" }}>Strom und Länge eingeben (cos φ = 1, ΔU ≤ 3 %)</div>}
+    </div>
+  );
+}
+
+// ── Blindleistungskompensation (mini) ─────────────────────────────────────────
+function RechnerKompensation() {
+  const [p, setP] = useState(""); const [c1, setC1] = useState("0.7"); const [c2, setC2] = useState("0.95");
+  const [u, setU] = useState("400"); const [f, setF] = useState("50");
+  const P = parseFloat(p) * 1000, cos1 = parseFloat(c1), cos2 = parseFloat(c2), U = parseFloat(u), freq = parseFloat(f);
+  const valid = P > 0 && cos1 > 0 && cos2 > cos1 && U > 0 && freq > 0;
+  const Qc = valid ? P * (Math.tan(Math.acos(cos1)) - Math.tan(Math.acos(cos2))) : null;
+  const C = valid ? (Qc * 1000) / (2 * Math.PI * freq * U * U) * 1e6 : null;
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <MiniInput label="P" unit="kW" value={p} onChange={setP} placeholder="z.B. 10" />
+        <MiniSelect label="cos φ IST" value={c1} onChange={setC1} options={[{ wert: "0.5", label: "0,50" }, { wert: "0.6", label: "0,60" }, { wert: "0.65", label: "0,65" }, { wert: "0.7", label: "0,70" }, { wert: "0.75", label: "0,75" }, { wert: "0.8", label: "0,80" }, { wert: "0.85", label: "0,85" }]} />
+        <MiniSelect label="cos φ SOLL" value={c2} onChange={setC2} options={[{ wert: "0.9", label: "0,90" }, { wert: "0.92", label: "0,92" }, { wert: "0.95", label: "0,95" }, { wert: "0.97", label: "0,97" }, { wert: "1", label: "1,00" }]} />
+        <MiniInput label="U" unit="V" value={u} onChange={setU} placeholder="400" />
+        <MiniSelect label="f" value={f} onChange={setF} options={[{ wert: "50", label: "50 Hz" }, { wert: "60", label: "60 Hz" }]} />
+      </div>
+      {valid && Qc ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <ResultChip label="Q_C" value={(Qc / 1000).toFixed(2)} unit="kVAr" />
+          <ResultChip label="Kondensator C" value={C.toFixed(1)} unit="µF" color="#a855f7" />
+        </div>
+      ) : <div style={{ fontSize: 12, color: "var(--text3)" }}>Werte eingeben (cos φ IST {'<'} cos φ SOLL)</div>}
+    </div>
+  );
+}
+
+// ── Schutzmaßnahmen + Konstanten (Referenz) ───────────────────────────────────
+const SCHUTZ_REF = [
+  { label: "Isolationswiderstand", wert: "R_iso ≥ 1 MΩ", norm: "VDE 0100-600 §61.3.3" },
+  { label: "FI-Abschaltzeit AC/A", wert: "t ≤ 300 ms @ I_ΔN", norm: "VDE 0100-410" },
+  { label: "FI-Abschaltzeit Typ S", wert: "t ≤ 500 ms @ I_ΔN", norm: "VDE 0100-410" },
+  { label: "FI schnell (5×I_ΔN)", wert: "t ≤ 40 ms", norm: "VDE 0100-410" },
+  { label: "Berührungsspannung", wert: "U_B ≤ 50 V AC", norm: "VDE 0100-410 (Trockene Räume)" },
+];
+const KONST_REF = [
+  { label: "Netzfrequenz", wert: "f = 50 Hz", info: "Europa" },
+  { label: "Nennspannung", wert: "230 / 400 V", info: "Strang / Leiter" },
+  { label: "√2", wert: "≈ 1,4142", info: "U_peak = √2 × U_eff" },
+  { label: "√3", wert: "≈ 1,7321", info: "Drehstromfaktor" },
+  { label: "κ Kupfer", wert: "56 m/(Ω·mm²)", info: "bei 20 °C" },
+  { label: "κ Aluminium", wert: "35 m/(Ω·mm²)", info: "bei 20 °C" },
+  { label: "ρ Kupfer", wert: "0,0178 Ω·mm²/m", info: "Spez. Widerstand 20 °C" },
+  { label: "1 kWh", wert: "= 3,6 MJ", info: "Energieumrechnung" },
 ];
 
-function TabFormeln() {
-  const [offen, setOffen] = useState(new Set(["Ohmsches Gesetz", "Wechselstrom (1-phasig, 230 V)"]));
+function RefTabelle({ rows, cols }) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+              {cols.map((col, j) => (
+                <td key={j} style={{ padding: "8px 12px", color: j === 1 ? AKZENT : j === 0 ? "var(--text)" : "var(--text3)", fontFamily: j === 1 ? "var(--mono)" : "inherit", fontWeight: j === 1 ? 700 : 400, fontSize: j === 2 ? 11 : 13, whiteSpace: "nowrap" }}>
+                  {row[col]}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-  function toggle(g) {
-    setOffen(prev => {
-      const n = new Set(prev);
-      if (n.has(g)) n.delete(g); else n.add(g);
-      return n;
-    });
-  }
+function TabFormelrechner() {
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16 }}>
+        Formeln direkt berechnen — Werte eingeben, Ergebnis erscheint sofort
+      </div>
+
+      <FormelCard titel="Ohmsches Gesetz" icon="⚡" formel="U = R × I" defaultOpen>
+        <RechnerOhm />
+      </FormelCard>
+
+      <FormelCard titel="Wechselstrom (1-phasig, 230 V)" icon="🔌" formel="P = U × I × cos φ">
+        <Rechner1P />
+      </FormelCard>
+
+      <FormelCard titel="Drehstrom (3-phasig, 400 V)" icon="🔁" formel="P = √3 × U × I × cos φ">
+        <Rechner3P />
+      </FormelCard>
+
+      <FormelCard titel="Leitungsquerschnitt (ΔU ≤ 3 %)" icon="📏" formel="A_min = Faktor × I × L × cos φ / (κ × ΔU_zul)">
+        <RechnerQuerschnitt />
+      </FormelCard>
+
+      <FormelCard titel="Blindleistungskompensation" icon="🔋" formel="Q_C = P × (tan φ₁ − tan φ₂)">
+        <RechnerKompensation />
+      </FormelCard>
+
+      <FormelCard titel="Schutzmaßnahmen (VDE 0100-410 / -600)" icon="🛡">
+        <RefTabelle rows={SCHUTZ_REF} cols={["label", "wert", "norm"]} />
+      </FormelCard>
+
+      <FormelCard titel="Nützliche Konstanten" icon="📊">
+        <RefTabelle rows={KONST_REF} cols={["label", "wert", "info"]} />
+      </FormelCard>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Tab: Maßstabsrechner
+// ══════════════════════════════════════════════════════════════════════════════
+
+const MASSSTAB_VORGABEN = [
+  { wert: "20",   label: "1:20" },
+  { wert: "25",   label: "1:25" },
+  { wert: "50",   label: "1:50" },
+  { wert: "75",   label: "1:75" },
+  { wert: "100",  label: "1:100" },
+  { wert: "200",  label: "1:200" },
+  { wert: "500",  label: "1:500" },
+  { wert: "1000", label: "1:1000" },
+];
+
+function TabMassstab() {
+  const [massstab, setMassstab] = useState("100");
+  const [planMm, setPlanMm]     = useState("");
+  const [realM, setRealM]       = useState("");
+
+  const M = parseFloat(massstab) || 100;
+  const planVal = parseFloat(planMm);
+  const realVal = parseFloat(realM);
+
+  // Plan → Real
+  const realMm  = !isNaN(planVal) && planVal > 0 ? planVal * M : null;
+  const realCm  = realMm ? realMm / 10 : null;
+  const realMet = realMm ? realMm / 1000 : null;
+
+  // Real → Plan
+  const planResult = !isNaN(realVal) && realVal > 0 ? (realVal * 1000) / M : null;
 
   return (
     <div>
       <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16 }}>
-        Wichtigste Formeln für Elektrofachkräfte — Tippen zum Auf-/Zuklappen
+        Umrechnung zwischen Plan-Maß und Wirklichkeit — für Grundrisse und Aufmaße
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {FORMELN.map(g => (
-          <div key={g.gruppe} style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-            <button
-              onClick={() => toggle(g.gruppe)}
+
+      {/* Maßstab-Wahl */}
+      <div style={{ ...card(), marginBottom: 20 }}>
+        <div style={{ fontSize: 11, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Maßstab</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+          {MASSSTAB_VORGABEN.map(s => (
+            <button key={s.wert} onClick={() => setMassstab(s.wert)}
               style={{
-                width: "100%", background: "none", border: "none", padding: "14px 20px",
-                display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
-                color: "var(--text)", textAlign: "left",
-              }}
-            >
-              <span style={{ fontSize: 18 }}>{g.icon}</span>
-              <span style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{g.gruppe}</span>
-              <span style={{ color: "var(--text3)", fontSize: 12 }}>{offen.has(g.gruppe) ? "▲" : "▼"}</span>
+                padding: "8px 14px", borderRadius: 8, border: `2px solid ${massstab === s.wert ? AKZENT : "var(--border)"}`,
+                background: massstab === s.wert ? `${AKZENT}18` : "var(--bg)",
+                color: massstab === s.wert ? AKZENT : "var(--text)", fontWeight: massstab === s.wert ? 700 : 400,
+                cursor: "pointer", fontSize: 13, fontFamily: "var(--mono)",
+              }}>
+              {s.label}
             </button>
-            {offen.has(g.gruppe) && (
-              <div style={{ borderTop: "1px solid var(--border)", padding: "4px 0 8px" }}>
-                {g.items.map((item, idx) => (
-                  <div key={idx} style={{
-                    display: "flex", alignItems: "baseline", gap: 12,
-                    padding: "8px 20px", borderBottom: idx < g.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-                  }}>
-                    <code style={{
-                      background: "var(--bg)", padding: "3px 10px", borderRadius: 6, fontSize: 13,
-                      color: AKZENT, fontFamily: "var(--mono)", whiteSpace: "nowrap", flexShrink: 0,
-                    }}>
-                      {item.formel}
-                    </code>
-                    <span style={{ fontSize: 13, color: "var(--text2)" }}>{item.beschr}</span>
-                    {item.einheit && <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: "auto", flexShrink: 0 }}>[{item.einheit}]</span>}
-                  </div>
-                ))}
-              </div>
-            )}
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: "var(--text3)" }}>Eigener Maßstab 1 :</span>
+          <input type="number" min="1" value={massstab} onChange={e => setMassstab(e.target.value)}
+            style={inp({ width: 90, padding: "7px 10px", fontSize: 14, fontFamily: "var(--mono)" })} />
+        </div>
+      </div>
+
+      {/* Plan → Real */}
+      <div style={{ ...card(), marginBottom: 16 }}>
+        <SectionTitle>Plan-Maß → Wirklichkeit</SectionTitle>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+          <MiniInput label="Maß auf Plan" unit="mm" value={planMm} onChange={setPlanMm} placeholder="z.B. 45" />
+          <div style={{ fontSize: 18, color: "var(--text3)", paddingBottom: 8, flexShrink: 0 }}>→</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {realMm ? (
+              <>
+                <ResultChip label="in Millimeter" value={realMm.toFixed(0)} unit="mm" />
+                <ResultChip label="in Zentimeter" value={realCm.toFixed(1)} unit="cm" color="var(--text2)" />
+                <ResultChip label="in Meter" value={realMet.toFixed(3)} unit="m" color="var(--green)" />
+              </>
+            ) : <div style={{ fontSize: 12, color: "var(--text3)", paddingBottom: 8 }}>Plan-Maß eingeben</div>}
           </div>
-        ))}
+        </div>
+        {realMm && (
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>
+            {planMm} mm × {M} = {realMm.toFixed(0)} mm = {realMet?.toFixed(3)} m
+          </div>
+        )}
+      </div>
+
+      {/* Real → Plan */}
+      <div style={{ ...card(), marginBottom: 20 }}>
+        <SectionTitle>Wirklichkeit → Plan-Maß</SectionTitle>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+          <MiniInput label="Reales Maß" unit="m" value={realM} onChange={setRealM} placeholder="z.B. 4.5" />
+          <div style={{ fontSize: 18, color: "var(--text3)", paddingBottom: 8, flexShrink: 0 }}>→</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {planResult ? (
+              <>
+                <ResultChip label="Auf Plan" value={planResult.toFixed(2)} unit="mm" />
+                <ResultChip label="Auf Plan" value={(planResult / 10).toFixed(2)} unit="cm" color="var(--text2)" />
+              </>
+            ) : <div style={{ fontSize: 12, color: "var(--text3)", paddingBottom: 8 }}>Reales Maß eingeben</div>}
+          </div>
+        </div>
+        {planResult && (
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>
+            {realM} m ÷ {M} = {planResult.toFixed(2)} mm auf dem Plan
+          </div>
+        )}
+      </div>
+
+      {/* Referenztabelle */}
+      <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border)", fontSize: 13, fontWeight: 700 }}>
+          Typische Maßstäbe &amp; Anwendungsbereiche
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "var(--bg3)" }}>
+              {["Maßstab", "1 mm Plan =", "Typischer Einsatz"].map(h => (
+                <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 12, color: "var(--text3)", fontWeight: 700 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ["1:20",   "2 cm",   "Detailzeichnungen, Schalter, Steckdosen"],
+              ["1:50",   "5 cm",   "Raumgrundrisse, Elektropläne"],
+              ["1:100",  "10 cm",  "Gebäudegrundrisse (Standard)"],
+              ["1:200",  "20 cm",  "Übersichtspläne Gebäude"],
+              ["1:500",  "50 cm",  "Lagepläne, Außenanlagen"],
+              ["1:1000", "1 m",    "Städtebau, Übersicht"],
+            ].map(([m, mm, info]) => (
+              <tr key={m} style={{ borderBottom: "1px solid var(--border)", background: massstab === m.split(":")[1] ? `${AKZENT}08` : "transparent" }}>
+                <td style={{ padding: "9px 14px", fontWeight: 700, color: AKZENT, fontFamily: "var(--mono)" }}>{m}</td>
+                <td style={{ padding: "9px 14px", fontFamily: "var(--mono)", color: "var(--text)" }}>{mm}</td>
+                <td style={{ padding: "9px 14px", color: "var(--text3)", fontSize: 12 }}>{info}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -903,12 +1182,13 @@ function TabFormeln() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 const TABS = [
-  { id: "ltg",      label: "Leitungsberechnung", icon: "📏" },
-  { id: "power",    label: "Strom & Leistung",   icon: "⚡" },
-  { id: "motor",    label: "Motorstrom",         icon: "🔁" },
-  { id: "komp",     label: "cos φ Korrektur",    icon: "🔋" },
-  { id: "abstand",  label: "Abstandsrechner",    icon: "📐" },
-  { id: "formel",   label: "Formelsammlung",     icon: "📖" },
+  { id: "ltg",      label: "Leitungsberechnung", icon: "📏", beschr: "Querschnitt & ΔU" },
+  { id: "power",    label: "Strom & Leistung",   icon: "⚡", beschr: "P · U · I · cos φ" },
+  { id: "motor",    label: "Motorstrom",         icon: "🔁", beschr: "I_n · I_a · Sicherung" },
+  { id: "komp",     label: "cos φ Korrektur",    icon: "🔋", beschr: "Kompensation · C" },
+  { id: "abstand",  label: "Abstandsrechner",    icon: "📐", beschr: "Lampen · Dübel · Objekte" },
+  { id: "massstab", label: "Maßstab",            icon: "🗺",  beschr: "Plan ↔ Wirklichkeit" },
+  { id: "formel",   label: "Formelrechner",      icon: "📖", beschr: "Alle Formeln interaktiv" },
 ];
 
 export default function Leitungsberechnung() {
@@ -924,36 +1204,32 @@ export default function Leitungsberechnung() {
         </div>
       </div>
 
-      {/* Tab-Bar */}
-      <div style={{
-        display: "flex", gap: 4, marginBottom: 24, overflowX: "auto",
-        borderBottom: "1px solid var(--border)", paddingBottom: 0,
-      }}>
+      {/* Tab-Nav als Kachelgitter */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8, marginBottom: 24 }}>
         {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            style={{
-              background: "none", border: "none", padding: "10px 14px",
-              cursor: "pointer", color: activeTab === t.id ? AKZENT : "var(--text3)",
-              fontWeight: activeTab === t.id ? 700 : 400,
-              fontSize: 13, display: "flex", alignItems: "center", gap: 6,
-              borderBottom: `2px solid ${activeTab === t.id ? AKZENT : "transparent"}`,
-              marginBottom: -1, whiteSpace: "nowrap", transition: "color 0.15s",
-            }}
-          >
-            <span>{t.icon}</span> {t.label}
+          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+            background: activeTab === t.id ? `${AKZENT}18` : "var(--bg2)",
+            border: `2px solid ${activeTab === t.id ? AKZENT : "var(--border)"}`,
+            borderRadius: 12, padding: "12px 8px",
+            cursor: "pointer", color: activeTab === t.id ? AKZENT : "var(--text)",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+            transition: "border-color 0.15s, background 0.15s",
+          }}>
+            <span style={{ fontSize: 24 }}>{t.icon}</span>
+            <span style={{ fontSize: 11, fontWeight: activeTab === t.id ? 700 : 500, textAlign: "center", lineHeight: 1.3, color: activeTab === t.id ? AKZENT : "var(--text)" }}>{t.label}</span>
+            <span style={{ fontSize: 10, color: "var(--text3)", textAlign: "center", lineHeight: 1.2 }}>{t.beschr}</span>
           </button>
         ))}
       </div>
 
       {/* Tab-Inhalt */}
-      {activeTab === "ltg"     && <TabLeitungsberechnung />}
-      {activeTab === "power"   && <TabStromLeistung />}
-      {activeTab === "motor"   && <TabMotor />}
-      {activeTab === "komp"    && <TabKompensation />}
-      {activeTab === "abstand" && <TabAbstandsrechner />}
-      {activeTab === "formel"  && <TabFormeln />}
+      {activeTab === "ltg"      && <TabLeitungsberechnung />}
+      {activeTab === "power"    && <TabStromLeistung />}
+      {activeTab === "motor"    && <TabMotor />}
+      {activeTab === "komp"     && <TabKompensation />}
+      {activeTab === "abstand"  && <TabAbstandsrechner />}
+      {activeTab === "massstab" && <TabMassstab />}
+      {activeTab === "formel"   && <TabFormelrechner />}
     </div>
   );
 }
