@@ -64,7 +64,7 @@ const PH_BORDER= { L1:"rgba(255,107,107,0.4)",  L2:"rgba(245,160,64,0.4)",  L3:"
 // Kabel = einzelne Ader/Leitung ohne Sicherungs-Zuordnung
 const mkKabel = (sw="EG") => ({
   id: uid(), bezeichnung:"", raum:"", stockwerk:sw,
-  kabelTyp:"NYM-J", kabelAdern:3, kabelQs:"1.5",
+  kabelTyp:"NYM-J", kabelAdern:3, kabelQs:"1.5", kabelLaenge:"",
 });
 
 // Sicherung = Leitungsschutzschalter mit 1–n Kabeln
@@ -759,6 +759,67 @@ function SettingsModal({ settings, onSave, onClose }) {
   );
 }
 
+// ── Leitungsrechner (VDE 0100-520, Kupfer, cos φ=1, ΔU ≤ 3%) ──
+const LR_STROM = { "1.5":13.5, "2.5":18, "4":24, "6":31, "10":42, "16":56 };
+function berechneLeitungsQs(iA, laengeM) {
+  const aMin = (2 * iA * laengeM) / (56 * 6.9); // 56=κ(Cu), 6.9V=3%×230V
+  const auswahl = ["1.5","2.5","4","6","10","16"];
+  return auswahl.find(q => parseFloat(q) >= aMin && LR_STROM[q] >= iA) || null;
+}
+function maxLaenge(iA, qs) {
+  return Math.floor((56 * 6.9 * parseFloat(qs)) / (2 * iA));
+}
+function LeitungsRechner({ qs, laenge, onSelectQs }) {
+  const [nenn, setNenn] = React.useState("16");
+  const nennA = parseFloat(nenn) || 16;
+  const lm = parseFloat(laenge) || 0;
+  const empfohlen = lm > 0 ? berechneLeitungsQs(nennA, lm) : null;
+  const maxL = maxLaenge(nennA, qs);
+  const lmOk = lm === 0 || lm <= maxL;
+  return (
+    <div style={{marginTop:8,padding:"12px 14px",background:"rgba(33,150,201,0.06)",border:"1px solid rgba(33,150,201,0.2)",borderRadius:8}}>
+      <div style={{fontSize:10,color:"var(--blue)",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",marginBottom:8}}>⚡ Leitungsrechner — VDE 0100-520 (Cu, ΔU ≤ 3 %)</div>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
+        <div>
+          <div style={{fontSize:10,color:"var(--text3)",marginBottom:4}}>Nennstrom (A)</div>
+          <select value={nenn} onChange={e=>setNenn(e.target.value)}
+            style={{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 8px",color:"var(--text)",fontSize:12,fontFamily:"var(--mono)"}}>
+            {["6","10","13","16","20","25","32"].map(v=><option key={v}>{v}</option>)}
+          </select>
+        </div>
+        <div style={{fontSize:13}}>
+          <div style={{fontSize:10,color:"var(--text3)",marginBottom:4}}>Max. Leitungslänge @ {qs} mm²</div>
+          <span style={{fontWeight:700,fontFamily:"var(--mono)",color:lmOk?"var(--green)":"var(--red)"}}>{maxL} m</span>
+          {lm > 0 && !lmOk && <span style={{fontSize:11,color:"var(--red)",marginLeft:8}}>⚠ Eingabe ({lm}m) überschreitet Limit!</span>}
+          {lm > 0 && lmOk && <span style={{fontSize:11,color:"var(--text3)",marginLeft:8}}>✓ {lm}m liegt im erlaubten Bereich</span>}
+        </div>
+        {empfohlen && empfohlen !== qs && (
+          <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
+            <div>
+              <div style={{fontSize:10,color:"var(--text3)",marginBottom:4}}>Empfohlener Querschnitt</div>
+              <span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--blue)",fontSize:13}}>{empfohlen} mm²</span>
+            </div>
+            <button onClick={()=>onSelectQs(empfohlen)}
+              style={{background:"rgba(33,150,201,0.1)",border:"1px solid rgba(33,150,201,0.3)",borderRadius:6,padding:"5px 10px",cursor:"pointer",color:"var(--blue)",fontSize:11,marginBottom:2}}>
+              Übernehmen
+            </button>
+          </div>
+        )}
+        {empfohlen === qs && lm > 0 && (
+          <span style={{fontSize:12,color:"var(--green)",paddingBottom:4}}>✓ Gewählter Querschnitt passend</span>
+        )}
+      </div>
+      <div style={{marginTop:8,display:"flex",gap:12,flexWrap:"wrap"}}>
+        {["1.5","2.5","4","6"].map(q=>(
+          <span key={q} style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>
+            {q}mm² → <span style={{color:"var(--text2)"}}>{maxLaenge(nennA,q)}m</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════
 // ── Hauptkomponente ──
 // ══════════════════════════════════════════
@@ -798,6 +859,7 @@ export default function Verteilerplaner({ onBack } = {}) {
   const [showRaumInput, setShowRaumInput] = useState(false);
 
   const [showInfo, setShowInfo] = useState(false);
+  const [showLeiRechner, setShowLeiRechner] = useState(null); // kabel.id or null
   const [toasts, setToasts] = useState([]);
   const showToast = useCallback((msg, type="success", dur=2500) => {
     const id = Date.now();
@@ -1630,7 +1692,7 @@ const stueckliste = (() => {
             <div className="header-logo-text">
               <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>Verteilerplaner</div>
             </div>
-            <span className="header-version" style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3.2</span>
+            <span className="header-version" style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3.3</span>
           </div>
         </div>
 
@@ -1928,9 +1990,21 @@ const stueckliste = (() => {
                       {KABEL_QS_OPTIONEN.map(q=><option key={q} value={q}>{q}</option>)}
                     </select>
                   </div>
-
-
+                  {/* Länge */}
+                  <div style={{flex:"0 0 70px"}}>
+                    <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>Länge (m)</div>
+                    <input type="number" min={0} placeholder="—" value={k.kabelLaenge||""} onChange={e=>updKabel(k.id,"kabelLaenge",e.target.value)}
+                      style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",color:"var(--text)",fontSize:12,fontFamily:"var(--mono)"}} />
+                  </div>
+                  {/* Leitungsrechner-Toggle */}
+                  <div style={{flex:"0 0 28px",display:"flex",alignItems:"flex-end",paddingBottom:4}}>
+                    <button onClick={()=>setShowLeiRechner(showLeiRechner===k.id?null:k.id)}
+                      title="Leitungsrechner"
+                      style={{background:showLeiRechner===k.id?"rgba(33,150,201,0.15)":"transparent",border:"1px solid var(--border)",borderRadius:6,padding:"5px 6px",cursor:"pointer",color:"var(--blue)",fontSize:11,lineHeight:1}}>⚡</button>
+                  </div>
                 </div>
+                {/* Leitungsrechner-Panel */}
+                {showLeiRechner===k.id && <LeitungsRechner qs={k.kabelQs||"1.5"} laenge={k.kabelLaenge} onSelectQs={qs=>updKabel(k.id,"kabelQs",qs)} />}
               </div>
             );
           })}

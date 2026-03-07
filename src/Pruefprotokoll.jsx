@@ -434,7 +434,7 @@ function StromkreisForm({ sk, onChange, onDelete }) {
       </div>
 
       {/* PE-Durchgangswiderstand */}
-      <SectionHead>PE-Durchgangswiderstand</SectionHead>
+      <SectionHead>PE-Durchgangswiderstand <NormInfo norm="§61.3.2 DIN VDE 0100-600" grenzwert="kein fester Grenzwert" begruendung="Leitfähige Verbindung aller Schutzleiter nachweisen. Richtwert: R ≤ (ρ·L)/A + 0,1 Ω (Kontaktwiderstände). Üblich < 1 Ω für Wohnungsinstallationen." /></SectionHead>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8, marginBottom: 12 }}>
         <FL label="R_PE (Ω)">
           <input style={inp()} value={sk.pe_widerstand} onChange={e => set("pe_widerstand", e.target.value)} placeholder="0,42" />
@@ -445,7 +445,7 @@ function StromkreisForm({ sk, onChange, onDelete }) {
       </div>
 
       {/* Isolationswiderstand */}
-      <SectionHead>Isolationswiderstand (Riso) — Grenzwert: ≥ 1 MΩ</SectionHead>
+      <SectionHead>Isolationswiderstand (Riso) — Grenzwert: ≥ 1 MΩ <NormInfo norm="§61.3.3 DIN VDE 0100-600" grenzwert="≥ 1 MΩ (500 V DC)" begruendung="Messung mit 500 V DC zwischen Leiter und PE. Schutzkleinspannung SELV/PELV: ≥ 0,5 MΩ bei 250 V DC. Neue Anlagen oft > 100 MΩ — Wert < 1 MΩ = Mangel." /></SectionHead>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
         <FL label="L1-PE (MΩ)">
           <input style={inp()} value={sk.riso_l1_pe} onChange={e => set("riso_l1_pe", e.target.value)} placeholder="1,00" />
@@ -464,7 +464,7 @@ function StromkreisForm({ sk, onChange, onDelete }) {
       </div>
 
       {/* Schleifenimpedanz */}
-      <SectionHead>Schleifenimpedanz</SectionHead>
+      <SectionHead>Schleifenimpedanz <NormInfo norm="§61.3.6 DIN VDE 0100-600" grenzwert="Zs ≤ U₀ / (5 × Ia)" begruendung={"Ia = Auslösestrom des Überstromschutzorgans. Beispiele: 16A/Typ B → Ia=80A → Zs ≤ 0,575 Ω · 16A/Typ C → Ia=160A → Zs ≤ 0,288 Ω · 20A/Typ B → Ia=100A → Zs ≤ 0,46 Ω"} /></SectionHead>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: 8, marginBottom: 12 }}>
         <FL label="Zs (Ω)">
           <input style={inp()} value={sk.zs} onChange={e => set("zs", e.target.value)} placeholder="0,42" />
@@ -479,10 +479,11 @@ function StromkreisForm({ sk, onChange, onDelete }) {
 
       {/* FI / RCD */}
       <SectionHead>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={sk.fi_vorhanden} onChange={e => set("fi_vorhanden", e.target.checked)} />
           FI / RCD-Prüfung
         </label>
+        {" "}<NormInfo norm="§61.6.3 DIN VDE 0100-600" grenzwert="t ≤ 300 ms bei IΔN (Typ S: ≤ 500 ms) · t ≤ 40 ms bei 5×IΔN" begruendung="Typ AC/A/F/B: Auslösung bei IΔN in ≤ 300 ms. Typ S (selektiv): ≤ 500 ms. Bei 5×IΔN: ≤ 40 ms. Bei ½×IΔN: kein Auslösen (Nichtauslösestrom). Berührungsspannung UB ≤ 50 V." />
       </SectionHead>
       {sk.fi_vorhanden && (
         <div style={{ marginBottom: 12 }}>
@@ -535,6 +536,34 @@ function SectionHead({ children }) {
       fontWeight: 700, marginBottom: 8, paddingBottom: 4,
       borderBottom: `1px solid rgba(245,158,11,0.2)`,
     }}>{children}</div>
+  );
+}
+
+// ── Norm-Info Tooltip ─────────────────────────────────────────────────────────
+function NormInfo({ norm, grenzwert, begruendung }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ background: "none", border: "none", cursor: "pointer", color: AMBER, fontSize: 11, padding: "0 4px", lineHeight: 1, opacity: 0.7 }}
+        title="Normreferenz"
+      >ⓘ</button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 490 }} />
+          <div style={{
+            position: "absolute", bottom: "calc(100% + 6px)", left: 0, zIndex: 500,
+            background: "var(--bg2)", border: `1px solid ${AMBER}40`, borderRadius: 10,
+            padding: "12px 14px", minWidth: 260, maxWidth: 320, boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          }}>
+            <div style={{ fontSize: 10, color: AMBER, fontWeight: 700, letterSpacing: "0.5px", marginBottom: 6 }}>{norm}</div>
+            {grenzwert && <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>Grenzwert: {grenzwert}</div>}
+            <div style={{ fontSize: 11, color: "var(--text2)", lineHeight: 1.6 }}>{begruendung}</div>
+          </div>
+        </>
+      )}
+    </span>
   );
 }
 

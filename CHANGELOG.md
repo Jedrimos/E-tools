@@ -6,7 +6,7 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
-## [2026.3.2] – 2026-03-07
+## [2026.3.3] – 2026-03-07
 
 ### ✨ Neu
 
@@ -37,8 +37,30 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 - ℹ️-Button in Stundenbuch, Prüfprotokoll und Wissensdatenbank (analog zum Verteilerplaner)
 - Jede App zeigt ein App-spezifisches Info-Modal mit Beschreibung, Features und Versionsnummer
 
+**Normreferenzen im Prüfprotokoll**
+- ⓘ-Buttons direkt bei den Messabschnitten: PE-Durchgangswiderstand, Isolationswiderstand, Schleifenimpedanz, FI/RCD
+- Popover zeigt Normreferenz (DIN VDE 0100-600 §xx), Grenzwert und technische Begründung
+- Beispiel Schleifenimpedanz: Formel Zs ≤ U₀/(5×Ia) mit konkreten Beispielwerten für gängige Sicherungstypen
+
+**Leitungsberechnung im Verteilerplaner**
+- Neues Feld "Länge (m)" pro Kabel in Schritt 2 (wird gespeichert)
+- ⚡-Button öffnet Inline-Leitungsrechner direkt im Kabel-Formular
+- Rechner: Nennstrom wählen → Max-Länge für gewählten Querschnitt + Empfehlung + "Übernehmen"-Button
+- Formel: VDE 0100-520, Kupfer, cos φ=1, ΔU ≤ 3 % (6,9 V)
+
+**Tagesberichte im Stundenbuch**
+- Button "📄 Tagesbericht" im Header
+- Datum wählen → strukturierte Tabelle aller Einträge des Tages: Von/Bis, Pause, Nettozeit, Projekt, Tätigkeit, Notiz
+- Gesamt-Stunden-Auswertung, Unterschriftsfelder für Mitarbeiter und Auftraggeber
+- Druckfunktion (Browserdruckdialog)
+
+**Zuletzt geöffnet im Dashboard**
+- Dashboard zeigt die letzten 3 geöffneten Apps als Schnellzugriff-Buttons über den App-Karten
+- Zeitstempel (z.B. "vor 2 Std.") direkt am Button
+
 **Todo.md**
 - Neue Datei `Todo.md` im Repository: zentrale Aufgabenliste für Ideen die während der Arbeit einfallen
+- PocketBase-Migration als offene Aufgabe eingetragen
 
 ### 🐛 Bugfixes
 

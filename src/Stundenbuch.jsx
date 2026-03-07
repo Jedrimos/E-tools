@@ -250,6 +250,8 @@ export default function Stundenbuch({ config = {} }) {
   const [timerNow, setTimerNow] = useState(null);
   const [timerVorbelegung, setTimerVorbelegung] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [showTagesbericht, setShowTagesbericht] = useState(false);
+  const [tagesberichtDatum, setTagesberichtDatum] = useState(new Date().toISOString().slice(0,10));
   const { toasts, addToast } = useToasts();
 
   // Timer-Tick jede Sekunde
@@ -380,6 +382,7 @@ export default function Stundenbuch({ config = {} }) {
           <div style={{ color: "var(--text3)", fontSize: 13 }}>Zeiterfassung{config.firma ? ` – ${config.firma}` : ""}{config.mitarbeiter ? ` | ${config.mitarbeiter}` : ""}</div>
         </div>
         <div style={{ flex: 1 }} />
+        <button onClick={() => setShowTagesbericht(true)} style={btnStyle("rgba(245,158,11,0.1)", "#f59e0b")}>📄 Tagesbericht</button>
         <button onClick={exportCSV} style={btnStyle("rgba(33,150,201,0.1)", "var(--blue)")}>↓ CSV Export</button>
         <button onClick={() => { setEditId(null); setTimerVorbelegung(null); setShowForm(s => !s); }} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>
           {showForm && !editId ? "✕ Schließen" : "+ Neuer Eintrag"}
@@ -524,6 +527,78 @@ export default function Stundenbuch({ config = {} }) {
           })}
         </div>
       )}
+
+      {/* Tagesbericht-Modal */}
+      {showTagesbericht && (() => {
+        const tagEintraege = eintraege.filter(e => e.datum === tagesberichtDatum);
+        const tagMinuten = tagEintraege.reduce((s, e) => s + calcNetto(e), 0);
+        return (
+          <div onClick={() => setShowTagesbericht(false)} style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+            <div onClick={e => e.stopPropagation()} style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:28,maxWidth:640,width:"100%",maxHeight:"90vh",overflowY:"auto",position:"relative"}}>
+              <button onClick={() => setShowTagesbericht(false)} style={{position:"absolute",top:14,right:14,background:"none",border:"none",color:"var(--text3)",fontSize:18,cursor:"pointer"}}>✕</button>
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>📄 Tagesbericht</div>
+                <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                  <input type="date" value={tagesberichtDatum} onChange={e=>setTagesberichtDatum(e.target.value)}
+                    style={{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 10px",color:"var(--text)",fontSize:14}} />
+                  <button onClick={() => window.print()} style={{...btnStyle("rgba(245,158,11,0.1)","#f59e0b"),fontSize:12}}>🖨 Drucken</button>
+                </div>
+              </div>
+              <div className="tagesbericht-print" style={{background:"var(--bg)",borderRadius:10,padding:20,border:"1px solid var(--border)"}}>
+                <div style={{borderBottom:"2px solid var(--green)",paddingBottom:12,marginBottom:16}}>
+                  <div style={{fontSize:16,fontWeight:800}}>{config.firma || "Stundennachweis"}</div>
+                  {config.mitarbeiter && <div style={{fontSize:13,color:"var(--text2)",marginTop:2}}>Mitarbeiter: {config.mitarbeiter}</div>}
+                  <div style={{fontSize:13,color:"var(--text2)",marginTop:2}}>Datum: {formatDate(tagesberichtDatum)}</div>
+                </div>
+                {tagEintraege.length === 0 ? (
+                  <div style={{textAlign:"center",color:"var(--text3)",padding:"24px 0"}}>Keine Einträge für diesen Tag.</div>
+                ) : (
+                  <>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,marginBottom:16}}>
+                      <thead>
+                        <tr style={{borderBottom:"1px solid var(--border)"}}>
+                          {["Von","Bis","Pause","Netto","Projekt","Tätigkeit","Notiz"].map(h=>(
+                            <th key={h} style={{textAlign:"left",padding:"4px 8px",color:"var(--text3)",fontWeight:600,fontSize:11}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tagEintraege.map(e=>(
+                          <tr key={e.id} style={{borderBottom:"1px solid var(--border)"}}>
+                            <td style={{padding:"6px 8px"}}>{e.von}</td>
+                            <td style={{padding:"6px 8px"}}>{e.bis}</td>
+                            <td style={{padding:"6px 8px",color:"var(--text3)"}}>{e.pause}min</td>
+                            <td style={{padding:"6px 8px",fontWeight:700,color:"var(--green)"}}>{formatDuration(calcNetto(e))}</td>
+                            <td style={{padding:"6px 8px"}}>{e.projekt||"—"}</td>
+                            <td style={{padding:"6px 8px"}}>{e.taetigkeit||"—"}</td>
+                            <td style={{padding:"6px 8px",color:"var(--text3)",fontSize:12}}>{e.notiz||""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div style={{display:"flex",justifyContent:"flex-end",gap:24,padding:"8px 8px 0",borderTop:"2px solid var(--border)"}}>
+                      <span style={{fontSize:13,color:"var(--text2)"}}>Einträge: <strong>{tagEintraege.length}</strong></span>
+                      <span style={{fontSize:14,fontWeight:800}}>Gesamt: <span style={{color:"var(--green)"}}>{formatDuration(tagMinuten)}</span> ({(tagMinuten/60).toFixed(2)} h)</span>
+                    </div>
+                    <div style={{marginTop:32,display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+                      <div style={{fontSize:12,color:"var(--text3)"}}>
+                        <div style={{marginBottom:4,fontWeight:600}}>Unterschrift Mitarbeiter</div>
+                        <div style={{borderBottom:"1px solid var(--border)",height:32}}/>
+                        <div style={{marginTop:4}}>{config.mitarbeiter||"____________________"}</div>
+                      </div>
+                      <div style={{fontSize:12,color:"var(--text3)"}}>
+                        <div style={{marginBottom:4,fontWeight:600}}>Unterschrift Auftraggeber</div>
+                        <div style={{borderBottom:"1px solid var(--border)",height:32}}/>
+                        <div style={{marginTop:4,color:"var(--border2)"}}>____________________</div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

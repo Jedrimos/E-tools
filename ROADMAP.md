@@ -11,7 +11,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ### 📋 Prüfprotokoll
 - ✅ ~~**Drucken / PDF**~~ — Umgesetzt: `window.print()` + Print-CSS + jsPDF-Export (professionelles A4-PDF, lazy-loaded)
 - ✅ ~~**Ablaufdatum-Badge im Dashboard**~~ — Umgesetzt: Badge auf Prüfprotokoll-Karte + Warnung in der Liste
-- ⚡ **Normreferenzen** — Info-Icons (ⓘ) mit Tooltip der VDE-Norm und Grenzwert-Begründung direkt bei den Messwert-Feldern.
+- ✅ ~~**Normreferenzen**~~ — Umgesetzt: ⓘ-Buttons mit VDE-Norm, Grenzwert und Begründung bei PE, Riso, Schleife, FI.
 
 ### ⏱ Stundenbuch
 - ✅ ~~**Wochenstunden-Summe**~~ — Umgesetzt
@@ -28,7 +28,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - ✅ ~~**Daten-Backup / Export**~~ — Umgesetzt
 - ✅ ~~**Daten-Import / Restore**~~ — Umgesetzt
 - ✅ ~~**Supabase Verbindungsstatus**~~ — Umgesetzt: Ping-Indikator im Dashboard
-- ⚡ **Zuletzt geöffnet** — Dashboard zeigt die letzten 3 verwendeten Projekte/Protokolle als Direktlinks.
+- ✅ ~~**Zuletzt geöffnet**~~ — Umgesetzt: Dashboard zeigt die letzten 3 geöffneten Apps als Schnellzugriff mit Zeitstempel.
 
 ---
 
@@ -40,11 +40,11 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - 🔨 **Prüfmittel-Verwaltung** — Messgerät, Kalibrierungsdatum, Seriennummer für Rückverfolgbarkeit.
 
 ### ⚡ Verteilerplaner
-- 🔨 **Leitungsberechnung integriert** — Beim Kabel anlegen: Querschnitts-Empfehlung auf Basis von Strom und Länge (VDE 0100-520 Tabelle).
+- ✅ ~~**Leitungsberechnung integriert**~~ — Umgesetzt: Längenfeld + ⚡-Inline-Rechner pro Kabel, empfiehlt Querschnitt und zeigt Max-Länge für verschiedene mm²-Werte (VDE 0100-520, Cu, ΔU ≤ 3 %).
 
 ### ⏱ Stundenbuch
 - ✅ ~~**Monatsübersicht / Diagramm**~~ — Umgesetzt: SVG-Balkendiagramm (Stunden/Tag) mit 8h-Linie und Farbkodierung
-- 🔨 **Tagesberichte** — Strukturierter Tagesbericht als Nachweis für den Auftraggeber.
+- ✅ ~~**Tagesberichte**~~ — Umgesetzt: Datum wählen → Tagesbericht mit Tabelle, Gesamt-Stunden, Unterschriftsfeldern und Druckfunktion.
 - 🔨 **Regiezettel** — Aus Stunden + Materialien (vom Verteilerplaner) eine einfache Regie-Rechnung generieren.
 
 ---
@@ -68,6 +68,42 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - 🔨 **📐 Leitungsberechnung** — Eigenständiges Tool: Strom + Länge + Verlegeart → Querschnitts-Empfehlung nach VDE 0100-520.
 - 🏗 **📦 Materialverwaltung** — Fahrzeug-/Lagerbestand, Verbrauch pro Baustelle, Mindestbestand-Warnung.
 - 🔨 **🔌 Betriebsmittelkennzeichnung** — QR-Code-Generator für Betriebsmittel, QR-Code öffnet das Prüfprotokoll.
+
+---
+
+## Neue Ideen
+
+### 🔗 App-übergreifend
+- ⚡ **PocketBase-Migration** — Datenspeicherung auf lokalen Server (PocketBase, single Go-Binary, SQLite) umstellen. Keine Supabase-Abhängigkeit mehr. Einfach auf Coolify deployen.
+- ⚡ **Dark-/Light-Mode Umschalter** — Toggle in den Einstellungen oder im Dashboard-Header.
+- ⚡ **Zuletzt geöffnet: Projektname** — Statt App-Name den letzten Projektnamen/Protokoll-Namen als Direktlink anzeigen (VP + PP).
+- 🔨 **Offline-Sync-Konflikt-Behandlung** — Wenn Daten lokal und in Supabase geändert wurden, Merge-Dialog anzeigen.
+- 🔨 **Mehrsprachigkeit (DE/EN)** — Sprachdateien, Umschaltung in den Einstellungen.
+
+### 📋 Prüfprotokoll
+- ⚡ **Messwerte-Vorabfüllung** — Typische Richtwerte als Platzhalter eintragen (z.B. Riso 999 MΩ = "unendlich").
+- ⚡ **Prüfmittel-Kurzinfo** — Messgerät, Kalibrierungsdatum direkt am Protokoll-Kopf hinterlegen.
+- 🔨 **Unterschriftsfeld (Canvas)** — Signatur-Pad auf dem Tablet, als Base64 im Protokoll gespeichert.
+- 🔨 **Vorlagen** — Vordefinierte Stromkreis-Listen für typische Anlagen (EFH, Gewerbeeinheit).
+
+### ⏱ Stundenbuch
+- ⚡ **Tagesbericht per E-Mail** — Erzeugtes HTML direkt aus dem Modal als E-Mail versenden (`mailto:`).
+- ⚡ **Projektliste verwalten** — Fixe Projektliste in den Einstellungen anlegen, statt Freitexteingabe.
+- 🔨 **Wochenübersicht** — Kompakte Ansicht mit Tages-Summen der aktuellen Woche als Tabelle.
+- 🔨 **Regiezettel** — Stunden + Materialien (aus Verteilerplaner-Stückliste) zu einfacher Regie-Rechnung kombinieren.
+
+### ⚡ Verteilerplaner
+- ⚡ **Kabelfarbe im Plan** — Leitung in der Belegungsplan-Tabelle in Stockwerk-Farbe einfärben.
+- ⚡ **Leitungsberechnung: cos φ wählbar** — Für Motorlasten etc. cos φ ≠ 1 einstellbar machen.
+- 🔨 **Selektivitäts-Hinweis** — Grobe Prüfung ob vorgelagerte Sicherung selektiv zu nachgelagerter ist.
+- 🔨 **Mehrere Verteiler pro Projekt** — Haupt- und Unterverteiler mit Verbindungskabel.
+
+### Neue Tools
+- 🔨 **📐 Leitungsberechnung (eigenständig)** — Vollständiges Rechentool: Strom, Länge, Verlegeart, cos φ, Spannungsfall, Kurzschlussstrom-Check.
+- 🔨 **🔌 Betriebsmittelkennzeichnung** — QR-Code-Generator, QR-Scan öffnet direkt das passende Prüfprotokoll.
+- 🏗 **🔧 Wartungsprotokoll** — Wiederkehrende Wartungen (E-Check, Blitzschutz, Notbeleuchtung) mit Intervallen und Fälligkeits-Berechnung.
+- 🏗 **📦 Materialverwaltung** — Fahrzeug-/Lagerbestand, Verbrauch pro Baustelle, Mindestbestand-Warnung.
+- 🏗 **⚖ Angebotskalkulation** — Stunden + Material + Aufschlag = Angebot als PDF.
 
 ---
 

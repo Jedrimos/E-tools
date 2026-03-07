@@ -89,6 +89,23 @@ function importBackup(file, onDone) {
   reader.readAsText(file);
 }
 
+// ── Zuletzt geöffnet ──
+const RECENT_KEY = "elektronikertools_zuletzt";
+function ladeZuletzt() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
+}
+function trackZuletzt(appId, name) {
+  const prev = ladeZuletzt().filter(x => !(x.appId === appId && x.name === name));
+  localStorage.setItem(RECENT_KEY, JSON.stringify([{ appId, name, ts: Date.now() }, ...prev].slice(0, 3)));
+}
+function zeitVor(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return "gerade eben";
+  if (diff < 3600000) return `vor ${Math.floor(diff / 60000)} Min.`;
+  if (diff < 86400000) return `vor ${Math.floor(diff / 3600000)} Std.`;
+  return `vor ${Math.floor(diff / 86400000)} Tag(en)`;
+}
+
 // ── App-Definitionen ──
 const APPS = [
   {
@@ -146,6 +163,7 @@ export default function Dashboard() {
   const [dbStatus, setDbStatus] = useState("unbekannt"); // "ok" | "fehler" | "unbekannt" | "nicht-konfiguriert"
   const [importMsg, setImportMsg] = useState("");
   const [stats, setStats] = useState(ladeLiveStats);
+  const [zuletzt, setZuletzt] = useState(ladeZuletzt);
 
   useEffect(() => { saveConfig(config); }, [config]);
 
@@ -180,11 +198,18 @@ export default function Dashboard() {
     e.target.value = "";
   }
 
+  function oeffneApp(appId) {
+    const app = APPS.find(a => a.id === appId);
+    if (app) { trackZuletzt(appId, app.name); setZuletzt(ladeZuletzt()); }
+    setAktiveApp(appId);
+  }
+
   // App rendern
   function zurueck() {
     setAktiveApp(null);
     setAblauf(ladeAblaufInfo());
     setStats(ladeLiveStats());
+    setZuletzt(ladeZuletzt());
   }
 
   if (aktiveApp === "verteilerplaner") {
@@ -277,6 +302,33 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Zuletzt geöffnet */}
+      {zuletzt.length > 0 && (
+        <div style={{ maxWidth: 800, width: "100%", marginBottom: 24 }}>
+          <div style={{ fontSize: 11, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: 700, marginBottom: 10 }}>Zuletzt geöffnet</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {zuletzt.map(z => {
+              const app = APPS.find(a => a.id === z.appId);
+              if (!app) return null;
+              return (
+                <button key={z.appId + z.ts} onClick={() => oeffneApp(z.appId)} style={{
+                  background: "var(--bg2)", border: `1px solid ${app.farbe}30`, borderRadius: 10,
+                  padding: "8px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                  color: "var(--text)", transition: "border-color 0.15s",
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = app.farbe}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = `${app.farbe}30`}
+                >
+                  <span style={{ fontSize: 16 }}>{app.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{app.name}</span>
+                  <span style={{ fontSize: 11, color: "var(--text3)" }}>{zeitVor(z.ts)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* App-Karten */}
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center", maxWidth: 800, width: "100%", marginBottom: 32 }}>
         {APPS.map(app => {
@@ -284,7 +336,7 @@ export default function Dashboard() {
           return (
             <button
               key={app.id}
-              onClick={() => { setAktiveApp(app.id); if (app.id === "pruefprotokoll") setAblauf(ladeAblaufInfo()); }}
+              onClick={() => { oeffneApp(app.id); if (app.id === "pruefprotokoll") setAblauf(ladeAblaufInfo()); }}
               style={{
                 background: app.bg,
                 border: `2px solid ${app.farbe}30`,
