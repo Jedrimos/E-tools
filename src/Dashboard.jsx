@@ -153,9 +153,9 @@ const APPS = [
   },
   {
     id: "leitungsberechnung",
-    name: "Leitungsberechnung",
-    icon: "📐",
-    beschreibung: "Querschnittsberechnung nach VDE 0100-520: Strom, Länge, Verlegeart → Mindest-Querschnitt und Spannungsfall-Tabelle.",
+    name: "Elektrorechner",
+    icon: "⚡",
+    beschreibung: "Rechner und Formelsammlung: Leitungsberechnung, Strom & Leistung, Motorstrom, cos φ-Korrektur, VDE-Formelreferenz.",
     farbe: "#f97316",
     bg: "#1a0e00",
   },
@@ -279,7 +279,7 @@ export default function Dashboard() {
   if (aktiveApp === "leitungsberechnung") {
     return (
       <div>
-        <TopBar label="Leitungsberechnung" icon="📐" farbe="#f97316" onBack={zurueck} config={config} onConfig={openConfig} />
+        <TopBar label="Elektrorechner" icon="⚡" farbe="#f97316" onBack={zurueck} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Leitungsberechnung />
       </div>

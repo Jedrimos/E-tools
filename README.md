@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.3.4-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.3.5-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -118,16 +118,31 @@ Wiederkehrende Wartungsaufgaben verwalten und nachverfolgen.
 
 ---
 
-### 📐 Leitungsberechnung
+### ⚡ Elektrorechner
 
-Eigenständiges Berechnungstool für Leitungsquerschnitte nach VDE 0100-520.
+Rechner und Formelsammlung für Elektrofachkräfte — 5 Tabs, kein Datenbankzugriff.
 
-**Features:**
+**Tab 1 — Leitungsberechnung (VDE 0100-520):**
 - Eingaben: Strom (A), Länge (m), Verlegeart (B1/B2/C/E), Material (Cu/Al), Phasenzahl (1P/3P), cos φ
 - Empfehlung des Mindest-Querschnitts (nächste Normstufe ≥ rechnerischer Wert)
-- Spannungsfall-Tabelle für alle Normstufen 1,5 … 120 mm²: ΔU (V), ΔU (%), max. Belastungsstrom, max. Länge
-- Grenzwert ΔU ≤ 3 % nach VDE 0100-520 farbkodiert; Überschreitung sofort erkennbar
-- Kein Datenbankzugriff — reines Rechentool, funktioniert vollständig offline
+- Spannungsfall-Tabelle für alle Normstufen 1,5 … 120 mm²: ΔU (V), ΔU (%), max. Strom, max. Länge
+
+**Tab 2 — Strom & Leistung:**
+- Leistungsrechner: P/U/I/cosφ für Einphasig (230 V) und Drehstrom (400 V) — beliebige Größe berechnen
+- Scheinleistung S (kVA), Blindleistung Q (kVAr)
+- Ohm'sches Gesetz: U/I/R — beliebige Größe berechnen
+
+**Tab 3 — Motorstrom:**
+- Nennstrom und Anlaufstrom für Drehstrommotoren (P kW, U, cosφ, Wirkungsgrad η)
+- Anlaufstrom-Faktor wählbar (DOL 5-8×, Stern-Dreieck / FU 2×)
+- Empfohlene Sicherungsgröße und Leitungsquerschnitt (Richtwert)
+
+**Tab 4 — cos φ Korrektur:**
+- Blindleistungskompensation: Q_C (kVAr) und Kondensatorgröße (µF)
+- Stromeinsparung ΔI und neue Scheinleistung S₂
+
+**Tab 5 — Formelsammlung:**
+- Aufklappbare Formelgruppen: Ohm, 1P/3P Wechselstrom, Leitungsberechnung, Kompensation, Schutzmaßnahmen (VDE 0100-410/-600), Konstanten
 
 ---
 

@@ -6,6 +6,20 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.5] – 2026-03-07
+
+### ✨ Neu / Geändert
+
+**Elektrorechner (erweitert aus Leitungsberechnung)**
+- App umbenannt von „Leitungsberechnung" zu „Elektrorechner" mit 5 Tabs:
+- **Leitungsberechnung** (unverändert): Querschnitt + Spannungsfall nach VDE 0100-520
+- **Strom & Leistung**: P/U/I/cosφ für 1-phasig und Drehstrom; Schein- und Blindleistung; Ohm'sches Gesetz (U/I/R)
+- **Motorstrom**: Nennstrom/Anlaufstrom (P, U, cosφ, η, Anlauf-Faktor), Sicherungsempfehlung, Leitungsquerschnitt-Richtwert
+- **cos φ Korrektur**: Q_C (kVAr), Kondensatorgröße (µF), Stromeinsparung ΔI
+- **Formelsammlung**: 7 Gruppen — Ohm, 1P/3P Wechselstrom, Leitungsberechnung, Kompensation, Schutzmaßnahmen VDE, Konstanten
+
+---
+
 ## [2026.3.4] – 2026-03-07
 
 ### ✨ Neu
