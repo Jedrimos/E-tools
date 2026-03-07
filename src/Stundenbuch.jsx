@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
-import Toast, { useToasts } from "./components/Toast.jsx";
+import React, { useState, useEffect } from "react";
+import Toast from "./components/Toast.jsx";
+import { useToasts } from "./lib/useToasts.js";
 import { loadStundenDB, saveEintragDB, deleteEintragDB } from "./lib/db_stundenbuch.js";
+import { supabaseFehlermeldung } from "./lib/supabase.js";
 import { uid } from "./lib/utils.js";
 
 function formatDuration(minutes) {
@@ -19,12 +21,6 @@ function timeToMinutes(timeStr) {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(":").map(Number);
   return h * 60 + m;
-}
-
-function minutesToTime(minutes) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
 }
 
 const PAUSE_OPTIONS = [0, 15, 30, 45, 60];
@@ -61,8 +57,6 @@ function saveData(data) {
 function EintragForm({ initial, onSave, onCancel, projekte }) {
   const [form, setForm] = useState(initial || mkEintrag());
   const netto = calcNetto(form);
-  const formRef = useRef(form);
-  formRef.current = form;
 
   function set(key, val) { setForm(f => ({ ...f, [key]: val })); }
 
@@ -71,12 +65,12 @@ function EintragForm({ initial, onSave, onCancel, projekte }) {
     function onKey(e) {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        onSave(formRef.current);
+        onSave(form);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onSave]);
+  }, [onSave, form]);
 
   return (
     <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 16 }}>
@@ -291,8 +285,8 @@ export default function Stundenbuch({ config = {} }) {
   useEffect(() => {
     loadStundenDB()
       .then(data => { if (data) setEintraege(data); })
-      .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      .catch(e => addToast("Datenbank: " + supabaseFehlermeldung(e), "error"));
+  }, [addToast]);
 
   const projekte = [...new Set(eintraege.map(e => e.projekt).filter(Boolean))].sort();
 
@@ -306,14 +300,14 @@ export default function Stundenbuch({ config = {} }) {
       try {
         const saved = await saveEintragDB(updated);
         if (saved) setEintraege(prev => prev.map(e => e.id === editId ? { ...e, db_id: saved.db_id } : e));
-      } catch (_) {}
+      } catch { /* fire-and-forget */ }
     } else {
       setEintraege(prev => [form, ...prev]);
       addToast("Eintrag gespeichert");
       try {
         const saved = await saveEintragDB(form);
         if (saved) setEintraege(prev => prev.map(e => e.id === form.id ? { ...e, db_id: saved.db_id } : e));
-      } catch (_) {}
+      } catch { /* fire-and-forget */ }
     }
     setShowForm(false);
   }
@@ -324,7 +318,7 @@ export default function Stundenbuch({ config = {} }) {
     setEintraege(prev => prev.filter(e => e.id !== id));
     addToast("Eintrag gelöscht");
     if (eintrag?.db_id) {
-      try { await deleteEintragDB(eintrag.db_id); } catch (_) {}
+      try { await deleteEintragDB(eintrag.db_id); } catch { /* fire-and-forget */ }
     }
   }
 

@@ -1,66 +1,18 @@
-import React, { useState, useEffect, useRef } from "react";
-import Toast, { useToasts } from "./components/Toast.jsx";
+import React, { useState, useEffect } from "react";
+import Toast from "./components/Toast.jsx";
+import { useToasts } from "./lib/useToasts.js";
 import {
   loadProtokolleDB, saveProtokollDB, deleteProtokollDB,
   loadProjekteForImport,
 } from "./lib/db_pruefprotokoll.js";
+import { supabaseFehlermeldung } from "./lib/supabase.js";
 import { uid } from "./lib/utils.js";
+import { GW, evalStromkreis, risoMin } from "./lib/vde.js";
 // jsPDF wird lazy geladen (nur bei PDF-Export, ~250kB gespart beim ersten Laden)
 
 const LS_KEY = "elektronikertools_pruefprotokoll";
 function load() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }
 function save(d) { localStorage.setItem(LS_KEY, JSON.stringify(d)); }
-
-// ── VDE-Grenzwerte ────────────────────────────────────────────────────────────
-const GW = {
-  riso_min:    1.0,   // ≥ 1 MΩ  (VDE 0100-600 §61.3)
-  fi_t_nenn:   300,   // ≤ 300 ms bei IΔN (Typ AC/A/F/B)
-  fi_t_s_nenn: 500,   // ≤ 500 ms bei IΔN (Typ S)
-  fi_t_5fach:   40,   // ≤ 40 ms bei 5×IΔN
-  fi_ub_max:    50,   // ≤ 50 V Berührungsspannung
-};
-
-function evalNum(val, pass) {
-  if (val === "" || val == null) return null;
-  const n = parseFloat(String(val).replace(",", "."));
-  if (isNaN(n)) return null;
-  return pass(n) ? "ok" : "fail";
-}
-
-function evalStromkreis(sk) {
-  const results = [
-    evalNum(sk.pe_widerstand, () => true),             // PE nur Messung, kein Grenzwert ohne Kabellänge
-    evalNum(sk.riso_l1_pe,  v => v >= GW.riso_min),
-    evalNum(sk.riso_l2_pe,  v => v >= GW.riso_min),
-    evalNum(sk.riso_l3_pe,  v => v >= GW.riso_min),
-    evalNum(sk.riso_n_pe,   v => v >= GW.riso_min),
-    // Schleife: kein einfacher globaler Grenzwert (abhängig von Sicherung) → nur Info
-  ].filter(r => r === "ok" || r === "fail");
-
-  if (sk.fi_vorhanden) {
-    const max_nenn = sk.fi_typ === "S" ? GW.fi_t_s_nenn : GW.fi_t_nenn;
-    results.push(...[
-      evalNum(sk.fi_t_nenn,  v => v <= max_nenn),
-      evalNum(sk.fi_t_5fach, v => v <= GW.fi_t_5fach),
-      evalNum(sk.fi_ub,      v => v <= GW.fi_ub_max),
-    ].filter(Boolean));
-    // ½×IΔN: wenn Wert eingetragen → RCD hat ausgelöst → Fehler
-    if (sk.fi_t_halb !== "" && sk.fi_t_halb != null) results.push("fail");
-  }
-
-  if (results.length === 0) return "offen";
-  if (results.includes("fail")) return "fail";
-  return "ok";
-}
-
-function risoMin(sk) {
-  const vals = [sk.riso_l1_pe, sk.riso_l2_pe, sk.riso_l3_pe, sk.riso_n_pe]
-    .filter(v => v !== "")
-    .map(v => parseFloat(String(v).replace(",", ".")))
-    .filter(n => !isNaN(n));
-  if (!vals.length) return "";
-  return Math.min(...vals).toFixed(2);
-}
 
 // ── Stammdaten ────────────────────────────────────────────────────────────────
 const mkStromkreis = () => ({
@@ -594,8 +546,6 @@ function FortschrittsRing({ gemessen, gesamt, size = 48 }) {
 function ProtokollEditor({ protokoll, onSave, onBack, config }) {
   const [p, setP] = useState(protokoll);
   const [expanded, setExpanded] = useState(new Set());
-  const pRef = useRef(p);
-  pRef.current = p;
 
   function setField(key, val) { setP(x => ({ ...x, [key]: val })); }
 
@@ -623,12 +573,12 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
     function onKey(e) {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        onSave(pRef.current);
+        onSave(p);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onSave]);
+  }, [onSave, p]);
 
   const bestanden = p.stromkreise.every(s => evalStromkreis(s) !== "fail");
   const hatMessungen = p.stromkreise.some(s => evalStromkreis(s) !== "offen");
@@ -817,6 +767,10 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
   );
 }
 
+// ── Datum-Konstanten (einmal pro Seitenaufruf berechnet) ──────────────────────
+const DATUM_HEUTE = new Date().toISOString().slice(0, 10);
+const DATUM_IN30  = new Date(+new Date() + 30 * 864e5).toISOString().slice(0, 10);
+
 // ── Protokoll-Liste ───────────────────────────────────────────────────────────
 function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync, config }) {
   const [showInfo, setShowInfo] = useState(false);
@@ -892,10 +846,8 @@ function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync,
             const hatFehler = statuses.includes("fail");
             const alleOk = statuses.length > 0 && statuses.every(s => s === "ok");
             const gesamt = hatFehler ? "fail" : alleOk ? "ok" : "offen";
-            const heute = new Date().toISOString().slice(0, 10);
-            const in30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
-            const istAbgelaufen = p.naechste_pruefung && p.naechste_pruefung < heute;
-            const istBaldFaellig = p.naechste_pruefung && !istAbgelaufen && p.naechste_pruefung <= in30;
+            const istAbgelaufen = p.naechste_pruefung && p.naechste_pruefung < DATUM_HEUTE;
+            const istBaldFaellig = p.naechste_pruefung && !istAbgelaufen && p.naechste_pruefung <= DATUM_IN30;
 
             return (
               <div
@@ -972,8 +924,8 @@ export default function Pruefprotokoll({ config = {} }) {
       .then(data => {
         if (data) { setProtokolleLive(data); save(data); setDbSync(true); }
       })
-      .catch(() => {});
-  }, []);
+      .catch(e => addToast("Datenbank: " + supabaseFehlermeldung(e), "error"));
+  }, [addToast]);
 
   function setProtokolle(fn) {
     setProtokolleLive(prev => {
@@ -1004,7 +956,7 @@ export default function Pruefprotokoll({ config = {} }) {
         setProtokolle(prev => prev.map(x => x.id === p.id ? { ...x, db_id: saved.db_id } : x));
       }
     } catch (e) {
-      addToast("Datenbank-Sync fehlgeschlagen: " + e.message, "error");
+      addToast("Datenbank: " + supabaseFehlermeldung(e), "error");
     }
   }
 
@@ -1013,7 +965,7 @@ export default function Pruefprotokoll({ config = {} }) {
     setProtokolle(prev => prev.filter(x => x.id !== id));
     addToast("Protokoll gelöscht", "error");
     if (proto?.db_id) {
-      try { await deleteProtokollDB(proto.db_id); } catch (_) {}
+      try { await deleteProtokollDB(proto.db_id); } catch { /* fire-and-forget */ }
     }
   }
 

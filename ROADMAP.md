@@ -109,11 +109,11 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 
 ## Technische Schulden
 
-- `Verteilerplaner.jsx` ist mit ~3000 Zeilen sehr groß → schrittweise in kleinere Komponenten aufteilen (`Step1`, `Step2`, `PlanView` …)
+- `Verteilerplaner.jsx` ist mit ~3000 Zeilen sehr groß → schrittweise in kleinere Komponenten aufteilen (`Step1`, `Step2`, `PlanView` …). Nächster Schritt: React Context einführen damit Props nicht so tief weitergegeben werden müssen.
 - ✅ ~~`uid()` in jeder Datei dupliziert~~ — Umgesetzt: `src/lib/utils.js` zentralisiert
-- ESLint-Fehler bereinigen — leere `catch`-Blöcke, ungenutzte Variablen
-- Tests — zumindest Unit-Tests für VDE-Grenzwertbewertung im Prüfprotokoll
-- Fehlerbehandlung — Supabase-Fehler verständlicher anzeigen (z.B. "Tabelle fehlt → SQL-Migration nötig")
+- ✅ ~~ESLint-Fehler bereinigen~~ — Umgesetzt: alle 21 Fehler behoben (leere catch, ungenutzte Variablen, setState in Effects, Ref-Updates in Render, impure Functions, Fast-Refresh)
+- ✅ ~~Tests — zumindest Unit-Tests für VDE-Grenzwertbewertung im Prüfprotokoll~~ — Umgesetzt: 26 Tests in `src/lib/__tests__/vde.test.js` (vitest), VDE-Logik in `src/lib/vde.js` ausgelagert
+- ✅ ~~Fehlerbehandlung — Supabase-Fehler verständlicher anzeigen~~ — Umgesetzt: `supabaseFehlermeldung()` in `src/lib/supabase.js`, erkennt fehlende Tabellen, abgelaufene JWT, Netzwerkfehler, RLS-Probleme
 
 ---
 

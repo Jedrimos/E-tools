@@ -164,7 +164,7 @@ function klemmenFuerKabel(adern) {
   return { mitPE:1, ohnePE:Math.floor((a-3)/2) };
 }
 
-function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherungen=[], mitNBruecke=false) {
+function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherungen=[]) {
   if (!plan) return [];
   const items={};
   const add=(key,label,menge,kat)=>{ if(!items[key])items[key]={label,menge:0,kat}; items[key].menge+=menge; };

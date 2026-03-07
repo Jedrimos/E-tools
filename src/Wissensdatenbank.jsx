@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import Toast, { useToasts } from "./components/Toast.jsx";
+import Toast from "./components/Toast.jsx";
+import { useToasts } from "./lib/useToasts.js";
 import { loadWissenDB, saveArtikelDB, deleteArtikelDB } from "./lib/db_wissen.js";
+import { supabaseFehlermeldung } from "./lib/supabase.js";
 import { isSupabaseConfigured } from "./lib/supabase.js";
 import { uid } from "./lib/utils.js";
 
@@ -354,7 +356,7 @@ function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", lineHeight: 1.4 }}>{a.titel}</div>
               {a.inhalt && (
                 <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>
-                  {a.inhalt.replace(/[#*`>\-]/g, "").slice(0, 160)}
+                  {a.inhalt.replace(/[#*`>-]/g, "").slice(0, 160)}
                 </div>
               )}
               {(a.tags || []).length > 0 && (
@@ -389,8 +391,8 @@ export default function Wissensdatenbank({ config = {} }) {
       .then(data => {
         if (data) { setArtikelLive(data); save(data); setDbSync(true); }
       })
-      .catch(() => {});
-  }, []);
+      .catch(e => addToast("Datenbank: " + supabaseFehlermeldung(e), "error"));
+  }, [addToast]);
 
   function setArtikel(fn) {
     setArtikelLive(prev => {
@@ -430,7 +432,7 @@ export default function Wissensdatenbank({ config = {} }) {
     addToast("Artikel gelöscht", "error");
     setAnsicht({ typ: "liste" });
     if (a?.db_id) {
-      try { await deleteArtikelDB(a.db_id); } catch (_) {}
+      try { await deleteArtikelDB(a.db_id); } catch { /* fire-and-forget */ }
     }
   }
 
