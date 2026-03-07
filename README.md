@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.3.5-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.3.6-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -27,6 +27,19 @@ Professionelle Planung und Dokumentation von Elektroverteiler-Belegungen.
 - **Schritt 4 – FI-Konfiguration:** FI-Schutzschalter (RCD) nach Bemessungsstrom, Typ (AC/A/F/B), Fehlerstrom und Polzahl konfigurieren.
 - **Schritt 5 – Belegungsplan:** Visuelle und tabellarische Ansicht, Klemmenleisten-Visualisierung, Stückliste, Beschriftungsplan.
 
+**Klemmenleiste (Schritt 5 → Tab "Klemmenleiste"):**
+- Jede FI-Gruppe bekommt eine Klemmleisten-Nummer (X1, X2, …); Klemmen fortlaufend X1.1, X1.2, …
+- Labels erscheinen unter jeder Klemme und im Beschriftungsplan neben der Sicherungs-Bezeichnung
+- FILS-Gruppen erhalten die nächste X-Nummer nach den FI-Gruppen
+- **Querverbinder-Visualisierung:** L-QV und N-QV Brücken-Overlay über den Klemmen; Clip-Pins (abzwicken) korrekt berechnet
+- **FILS-Querverbinder:** L-QV + N-QV für die 3-pol Klemme; bei 5×-Kabeln zusätzlich LL-QV (L2/L3)
+- **N-Schiene:** Optional zuschaltbar — visualisiert die Verbindung von N-Einspeisung bis N-Endklemme inkl. Länge in mm
+- Querverbinder-Stückliste: zeigt alle benötigten QV-Typen mit Port-Anzahl, Clip-Pins und Beschriftung
+
+**Projektstand speichern:**
+- Beim Speichern werden jetzt auch Schritt, aktiver Tab, alle Toggles (RK, QV, N-Brücke, KNX) und der generierte Plan mitgespeichert
+- Beim Laden öffnet sich das Projekt genau dort, wo man aufgehört hat
+
 ---
 
 ### ⏱ Stundenbuch
@@ -43,6 +56,7 @@ Einfache Zeiterfassung für Elektriker und Monteure.
 - CSV-Export als Stundennachweis (mit Firmenname)
 - Projekte/Baustellen per Autocomplete
 - Optionale Synchronisierung mit Supabase
+- **Mobiloptimiert:** Eintrags-Karten responsives 2-Spalten-Layout auf kleinen Bildschirmen
 
 ---
 
@@ -85,6 +99,7 @@ VDE-konforme Messprotokollierung für Erst- und Wiederholungsprüfungen nach VDE
 - **PDF-Export:** Professionelles A4-Prüfprotokoll als PDF (DIN VDE 0100-600), lazy-geladen — direkt aus der Liste oder dem Editor
 - Drucken via `window.print()` + Print-CSS
 - Optionale Synchronisierung mit Supabase
+- **Mobiloptimiert:** Stromkreis-Tabelle horizontal scrollbar, Formulare 2-spaltig, Header-Buttons wrappend
 
 ---
 

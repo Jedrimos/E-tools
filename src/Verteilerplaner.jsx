@@ -1630,7 +1630,7 @@ const stueckliste = (() => {
             <div className="header-logo-text">
               <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>Verteilerplaner</div>
             </div>
-            <span className="header-version" style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3</span>
+            <span className="header-version" style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3.6</span>
           </div>
         </div>
 

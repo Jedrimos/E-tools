@@ -20,6 +20,9 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ### ⚡ Verteilerplaner
 - ✅ ~~**Reserveplatz-Markierung**~~ — Umgesetzt: Reserve-Toggle an Sicherungen, Stückliste
 - ✅ ~~**Projekt-Suche**~~ — Umgesetzt: Suchfeld in beiden Lade-Dialogen
+- ✅ ~~**Klemmenbezeichnungen (X1.n)**~~ — Umgesetzt: Strip-Label X1/X2 auf PE-Einspeisung, fortlaufende Klemmennummern X1.1/X1.2 in Visualisierung und Beschriftungsplan
+- ✅ ~~**Projektstand persistieren**~~ — Umgesetzt: Schritt, Tab, Toggles und generierter Plan werden beim Speichern mitgesichert und beim Laden wiederhergestellt
+- ✅ ~~**FILS Querverbinder vollständig**~~ — Umgesetzt: L-QV + N-QV für 3-pol Klemme, LL-QV für 5×-Kabel
 
 ### 🔗 App-übergreifend
 - ✅ ~~**Daten-Backup / Export**~~ — Umgesetzt

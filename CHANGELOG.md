@@ -6,6 +6,44 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.6] – 2026-03-07
+
+### ✨ Neu
+
+**Verteilerplaner — Klemmenbezeichnungen**
+- Jede FI-Gruppe (Q1, Q2, …) bekommt eine Klemmleisten-Nummer: X1, X2, …
+- Die PE-Einspeisung jeder Klemmleiste trägt das Strip-Label (z.B. "X1")
+- Jede Reihenklemme (rk_mit_pe, rk_ohne_pe, rk_n_fils) wird fortlaufend nummeriert: X1.1, X1.2, X1.3 …
+- FILS-Gruppen erhalten die nächste verfügbare Nummer nach den FI-Gruppen
+- Labels erscheinen unter jeder Klemme in der Klemmenleisten-Visualisierung
+- Im Beschriftungsplan: Q-Zeile zeigt "Q1 X1", LS-Zeile zeigt "1F1 / X1.1" (oder X1.2–X1.4 bei mehreren Klemmen)
+
+**Verteilerplaner — FILS Querverbinder komplett**
+- L-QV + N-QV für die L- und N-Seite der 3-pol rk_n_fils Klemme (beide Brücken benötigt)
+- Bei 5×-Kabeln in FILS: zusätzlich LL-QV für rk_ohne_pe (L2+L3)
+- QV-Overlay jetzt **über** den Klemmen dargestellt (physikalisch korrekt: QV wird von oben aufgesteckt)
+
+**Verteilerplaner — Projektstand persistieren**
+- Beim Speichern werden jetzt mitgespeichert: aktueller Schritt, aktiver Tab, Plantyp (visuell/tabelle), alle Toggles (RK, QV, N-Brücke, KNX) sowie der generierte Belegungsplan
+- Beim Laden eines Projekts öffnet die App direkt auf dem zuletzt genutzten Schritt / Tab — kein manuelles Weiterklicken mehr nötig
+
+**Mobile Responsiveness — alle Tools**
+- *Verteilerplaner:* Header auf Mobilgeräten zweizeilig: Zeile 1 mit Logo-Icon + Laden/Speichern, Zeile 2 mit Step-Navigation (horizontal scrollbar). Logo-Text, Version-Badge, Foto/Einstellungen/Info-Buttons auf kleinen Screens ausgeblendet.
+- *Verteilerplaner:* Redundanter Step-Fortschrittsbalken in der Hauptansicht auf Mobile ausgeblendet (Header-Nav übernimmt)
+- *Stundenbuch:* Eintrags-Karten responsives 2-Spalten-Grid auf < 600 px; Pause-Spalte automatisch ausgeblendet
+- *Prüfprotokoll:* Stromkreis-Tabelle mit horizontalem Scroll auf Mobile; StromkreisForm 2-spaltig; Anlagendaten-Grid 2-spaltig; Header-Aktionsbuttons wrappen in neue Zeile
+
+**Todo.md**
+- Neue Datei `Todo.md` im Repository: zentrale Aufgabenliste für Ideen die während der Arbeit einfallen; aus `origin/main` übernommen
+
+### 🐛 Bugfixes
+
+- Verteilerplaner: `buildSeq`-Kontext in der Beschriftungs-Klemmen-Zählung korrekt (FILS-Gruppe hatte fehlende `xLabels`-Definition → `?.get()` als sicherer Fallback)
+- Prüfprotokoll: FL-Komponente akzeptiert kein `className` — 3-polig-Feld korrekt in eigenen `div` gewrappt
+- Verteilerplaner: Step-2-Buttons overflow auf schmalen Screens behoben (flexWrap + whiteSpace:nowrap)
+
+---
+
 ## [2026.3.5] – 2026-03-06
 
 ### ✨ Neu
