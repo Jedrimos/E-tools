@@ -235,7 +235,7 @@ async function exportPDF(p, config = {}) {
   }
 
   const datei = `Pruefprotokoll_${p.anlagenstandort || p.auftraggeber || "Protokoll"}_${p.datum || "kein-Datum"}.pdf`
-    .replace(/[^a-zA-Z0-9_\-\.äöüÄÖÜß]/g, "_");
+    .replace(/[^a-zA-Z0-9_\-.äöüÄÖÜß]/g, "_");
   doc.save(datei);
 }
 

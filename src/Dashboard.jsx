@@ -159,20 +159,17 @@ export default function Dashboard() {
   const [config, setConfig] = useState(loadConfig);
   const [showConfig, setShowConfig] = useState(false);
   const [configDraft, setConfigDraft] = useState({});
-  const [ablauf, setAblauf] = useState({ abgelaufen: 0, baldFaellig: 0 });
-  const [dbStatus, setDbStatus] = useState("unbekannt"); // "ok" | "fehler" | "unbekannt" | "nicht-konfiguriert"
+  const [ablauf, setAblauf] = useState(ladeAblaufInfo);
+  const [dbStatus, setDbStatus] = useState(() => isSupabaseConfigured() ? "unbekannt" : "nicht-konfiguriert");
   const [importMsg, setImportMsg] = useState("");
   const [stats, setStats] = useState(ladeLiveStats);
   const [zuletzt, setZuletzt] = useState(ladeZuletzt);
 
   useEffect(() => { saveConfig(config); }, [config]);
 
-  // Ablauf-Info + Stats laden beim Start und wenn zurück zum Dashboard
-  useEffect(() => { setAblauf(ladeAblaufInfo()); setStats(ladeLiveStats()); }, []);
-
   // Supabase-Ping
   useEffect(() => {
-    if (!isSupabaseConfigured()) { setDbStatus("nicht-konfiguriert"); return; }
+    if (!isSupabaseConfigured()) return;
     supabase.from("projekte").select("id", { head: true, count: "exact" }).then(({ error }) => {
       setDbStatus(error ? "fehler" : "ok");
     }).catch(() => setDbStatus("fehler"));
