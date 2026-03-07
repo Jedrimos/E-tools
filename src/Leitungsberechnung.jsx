@@ -517,7 +517,249 @@ function TabKompensation() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Tab 5: Formelsammlung
+// Tab 5: Abstandsrechner
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Befestigungsabstände nach VDE 0100-520 / DIN VDE 0298
+const BEFESTIGUNG_REF = [
+  { typ: "NYM-J (Mantelleitung)",        horiz: 25,  vert: 40,  norm: "VDE 0100-520" },
+  { typ: "NYY / NAYY (Erdkabel)",        horiz: 40,  vert: 80,  norm: "VDE 0100-520" },
+  { typ: "H07V-K (Aderleitung, flex.)",  horiz: 25,  vert: 40,  norm: "VDE 0298-4"   },
+  { typ: "Rohr starr (PVC/Metall)",      horiz: 80,  vert: 100, norm: "DIN EN 61386"  },
+  { typ: "Rohr flexibel (Wellrohr)",     horiz: 50,  vert: 80,  norm: "DIN EN 61386"  },
+  { typ: "Kabelkanal (Installationskanal)", horiz: 80, vert: 80, norm: "DIN EN 50085" },
+  { typ: "Datenkabel (CAT, LWL)",        horiz: 40,  vert: 60,  norm: "VDE 0800"      },
+];
+
+function berechneAbstand({ laenge, anzahl, modus, wandabstand }) {
+  const L = parseFloat(laenge);
+  const N = parseInt(anzahl, 10);
+  const d = parseFloat(wandabstand) || 0;
+  if (!L || L <= 0 || !N || N < 1) return null;
+
+  let abstand, wandOffset, positionen;
+
+  if (modus === "sym") {
+    // Gleichmäßig inkl. Randabstand: spacing = L / (N+1)
+    abstand = L / (N + 1);
+    wandOffset = abstand;
+    positionen = Array.from({ length: N }, (_, i) => wandOffset + i * abstand);
+  } else if (modus === "rand") {
+    // Wand zu Wand: erstes und letztes Objekt an der Wand
+    if (N < 2) {
+      abstand = 0;
+      wandOffset = 0;
+      positionen = [0];
+    } else {
+      abstand = L / (N - 1);
+      wandOffset = 0;
+      positionen = Array.from({ length: N }, (_, i) => i * abstand);
+    }
+  } else {
+    // Freier Wandabstand: Objekte mit d Abstand von Wand, Rest gleichmäßig verteilt
+    if (d * 2 >= L) return null;
+    if (N === 1) {
+      positionen = [L / 2];
+      abstand = 0;
+      wandOffset = d;
+    } else {
+      abstand = (L - 2 * d) / (N - 1);
+      wandOffset = d;
+      positionen = Array.from({ length: N }, (_, i) => d + i * abstand);
+    }
+  }
+
+  return { abstand, wandOffset, positionen, L, N };
+}
+
+function AbstandSVG({ erg, einheit }) {
+  if (!erg) return null;
+  const { positionen, L } = erg;
+  const W = 560, H = 110, pad = 30;
+  const scale = (W - 2 * pad) / L;
+
+  const x = p => pad + p * scale;
+  const BLAU = AKZENT;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: W, display: "block", overflow: "visible" }}>
+      {/* Wände */}
+      <line x1={pad} y1={30} x2={pad} y2={80} stroke="var(--text2)" strokeWidth="3" />
+      <line x1={W - pad} y1={30} x2={W - pad} y2={80} stroke="var(--text2)" strokeWidth="3" />
+      {/* Boden-Linie */}
+      <line x1={pad} y1={55} x2={W - pad} y2={55} stroke="var(--border)" strokeWidth="1.5" />
+      {/* Gesamt-Länge-Label */}
+      <text x={W / 2} y={100} textAnchor="middle" fontSize="11" fill="var(--text3)">
+        Gesamt: {L} {einheit}
+      </text>
+
+      {/* Objekte */}
+      {positionen.map((p, i) => {
+        const cx = x(p);
+        const isFirst = i === 0, isLast = i === positionen.length - 1;
+        return (
+          <g key={i}>
+            <circle cx={cx} cy={55} r={10} fill={BLAU} opacity="0.9" />
+            <text x={cx} y={59} textAnchor="middle" fontSize="10" fontWeight="bold" fill="#000">{i + 1}</text>
+            {/* Wandabstand erstes/letztes */}
+            {isFirst && p > 0.01 && (
+              <>
+                <line x1={pad} y1={20} x2={cx} y2={20} stroke={BLAU} strokeWidth="1" markerEnd="url(#arr)" markerStart="url(#arr)" />
+                <text x={(pad + cx) / 2} y={15} textAnchor="middle" fontSize="10" fill={BLAU}>{p.toFixed(2)} {einheit}</text>
+              </>
+            )}
+            {isLast && L - p > 0.01 && (
+              <>
+                <line x1={cx} y1={20} x2={W - pad} y2={20} stroke={BLAU} strokeWidth="1" />
+                <text x={(cx + W - pad) / 2} y={15} textAnchor="middle" fontSize="10" fill={BLAU}>{(L - p).toFixed(2)} {einheit}</text>
+              </>
+            )}
+          </g>
+        );
+      })}
+
+      {/* Abstands-Labels zwischen je zwei Objekten */}
+      {positionen.length > 1 && positionen.slice(0, -1).map((p, i) => {
+        const cx1 = x(p), cx2 = x(positionen[i + 1]);
+        const mid = (cx1 + cx2) / 2;
+        const d = positionen[i + 1] - p;
+        return (
+          <g key={`sp${i}`}>
+            <line x1={cx1 + 11} y1={70} x2={cx2 - 11} y2={70} stroke="var(--text3)" strokeWidth="1" strokeDasharray="3,2" />
+            <text x={mid} y={84} textAnchor="middle" fontSize="10" fill="var(--text2)">{d.toFixed(2)} {einheit}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function TabAbstandsrechner() {
+  const [laenge,      setLaenge]      = useState("");
+  const [anzahl,      setAnzahl]      = useState("3");
+  const [modus,       setModus]       = useState("sym");
+  const [wandabstand, setWandabstand] = useState("0.5");
+  const [einheit,     setEinheit]     = useState("m");
+  const [objekt,      setObjekt]      = useState("Lampe");
+
+  const erg = berechneAbstand({ laenge, anzahl, modus, wandabstand });
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16 }}>
+        Gleichmäßige Verteilung von Objekten auf einer Strecke (Lampen, Rohrschellen, Steckdosen …)
+      </div>
+
+      {/* Eingaben */}
+      <div style={{ ...card(), marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
+          <NumInput label="Gesamtlänge / Raummaß" unit={einheit} value={laenge} onChange={setLaenge} placeholder="z.B. 5.4" />
+          <NumInput label="Anzahl Objekte" unit="Stück" value={anzahl} onChange={setAnzahl} placeholder="z.B. 3" step="1" min="1" />
+          <SelectInput label="Einheit" value={einheit} onChange={setEinheit} options={[{ wert: "m", label: "Meter (m)" }, { wert: "cm", label: "Zentimeter (cm)" }]} />
+          <SelectInput label="Verteilungs-Modus" value={modus} onChange={setModus} options={[
+            { wert: "sym",  label: "Gleichmäßig inkl. Randabstand" },
+            { wert: "rand", label: "Wand zu Wand (erstes/letztes an Wand)" },
+            { wert: "frei", label: "Frei — Wandabstand vorgeben" },
+          ]} />
+          {modus === "frei" && (
+            <NumInput label="Wandabstand" unit={einheit} value={wandabstand} onChange={setWandabstand} placeholder="z.B. 0.5" />
+          )}
+          <SelectInput label="Objekt-Bezeichnung" value={objekt} onChange={setObjekt} options={["Lampe", "Rohrschelle", "Steckdose", "Leuchte", "Befestigung", "Dübel"].map(o => ({ wert: o, label: o }))} />
+        </div>
+      </div>
+
+      {/* Ergebnis */}
+      {!erg && (
+        <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--text3)", fontSize: 13 }}>
+          Gesamtlänge und Anzahl eingeben
+        </div>
+      )}
+
+      {erg && (
+        <>
+          {/* Kennwerte */}
+          <div style={resultBox()}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
+              {[
+                { label: `Abstand zwischen ${objekt}n`, value: erg.abstand > 0 ? erg.abstand.toFixed(3) : "–", unit: einheit, color: AKZENT },
+                { label: "Wandabstand (Rand)", value: erg.wandOffset > 0 ? erg.wandOffset.toFixed(3) : "0", unit: einheit, color: "var(--text2)" },
+                { label: "Anzahl Objekte", value: erg.N, unit: "Stk.", color: "var(--text2)" },
+              ].map(({ label, value, unit, color }) => (
+                <div key={label} style={{ textAlign: "center", padding: "8px 0" }}>
+                  <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: "var(--mono)" }}>
+                    {value} <span style={{ fontSize: 12, fontWeight: 400 }}>{unit}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* SVG-Visualisierung */}
+            <div style={{ background: "var(--bg)", borderRadius: 10, padding: "16px 8px", marginBottom: 12 }}>
+              <AbstandSVG erg={erg} einheit={einheit} />
+            </div>
+
+            {/* Positions-Liste */}
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+              <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Positionen ab linker Wand
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {erg.positionen.map((p, i) => (
+                  <div key={i} style={{
+                    background: "var(--bg3)", border: `1px solid ${AKZENT}40`, borderRadius: 8,
+                    padding: "5px 12px", fontSize: 13,
+                  }}>
+                    <span style={{ color: "var(--text3)", fontSize: 11 }}>{objekt} {i + 1}: </span>
+                    <span style={{ fontWeight: 700, color: AKZENT, fontFamily: "var(--mono)" }}>{p.toFixed(3)} {einheit}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Modi-Erklärung */}
+          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 20 }}>
+            {modus === "sym" && `Abstand = Gesamtlänge / (Anzahl + 1) = ${laenge} / (${anzahl} + 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
+            {modus === "rand" && parseInt(anzahl) >= 2 && `Abstand = Gesamtlänge / (Anzahl − 1) = ${laenge} / (${anzahl} − 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
+            {modus === "frei" && `Abstand = (Gesamtlänge − 2 × Wandabstand) / (Anzahl − 1) = (${laenge} − 2 × ${wandabstand}) / (${anzahl} − 1) = ${erg.abstand.toFixed(3)} ${einheit}`}
+          </div>
+        </>
+      )}
+
+      {/* Referenztabelle Befestigungsabstände */}
+      <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", fontSize: 13, fontWeight: 700 }}>
+          Referenz: Max. Befestigungsabstände nach VDE / DIN
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "var(--bg3)" }}>
+                {["Leitungstyp", "Horizontal (max.)", "Vertikal (max.)", "Norm"].map(h => (
+                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 700, color: "var(--text3)", fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {BEFESTIGUNG_REF.map((row, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <td style={{ padding: "10px 16px" }}>{row.typ}</td>
+                  <td style={{ padding: "10px 16px", fontWeight: 700, color: AKZENT, fontFamily: "var(--mono)" }}>{row.horiz} cm</td>
+                  <td style={{ padding: "10px 16px", fontWeight: 700, color: "var(--green)", fontFamily: "var(--mono)" }}>{row.vert} cm</td>
+                  <td style={{ padding: "10px 16px", color: "var(--text3)", fontSize: 12 }}>{row.norm}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Tab 6: Formelsammlung
 // ══════════════════════════════════════════════════════════════════════════════
 
 const FORMELN = [
@@ -661,11 +903,12 @@ function TabFormeln() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 const TABS = [
-  { id: "ltg",    label: "Leitungsberechnung", icon: "📏" },
-  { id: "power",  label: "Strom & Leistung",   icon: "⚡" },
-  { id: "motor",  label: "Motorstrom",         icon: "🔁" },
-  { id: "komp",   label: "cos φ Korrektur",    icon: "🔋" },
-  { id: "formel", label: "Formelsammlung",     icon: "📐" },
+  { id: "ltg",      label: "Leitungsberechnung", icon: "📏" },
+  { id: "power",    label: "Strom & Leistung",   icon: "⚡" },
+  { id: "motor",    label: "Motorstrom",         icon: "🔁" },
+  { id: "komp",     label: "cos φ Korrektur",    icon: "🔋" },
+  { id: "abstand",  label: "Abstandsrechner",    icon: "📐" },
+  { id: "formel",   label: "Formelsammlung",     icon: "📖" },
 ];
 
 export default function Leitungsberechnung() {
@@ -705,11 +948,12 @@ export default function Leitungsberechnung() {
       </div>
 
       {/* Tab-Inhalt */}
-      {activeTab === "ltg"    && <TabLeitungsberechnung />}
-      {activeTab === "power"  && <TabStromLeistung />}
-      {activeTab === "motor"  && <TabMotor />}
-      {activeTab === "komp"   && <TabKompensation />}
-      {activeTab === "formel" && <TabFormeln />}
+      {activeTab === "ltg"     && <TabLeitungsberechnung />}
+      {activeTab === "power"   && <TabStromLeistung />}
+      {activeTab === "motor"   && <TabMotor />}
+      {activeTab === "komp"    && <TabKompensation />}
+      {activeTab === "abstand" && <TabAbstandsrechner />}
+      {activeTab === "formel"  && <TabFormeln />}
     </div>
   );
 }

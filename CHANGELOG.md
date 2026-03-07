@@ -6,6 +6,20 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.6] – 2026-03-07
+
+### ✨ Neu
+
+**Elektrorechner — neuer Tab Abstandsrechner**
+- Gleichmäßige Verteilung von Objekten (Lampen, Rohrschellen, Steckdosen …) auf einer Strecke
+- 3 Modi: Gleichmäßig inkl. Randabstand · Wand-zu-Wand · Frei (Wandabstand vorgeben)
+- SVG-Visualisierung mit Positions-Nummern, Abstands-Labels und Wandabstand-Markierung
+- Positionsliste aller Objekte als „Abstand ab linker Wand"
+- Referenztabelle Max. Befestigungsabstände nach VDE / DIN (NYM, NYY, H07V-K, Rohre, Kabelkanal, Datenkabel)
+- Einheit wählbar: Meter oder Zentimeter
+
+---
+
 ## [2026.3.5] – 2026-03-07
 
 ### ✨ Neu / Geändert
