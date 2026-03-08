@@ -2,7 +2,7 @@
  * KNX-Planer – Gruppenadress-Planer, Raumplan, Inbetriebnahme-Checkliste, KNX-Rechner
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ladeGA, speichereGA, loescheGA,
   ladeRaeume, speichereRaum, loescheRaum,
@@ -72,7 +72,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function csvExport(gaListe, raeume) {
   const raumMap = Object.fromEntries(raeume.map(r => [r.id, r.name]));
   const header = "Gruppenadresse;Name;DPT;Funktion;Raum;Dezimal;Notiz";
-  const rows = gaListe
+  const rows = [...gaListe]  // shallow copy to avoid mutating React state
     .sort((a, b) => gaInt(a.hauptgruppe, a.mittelgruppe, a.untergruppe) - gaInt(b.hauptgruppe, b.mittelgruppe, b.untergruppe))
     .map(ga => [
       gaStr(ga.hauptgruppe, ga.mittelgruppe, ga.untergruppe),
@@ -82,8 +82,12 @@ function csvExport(gaListe, raeume) {
       ga.notiz || "",
     ].join(";"));
   const blob = new Blob([header + "\n" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-  a.download = `knx_gruppen_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `knx_gruppen_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Chip / Badge ─────────────────────────────────────────────────────────────
@@ -99,12 +103,16 @@ function FunkBadge({ funktion, small }) {
 }
 
 // ── GA-Formular ──────────────────────────────────────────────────────────────
+const GA_FORM_DEFAULT = { hauptgruppe: 1, mittelgruppe: 0, untergruppe: 1, name: "", funktion: "Licht", dpt: "1.001", raum_id: "", notiz: "" };
+
 function GAForm({ initial, raeume, onSave, onCancel }) {
-  const [form, setForm] = useState(initial || {
-    hauptgruppe: 1, mittelgruppe: 0, untergruppe: 1,
-    name: "", funktion: "Licht", dpt: "1.001", raum_id: "", notiz: "",
-  });
+  const [form, setForm] = useState(initial || GA_FORM_DEFAULT);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Sync form when switching between different GAs to edit
+  useEffect(() => {
+    setForm(initial || GA_FORM_DEFAULT);
+  }, [initial?.id]);
   const valid = form.name.trim() && form.hauptgruppe >= 0 && form.hauptgruppe <= 31
     && form.mittelgruppe >= 0 && form.mittelgruppe <= 7
     && form.untergruppe >= 0 && form.untergruppe <= 255;
@@ -193,21 +201,33 @@ function TabGA({ gaListe, raeume, onReload }) {
   const [filterHG, setFilterHG] = useState("Alle");
   const [suche, setSuche] = useState("");
 
-  const hgListe = [...new Set(gaListe.map(g => g.hauptgruppe))].sort((a, b) => a - b);
+  const hgListe = useMemo(() =>
+    [...new Set(gaListe.map(g => g.hauptgruppe))].sort((a, b) => a - b),
+    [gaListe]
+  );
 
-  const gefiltert = gaListe.filter(g => {
-    if (filterFunk !== "Alle" && g.funktion !== filterFunk) return false;
-    if (filterHG !== "Alle" && g.hauptgruppe !== Number(filterHG)) return false;
-    if (suche && !g.name.toLowerCase().includes(suche.toLowerCase())) return false;
-    return true;
-  }).sort((a, b) => gaInt(a.hauptgruppe, a.mittelgruppe, a.untergruppe) - gaInt(b.hauptgruppe, b.mittelgruppe, b.untergruppe));
+  const sucheLower = suche.toLowerCase();
+  const gefiltert = useMemo(() =>
+    gaListe.filter(g => {
+      if (filterFunk !== "Alle" && g.funktion !== filterFunk) return false;
+      if (filterHG !== "Alle" && g.hauptgruppe !== Number(filterHG)) return false;
+      if (sucheLower && !g.name.toLowerCase().includes(sucheLower)) return false;
+      return true;
+    }).sort((a, b) => gaInt(a.hauptgruppe, a.mittelgruppe, a.untergruppe) - gaInt(b.hauptgruppe, b.mittelgruppe, b.untergruppe)),
+    [gaListe, filterFunk, filterHG, sucheLower]
+  );
 
   // Gruppiert nach HG
-  const grouped = {};
-  gefiltert.forEach(g => {
-    if (!grouped[g.hauptgruppe]) grouped[g.hauptgruppe] = [];
-    grouped[g.hauptgruppe].push(g);
-  });
+  const grouped = useMemo(() => {
+    const g = {};
+    gefiltert.forEach(ga => {
+      if (!g[ga.hauptgruppe]) g[ga.hauptgruppe] = [];
+      g[ga.hauptgruppe].push(ga);
+    });
+    return g;
+  }, [gefiltert]);
+
+  const raumMap = useMemo(() => Object.fromEntries(raeume.map(r => [r.id, r])), [raeume]);
 
   async function handleSave(form) {
     await speichereGA({ ...form, id: editGA?.id || uid() });
@@ -220,8 +240,6 @@ function TabGA({ gaListe, raeume, onReload }) {
     await loescheGA(ga.id);
     onReload();
   }
-
-  const raumMap = Object.fromEntries(raeume.map(r => [r.id, r]));
 
   return (
     <div>
@@ -267,6 +285,11 @@ function TabGA({ gaListe, raeume, onReload }) {
       {gaListe.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text3)" }}>
           Noch keine Gruppenadresse angelegt. Klick auf "+ GA hinzufügen"
+        </div>
+      )}
+      {gaListe.length > 0 && gefiltert.length === 0 && (
+        <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--text3)" }}>
+          Keine Ergebnisse für den aktuellen Filter
         </div>
       )}
 
@@ -323,18 +346,21 @@ function TabRaeume({ gaListe, raeume, onReload }) {
   const gefRaeume = raeume.filter(r => r.etage === akt);
 
   async function raumSpeichern() {
+    const etage = raumForm.etage;
     await speichereRaum({ ...raumForm, id: uid(), position: raeume.length });
     setShowRaumForm(false);
     setRaumForm({ name: "", etage: "EG", typ: "Wohnzimmer" });
+    setAktEtage(etage); // jump to the new room's floor
     onReload();
   }
 
   async function raumLoeschen(id) {
     if (!confirm("Raum löschen?")) return;
-    await loescheRaum(id);
-    // GAs diesem Raum entziehen
     const betroffene = gaListe.filter(g => g.raum_id === id);
-    for (const ga of betroffene) await speichereGA({ ...ga, raum_id: "" });
+    await Promise.all([
+      loescheRaum(id),
+      ...betroffene.map(ga => speichereGA({ ...ga, raum_id: "" })),
+    ]);
     onReload();
   }
 
@@ -347,8 +373,7 @@ function TabRaeume({ gaListe, raeume, onReload }) {
     <div>
       {/* Etage-Tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-        {ETAGEN.filter(e => etagen.includes(e) || raeume.length === 0).map(e => (
-          etagen.includes(e) &&
+        {ETAGEN.filter(e => etagen.includes(e)).map(e => (
           <button key={e} onClick={() => setAktEtage(e)}
             style={{
               padding: "7px 14px", borderRadius: 20, border: `2px solid ${akt === e ? AKZENT : "var(--border)"}`,
@@ -406,24 +431,27 @@ function TabRaeume({ gaListe, raeume, onReload }) {
               </div>
 
               {/* GA-Zuweisung */}
-              {zuwOpen && (
-                <div style={{ marginBottom: 10, background: "var(--bg)", borderRadius: 8, padding: 10 }}>
-                  <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6 }}>GA zum Raum hinzufügen:</div>
-                  <div style={{ maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-                    {gaListe.filter(g => !g.raum_id).map(ga => (
-                      <button key={ga.id} onClick={() => { gaZuweisen(ga, raum.id); }}
-                        style={{ ...btnGhost({ textAlign: "left", padding: "6px 10px", fontSize: 12 }), display: "flex", gap: 8, alignItems: "center" }}>
-                        <span style={{ fontFamily: "var(--mono)", color: AKZENT }}>{gaStr(ga.hauptgruppe, ga.mittelgruppe, ga.untergruppe)}</span>
-                        <span>{ga.name}</span>
-                        <FunkBadge funktion={ga.funktion} small />
-                      </button>
-                    ))}
-                    {gaListe.filter(g => !g.raum_id).length === 0 && (
-                      <div style={{ fontSize: 12, color: "var(--text3)" }}>Alle GAs sind bereits zugewiesen</div>
-                    )}
+              {zuwOpen && (() => {
+                const unassigned = gaListe.filter(g => !g.raum_id);
+                return (
+                  <div style={{ marginBottom: 10, background: "var(--bg)", borderRadius: 8, padding: 10 }}>
+                    <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6 }}>GA zum Raum hinzufügen:</div>
+                    <div style={{ maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+                      {unassigned.map(ga => (
+                        <button key={ga.id} onClick={() => gaZuweisen(ga, raum.id)}
+                          style={{ ...btnGhost({ textAlign: "left", padding: "6px 10px", fontSize: 12 }), display: "flex", gap: 8, alignItems: "center" }}>
+                          <span style={{ fontFamily: "var(--mono)", color: AKZENT }}>{gaStr(ga.hauptgruppe, ga.mittelgruppe, ga.untergruppe)}</span>
+                          <span>{ga.name}</span>
+                          <FunkBadge funktion={ga.funktion} small />
+                        </button>
+                      ))}
+                      {unassigned.length === 0 && (
+                        <div style={{ fontSize: 12, color: "var(--text3)" }}>Alle GAs sind bereits zugewiesen</div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* GA-Chips */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -460,9 +488,11 @@ function TabCheckliste({ raeume, gaListe, checks, onReload }) {
 
   async function addVorlage(raumId, kat) {
     const items = CHECK_TEMPLATES[kat] || [];
-    for (let i = 0; i < items.length; i++) {
-      await speichereCheckItem({ id: uid(), raum_id: raumId, kategorie: kat, bezeichnung: items[i], erledigt: false, notiz: "", position: i });
-    }
+    await Promise.all(
+      items.map((bezeichnung, i) =>
+        speichereCheckItem({ id: uid(), raum_id: raumId, kategorie: kat, bezeichnung, erledigt: false, notiz: "", position: i })
+      )
+    );
     onReload();
   }
 
@@ -486,8 +516,9 @@ function TabCheckliste({ raeume, gaListe, checks, onReload }) {
   const total = checks.length, done = checks.filter(c => c.erledigt).length;
   const pct = total > 0 ? Math.round(done / total * 100) : 0;
 
-  const aktRaумId = aktRaum || raeume[0]?.id;
-  const raumChecks = checks.filter(c => c.raum_id === aktRaумId);
+  const aktRaumId = aktRaum || raeume[0]?.id;
+  const aktRaumObj = raeume.find(r => r.id === aktRaumId) || null;
+  const raumChecks = checks.filter(c => c.raum_id === aktRaumId);
   const raumDone = raumChecks.filter(c => c.erledigt).length;
 
   // Kategorien im aktuellen Raum
@@ -516,9 +547,9 @@ function TabCheckliste({ raeume, gaListe, checks, onReload }) {
           return (
             <button key={r.id} onClick={() => setAktRaum(r.id)} style={{
               padding: "8px 12px", borderRadius: 10, cursor: "pointer",
-              border: `2px solid ${aktRaумId === r.id ? AKZENT : "var(--border)"}`,
-              background: aktRaумId === r.id ? `${AKZENT}18` : "var(--bg2)",
-              color: aktRaумId === r.id ? AKZENT : "var(--text2)", textAlign: "left",
+              border: `2px solid ${aktRaumId === r.id ? AKZENT : "var(--border)"}`,
+              background: aktRaumId === r.id ? `${AKZENT}18` : "var(--bg2)",
+              color: aktRaumId === r.id ? AKZENT : "var(--text2)", textAlign: "left",
             }}>
               <div style={{ fontSize: 12, fontWeight: 700 }}>{r.name}</div>
               <div style={{ fontSize: 10, color: "var(--text3)" }}>{rd}/{rc.length} ✓</div>
@@ -528,15 +559,15 @@ function TabCheckliste({ raeume, gaListe, checks, onReload }) {
         {raeume.length === 0 && <div style={{ fontSize: 13, color: "var(--text3)" }}>Zuerst Räume im Raumplan anlegen</div>}
       </div>
 
-      {aktRaумId && raeume.find(r => r.id === aktRaумId) && (
+      {aktRaumId && aktRaumObj && (
         <div>
           {/* Raum-Header */}
           <div style={{ display: "flex", alignItems: "center", marginBottom: 14, gap: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>{raeume.find(r => r.id === aktRaумId)?.name}</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{aktRaumObj.name}</div>
             <span style={{ fontSize: 12, color: "var(--text3)" }}>{raumDone}/{raumChecks.length} erledigt</span>
             <div style={{ display: "flex", gap: 4, marginLeft: "auto", flexWrap: "wrap" }}>
               {["Licht", "Dimmen", "Jalousie", "Heizung", "Szene", "Allgemein"].map(k => (
-                <button key={k} onClick={() => addVorlage(aktRaумId, k)}
+                <button key={k} onClick={() => addVorlage(aktRaumId, k)}
                   style={btnGhost({ padding: "4px 8px", fontSize: 10 })}>
                   + {k}
                 </button>
@@ -588,7 +619,7 @@ function TabCheckliste({ raeume, gaListe, checks, onReload }) {
             <div style={{ flex: "1 1 160px" }}>
               <span style={lbl}>Eigener Prüfpunkt</span>
               <input value={neuItem} onChange={e => setNeuItem(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && addItem(aktRaумId)}
+                onKeyDown={e => e.key === "Enter" && addItem(aktRaumId)}
                 placeholder="z.B. Kurztest Taster 3" style={inp({ padding: "8px 10px" })} />
             </div>
             <div style={{ flex: "0 1 130px" }}>
@@ -597,7 +628,7 @@ function TabCheckliste({ raeume, gaListe, checks, onReload }) {
                 {["Licht", "Dimmen", "Jalousie", "Heizung", "Szene", "Allgemein"].map(k => <option key={k}>{k}</option>)}
               </select>
             </div>
-            <button onClick={() => addItem(aktRaумId)} style={btn(AKZENT, { alignSelf: "flex-end" })}>+ Hinzufügen</button>
+            <button onClick={() => addItem(aktRaumId)} style={btn(AKZENT, { alignSelf: "flex-end" })}>+ Hinzufügen</button>
           </div>
         </div>
       )}
@@ -626,9 +657,9 @@ function TabRechner({ gaListe, raeume }) {
     h: (dezVal >> 11) & 0x1F, m: (dezVal >> 8) & 0x07, u: dezVal & 0xFF
   } : null;
 
-  // Statistik
+  // Statistik — single O(n) pass instead of O(n*m)
   const totalGA = gaListe.length;
-  const byFunk = FUNKTIONEN.reduce((acc, f) => { acc[f] = gaListe.filter(g => g.funktion === f).length; return acc; }, {});
+  const byFunk = gaListe.reduce((acc, g) => { acc[g.funktion] = (acc[g.funktion] || 0) + 1; return acc; }, {});
 
   return (
     <div>
