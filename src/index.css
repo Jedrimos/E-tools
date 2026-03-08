@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* ── Design Tokens ── */
+/* ── Design Tokens – Dark Mode (Standard) ── */
 :root {
   --bg:      #111416;
   --bg2:     #181c1f;
@@ -16,6 +16,23 @@
   --text2:   #9aa3ad;
   --text3:   #5a6370;
   --mono:    'JetBrains Mono', monospace;
+}
+
+/* ── Light Mode ── */
+[data-theme="light"] {
+  --bg:      #f4f6f8;
+  --bg2:     #ffffff;
+  --bg3:     #e8ecf0;
+  --border:  #d0d7de;
+  --border2: #b8c2cc;
+  --blue:    #1a7ab5;
+  --blue2:   #1567a0;
+  --green:   #1a9e53;
+  --red:     #d63030;
+  --purple:  #7c3aed;
+  --text:    #1a1f24;
+  --text2:   #4a5568;
+  --text3:   #718096;
 }
 
 /* ── Reset ── */

@@ -195,6 +195,15 @@ export default function Dashboard() {
   const [importMsg, setImportMsg] = useState("");
   const [stats, setStats] = useState(ladeLiveStats);
   const [zuletzt, setZuletzt] = useState(ladeZuletzt);
+  const [theme, setTheme] = useState(() => localStorage.getItem("ui_theme") || "dark");
+
+  // Theme auf <html> anwenden
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("ui_theme", theme);
+  }, [theme]);
+
+  function toggleTheme() { setTheme(t => t === "dark" ? "light" : "dark"); }
 
   useEffect(() => { saveConfig(config); }, [config]);
 
@@ -251,7 +260,7 @@ export default function Dashboard() {
   if (aktiveApp === "stundenbuch") {
     return (
       <div>
-        <TopBar label="Stundenbuch" icon="⏱" farbe="#3dcc7e" onBack={zurueck} config={config} onConfig={openConfig} />
+        <TopBar label="Stundenbuch" icon="⏱" farbe="#3dcc7e" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Stundenbuch config={config} />
       </div>
@@ -261,7 +270,7 @@ export default function Dashboard() {
   if (aktiveApp === "pruefprotokoll") {
     return (
       <div>
-        <TopBar label="Prüfprotokoll" icon="📋" farbe="#f59e0b" onBack={zurueck} config={config} onConfig={openConfig} />
+        <TopBar label="Prüfprotokoll" icon="📋" farbe="#f59e0b" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Pruefprotokoll config={config} />
       </div>
@@ -271,7 +280,7 @@ export default function Dashboard() {
   if (aktiveApp === "wissen") {
     return (
       <div>
-        <TopBar label="Wissensdatenbank" icon="📚" farbe="#06b6d4" onBack={zurueck} config={config} onConfig={openConfig} />
+        <TopBar label="Wissensdatenbank" icon="📚" farbe="#06b6d4" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Wissensdatenbank config={config} />
       </div>
@@ -281,7 +290,7 @@ export default function Dashboard() {
   if (aktiveApp === "wartung") {
     return (
       <div>
-        <TopBar label="Wartungsprotokoll" icon="🔧" farbe="#a855f7" onBack={zurueck} config={config} onConfig={openConfig} />
+        <TopBar label="Wartungsprotokoll" icon="🔧" farbe="#a855f7" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Wartungsprotokoll config={config} />
       </div>
@@ -291,7 +300,7 @@ export default function Dashboard() {
   if (aktiveApp === "leitungsberechnung") {
     return (
       <div>
-        <TopBar label="Elektrorechner" icon="⚡" farbe="#f97316" onBack={zurueck} config={config} onConfig={openConfig} />
+        <TopBar label="Elektrorechner" icon="⚡" farbe="#f97316" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Leitungsberechnung />
       </div>
@@ -301,7 +310,7 @@ export default function Dashboard() {
   if (aktiveApp === "knxplaner") {
     return (
       <div>
-        <TopBar label="KNX-Planer" icon="🏡" farbe="#e11d48" onBack={zurueck} config={config} onConfig={openConfig} />
+        <TopBar label="KNX-Planer" icon="🏡" farbe="#e11d48" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <KNXPlaner />
       </div>
@@ -319,6 +328,18 @@ export default function Dashboard() {
       {showConfig && (
         <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />
       )}
+
+      {/* Theme-Toggle oben rechts */}
+      <div style={{ position: "fixed", top: 14, right: 14, zIndex: 100 }}>
+        <button onClick={toggleTheme} title={theme === "dark" ? "Light Mode" : "Dark Mode"} style={{
+          background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 20,
+          padding: "6px 12px", cursor: "pointer", fontSize: 16, color: "var(--text2)",
+          display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+        }}>
+          {theme === "dark" ? "☀" : "🌙"}
+          <span style={{ fontSize: 11, fontWeight: 600 }}>{theme === "dark" ? "Hell" : "Dunkel"}</span>
+        </button>
+      </div>
 
       {/* Logo & Titel */}
       <div style={{ textAlign: "center", marginBottom: 48 }}>
@@ -476,7 +497,7 @@ export default function Dashboard() {
 }
 
 // ── Top-Bar (wenn App geöffnet) ──
-function TopBar({ label, icon, farbe, onBack, config, onConfig }) {
+function TopBar({ label, icon, farbe, onBack, config, onConfig, theme, onToggleTheme }) {
   return (
     <div style={{
       background: "var(--bg)", borderBottom: "1px solid var(--border)",
@@ -494,6 +515,12 @@ function TopBar({ label, icon, farbe, onBack, config, onConfig }) {
       <span style={{ fontWeight: 700, color: farbe, fontSize: 15 }}>{label}</span>
       {config.firma && <span style={{ color: "var(--text3)", fontSize: 13 }}>| {config.firma}</span>}
       <div style={{ flex: 1 }} />
+      {onToggleTheme && (
+        <button onClick={onToggleTheme} title={theme === "dark" ? "Light Mode" : "Dark Mode"}
+          style={{ background: "transparent", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 15, padding: "0 4px" }}>
+          {theme === "dark" ? "☀" : "🌙"}
+        </button>
+      )}
       <button
         onClick={onConfig}
         style={{ background: "transparent", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 16 }}

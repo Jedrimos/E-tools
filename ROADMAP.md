@@ -75,7 +75,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 
 ### 🔗 App-übergreifend
 - ⚡ **PocketBase-Migration** — Datenspeicherung auf lokalen Server (PocketBase, single Go-Binary, SQLite) umstellen. Keine Supabase-Abhängigkeit mehr. Einfach auf Coolify deployen.
-- ⚡ **Dark-/Light-Mode Umschalter** — Toggle in den Einstellungen oder im Dashboard-Header.
+- ✅ ~~**Dark-/Light-Mode Umschalter**~~ — Umgesetzt: Toggle in Dashboard-Header und TopBar jeder App, CSS-Variablen für Light Mode in `index.css`, Einstellung in localStorage.
 - ⚡ **Zuletzt geöffnet: Projektname** — Statt App-Name den letzten Projektnamen/Protokoll-Namen als Direktlink anzeigen (VP + PP).
 - 🔨 **Offline-Sync-Konflikt-Behandlung** — Wenn Daten lokal und in Supabase geändert wurden, Merge-Dialog anzeigen.
 - 🔨 **Mehrsprachigkeit (DE/EN)** — Sprachdateien, Umschaltung in den Einstellungen.
@@ -87,8 +87,8 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - 🔨 **Vorlagen** — Vordefinierte Stromkreis-Listen für typische Anlagen (EFH, Gewerbeeinheit).
 
 ### ⏱ Stundenbuch
-- ⚡ **Tagesbericht per E-Mail** — Erzeugtes HTML direkt aus dem Modal als E-Mail versenden (`mailto:`).
-- ⚡ **Projektliste verwalten** — Fixe Projektliste in den Einstellungen anlegen, statt Freitexteingabe.
+- ✅ ~~**Tagesbericht per E-Mail**~~ — Umgesetzt: `mailto:`-Button im Tagesbericht-Modal mit Betreff und tabellarischem Inhalt.
+- ✅ ~~**Projektliste verwalten**~~ — Umgesetzt: Modal zum Anlegen/Löschen fester Projekte, erscheinen als Vorschläge im Formular.
 - 🔨 **Wochenübersicht** — Kompakte Ansicht mit Tages-Summen der aktuellen Woche als Tabelle.
 - 🔨 **Regiezettel** — Stunden + Materialien (aus Verteilerplaner-Stückliste) zu einfacher Regie-Rechnung kombinieren.
 
@@ -102,6 +102,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - ✅ ~~**📐 Leitungsberechnung (eigenständig)**~~ — Umgesetzt: Strom, Länge, Verlegeart, cos φ, Spannungsfall-Tabelle (VDE 0100-520).
 - 🔨 **🔌 Betriebsmittelkennzeichnung** — QR-Code-Generator, QR-Scan öffnet direkt das passende Prüfprotokoll.
 - ✅ ~~**🔧 Wartungsprotokoll**~~ — Umgesetzt: Kategorien, Intervalle, Fälligkeits-Automatik, Erledigt-Button, Supabase-Sync.
+- ✅ ~~**🏡 KNX-Planer**~~ — Umgesetzt: GA-Planer (3-Ebenen-Hierarchie, DPT, CSV-Export), Raumplan, Inbetriebnahme-Checkliste mit Vorlagen, KNX-Adressrechner + DPT-Referenz.
 - 🏗 **📦 Materialverwaltung** — Fahrzeug-/Lagerbestand, Verbrauch pro Baustelle, Mindestbestand-Warnung.
 - 🏗 **⚖ Angebotskalkulation** — Stunden + Material + Aufschlag = Angebot als PDF.
 

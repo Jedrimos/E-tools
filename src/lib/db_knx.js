@@ -45,14 +45,11 @@
  */
 
 import { supabase, isSupabaseConfigured } from "./supabase.js";
+import { uid } from "./utils.js";
 
 const LS_GA      = "knx_gruppen";
 const LS_RAEUME  = "knx_raeume";
 const LS_CHECK   = "knx_checkliste";
-
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
 
 // ── Gruppenandadressen ──────────────────────────────────────────────────────
 

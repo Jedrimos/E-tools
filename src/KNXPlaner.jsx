@@ -8,6 +8,7 @@ import {
   ladeRaeume, speichereRaum, loescheRaum,
   ladeCheckliste, speichereCheckItem, loescheCheckItem,
 } from "./lib/db_knx.js";
+import { uid } from "./lib/utils.js";
 
 const AKZENT = "#e11d48";
 
@@ -67,7 +68,6 @@ const CHECK_TEMPLATES = {
 // ── Hilfs-Funktionen ─────────────────────────────────────────────────────────
 function gaStr(h, m, u) { return `${h}/${m}/${u}`; }
 function gaInt(h, m, u) { return ((h & 0x1F) << 11) | ((m & 0x07) << 8) | (u & 0xFF); }
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 function csvExport(gaListe, raeume) {
   const raumMap = Object.fromEntries(raeume.map(r => [r.id, r.name]));

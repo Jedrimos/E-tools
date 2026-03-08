@@ -246,6 +246,11 @@ export default function Stundenbuch({ config = {} }) {
   const [showInfo, setShowInfo] = useState(false);
   const [showTagesbericht, setShowTagesbericht] = useState(false);
   const [tagesberichtDatum, setTagesberichtDatum] = useState(new Date().toISOString().slice(0,10));
+  const [gespeicherteProjekte, setGespeicherteProjekte] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("stundenbuch_projekte") || "[]"); } catch { return []; }
+  });
+  const [showProjekteMgr, setShowProjekteMgr] = useState(false);
+  const [neuProjekt, setNeuProjekt] = useState("");
   const { toasts, addToast } = useToasts();
 
   // Timer-Tick jede Sekunde
@@ -288,7 +293,26 @@ export default function Stundenbuch({ config = {} }) {
       .catch(e => addToast("Datenbank: " + supabaseFehlermeldung(e), "error"));
   }, [addToast]);
 
-  const projekte = [...new Set(eintraege.map(e => e.projekt).filter(Boolean))].sort();
+  // Projektliste: gespeicherte + auto-extrahierte aus Einträgen (ohne Duplikate)
+  const projekte = [...new Set([
+    ...gespeicherteProjekte,
+    ...eintraege.map(e => e.projekt).filter(Boolean),
+  ])].sort();
+
+  function projektHinzufuegen() {
+    const name = neuProjekt.trim();
+    if (!name || gespeicherteProjekte.includes(name)) return;
+    const neu = [...gespeicherteProjekte, name].sort();
+    setGespeicherteProjekte(neu);
+    localStorage.setItem("stundenbuch_projekte", JSON.stringify(neu));
+    setNeuProjekt("");
+  }
+
+  function projektLoeschen(p) {
+    const neu = gespeicherteProjekte.filter(x => x !== p);
+    setGespeicherteProjekte(neu);
+    localStorage.setItem("stundenbuch_projekte", JSON.stringify(neu));
+  }
 
   async function handleSave(form) {
     if (editId) {
@@ -376,6 +400,7 @@ export default function Stundenbuch({ config = {} }) {
           <div style={{ color: "var(--text3)", fontSize: 13 }}>Zeiterfassung{config.firma ? ` – ${config.firma}` : ""}{config.mitarbeiter ? ` | ${config.mitarbeiter}` : ""}</div>
         </div>
         <div style={{ flex: 1 }} />
+        <button onClick={() => setShowProjekteMgr(true)} style={btnStyle("rgba(139,92,246,0.1)", "#8b5cf6")} title="Projektliste verwalten">📋 Projekte</button>
         <button onClick={() => setShowTagesbericht(true)} style={btnStyle("rgba(245,158,11,0.1)", "#f59e0b")}>📄 Tagesbericht</button>
         <button onClick={exportCSV} style={btnStyle("rgba(33,150,201,0.1)", "var(--blue)")}>↓ CSV Export</button>
         <button onClick={() => { setEditId(null); setTimerVorbelegung(null); setShowForm(s => !s); }} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>
@@ -536,6 +561,15 @@ export default function Stundenbuch({ config = {} }) {
                   <input type="date" value={tagesberichtDatum} onChange={e=>setTagesberichtDatum(e.target.value)}
                     style={{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 10px",color:"var(--text)",fontSize:14}} />
                   <button onClick={() => window.print()} style={{...btnStyle("rgba(245,158,11,0.1)","#f59e0b"),fontSize:12}}>🖨 Drucken</button>
+                  <button onClick={() => {
+                    const betreff = `Tagesbericht ${formatDate(tagesberichtDatum)}${config.mitarbeiter ? " – " + config.mitarbeiter : ""}`;
+                    const kopf = `${config.firma || "Tagesbericht"}\nDatum: ${formatDate(tagesberichtDatum)}${config.mitarbeiter ? "\nMitarbeiter: " + config.mitarbeiter : ""}\n\n`;
+                    const zeilen = tagEintraege.map(e =>
+                      `${e.von}–${e.bis} | ${e.pause}min Pause | ${formatDuration(calcNetto(e))} | ${e.projekt || "–"} | ${e.taetigkeit || "–"}${e.notiz ? " [" + e.notiz + "]" : ""}`
+                    ).join("\n");
+                    const fuss = `\n\nGesamt: ${formatDuration(tagMinuten)} (${(tagMinuten/60).toFixed(2)} h)`;
+                    window.location.href = `mailto:?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(kopf + zeilen + fuss)}`;
+                  }} style={{...btnStyle("rgba(59,130,246,0.1)","#3b82f6"),fontSize:12}}>📧 E-Mail</button>
                 </div>
               </div>
               <div className="tagesbericht-print" style={{background:"var(--bg)",borderRadius:10,padding:20,border:"1px solid var(--border)"}}>
@@ -593,6 +627,39 @@ export default function Stundenbuch({ config = {} }) {
           </div>
         );
       })()}
+
+      {/* Projektliste-Manager */}
+      {showProjekteMgr && (
+        <div onClick={() => setShowProjekteMgr(false)} style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e => e.stopPropagation()} style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:24,maxWidth:440,width:"100%",position:"relative"}}>
+            <button onClick={() => setShowProjekteMgr(false)} style={{position:"absolute",top:12,right:12,background:"none",border:"none",color:"var(--text3)",fontSize:18,cursor:"pointer"}}>✕</button>
+            <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>📋 Projektliste</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>Projekte vorausfüllen — erscheinen als Vorschläge im Eintrag-Formular</div>
+            {/* Neue hinzufügen */}
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              <input value={neuProjekt} onChange={e => setNeuProjekt(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && projektHinzufuegen()}
+                placeholder="Projektname…"
+                style={{flex:1,background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",padding:"8px 10px",fontSize:14,outline:"none",fontFamily:"inherit"}} />
+              <button onClick={projektHinzufuegen} style={btnStyle("rgba(139,92,246,0.15)","#8b5cf6")}>+ Hinzufügen</button>
+            </div>
+            {/* Liste */}
+            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:260,overflowY:"auto"}}>
+              {projekte.length === 0 && <div style={{fontSize:13,color:"var(--text3)",textAlign:"center",padding:16}}>Noch keine Projekte</div>}
+              {projekte.map(p => (
+                <div key={p} style={{display:"flex",alignItems:"center",background:"var(--bg)",borderRadius:8,padding:"8px 12px",border:"1px solid var(--border)"}}>
+                  <span style={{flex:1,fontSize:13}}>{p}</span>
+                  {gespeicherteProjekte.includes(p) ? (
+                    <button onClick={() => projektLoeschen(p)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,padding:"0 4px"}}>✕</button>
+                  ) : (
+                    <span style={{fontSize:10,color:"var(--text3)"}}>aus Einträgen</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

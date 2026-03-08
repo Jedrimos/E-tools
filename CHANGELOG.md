@@ -6,6 +6,41 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.7] – 2026-03-08
+
+### 🐛 Bugfixes KNX-Planer
+- Kyrillisches `м` in `aktRaумId` → korrektes ASCII `aktRaumId`
+- `csvExport()` mutierte React-State direkt via `.sort()` → `[...gaListe].sort()`
+- `URL.revokeObjectURL()` nach CSV-Download ergänzt (Memory-Leak geschlossen)
+- `GAForm`: `useEffect` synct form-State wenn anderer editGA gewählt wird (stale prop)
+- Sequentielle `await`-Schleifen in `addVorlage` und `raumLoeschen` → `Promise.all`
+- Etagen-Tab-Filter: widersprüchliche Bedingung bereinigt
+- Neuer Raum wechselt jetzt automatisch auf dessen Etagen-Tab
+- Doppeltes `raeume.find()` in TabCheckliste konsolidiert
+- `byFunk`: O(n×m) doppelter Filter → O(n) Single-Pass
+- `useMemo` für `gefiltert`, `grouped`, `hgListe`, `raumMap`
+- Leer-Zustand "Keine Ergebnisse" bei aktivem Filter ergänzt
+- `uid()` in `db_knx.js` auf zentrales `src/lib/utils.js` umgestellt
+
+### ✨ Neu — Roadmap-Features
+
+**🌙 Dark-/Light-Mode Umschalter**
+- Toggle-Button in Dashboard-Header (oben rechts, dauerhaft sichtbar) und in TopBar jeder App
+- Einstellung wird in `localStorage` gespeichert und beim Start wiederhergestellt
+- Light Mode: vollständig neue CSS-Variablen in `index.css` (`[data-theme="light"]`)
+
+**📧 Tagesbericht per E-Mail (Stundenbuch)**
+- Neuer Button „📧 E-Mail" im Tagesbericht-Modal
+- Öffnet `mailto:` mit vorausgefülltem Betreff (Datum, Mitarbeiter) und tabellarischem Inhalt aller Einträge
+
+**📋 Projektliste verwalten (Stundenbuch)**
+- Neuer Button „📋 Projekte" in der Stundenbuch-Toolbar
+- Modal zum Anlegen und Löschen fester Projekte (gespeichert in `stundenbuch_projekte`)
+- Vordefinierte Projekte erscheinen als Vorschläge im Eintrag-Formular
+- Aus bestehenden Einträgen auto-extrahierte Projekte werden weiterhin angezeigt
+
+---
+
 ## [2026.3.6] – 2026-03-07
 
 ### ✨ Neu — KNX-Planer (neue App)
