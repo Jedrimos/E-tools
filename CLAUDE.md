@@ -1,4 +1,4 @@
-# Claude Code – Projektregeln für Elektronikertools
+## Claude Code – Projektregeln für Elektronikertools
 
 Diese Datei enthält verbindliche Regeln die bei jeder Änderung am Projekt einzuhalten sind.
 
@@ -14,6 +14,11 @@ Diese Datei enthält verbindliche Regeln die bei jeder Änderung am Projekt einz
 4. **`docs/` aktualisieren** — relevante Seiten in `docs/apps/` oder `docs/setup.md` anpassen
 
 Versionsschema: **`JAHR.MONAT.PATCH`** — z.B. `2026.3.4` = März 2026, fünftes Release.
+
+**Wann die Version erhöhen:**
+- ✅ Bei größeren Features oder mehreren kleinen Änderungen zusammen
+- ✅ Wenn ein sinnvoller Release-Punkt erreicht ist
+- ❌ **Nicht** bei jeder kleinen Bugfix- oder Textänderung einzeln
 
 ---
 

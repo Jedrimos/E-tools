@@ -2,6 +2,10 @@
 
 VDE-konforme Messprotokollierung für Erst- und Wiederholungsprüfungen nach VDE 0100-600.
 
+**Version:** `2026.3.3` | **Farbe:** `#f59e0b` (amber)
+
+---
+
 ## Protokoll-Kopfdaten
 
 | Feld | Beschreibung |
@@ -94,3 +98,43 @@ CREATE TABLE pruefprotokolle (
   updated_at        timestamptz DEFAULT now()
 );
 ```
+
+---
+
+## Roadmap
+
+### Kurzfristig
+- **PDF-Export / Drucken** — Druckansicht mit Briefkopf (Firma, Logo, Prüfer), sauber formatierten Tabellen und Unterschriftsfeld. `window.print()` mit CSS `@media print` als erster Schritt.
+- **Unterschriftsfeld** — Canvas-basiertes Unterschrifts-Pad, Signatur wird als Base64 im Protokoll gespeichert. Nützlich auf dem Tablet direkt vor Ort.
+- **Wiederholungsprüfungs-Erinnerung** — Protokolle mit abgelaufenem `naechste_pruefung`-Datum werden im Dashboard hervorgehoben.
+- **Messwert-Import aus Gerät** — Schnittstelle für gängige Messgeräte (Fluke, Metrel, Benning) die Ergebnisse als CSV oder Bluetooth exportieren.
+
+### Mittelfristig
+- **Normreferenzen im UI** — Kleine Info-Icons mit Tooltip der genauen Norm und Grenzwert-Begründung (z.B. "VDE 0100-600 §61.3.3" bei Riso).
+- **Prüfmittel-Verwaltung** — Welches Messgerät wurde verwendet, Kalibrierungsdatum, Seriennummer — für die Rückverfolgbarkeit.
+- **Vorlagen** — Vordefinierte Stromkreis-Listen für typische Anlagen (EFH, Gewerbeeinheit, Tiefgarage) als Schnellstart.
+
+---
+
+## Changelog
+
+### [2026.3.3] – 2026-03-05
+#### ✨ Neu
+- **Supabase-Sync** — Beim Start automatisch aus Supabase laden, nach jedem Speichern/Löschen synchronisieren. `☁ Datenbank`-Indikator wenn aktiv.
+- **Import aus Verteilerplaner** — Gespeicherte Verteiler-Projekte direkt importieren. Übernommen werden: Auftraggeber, Anlagenstandort, Prüfer sowie alle Stromkreise (Bezeichnung, Nennstrom, Sicherungstyp, 3-phasig-Flag).
+- **`src/lib/db_pruefprotokoll.js`** — DB-Layer für `pruefprotokolle`-Tabelle (CRUD + `loadProjekteForImport` mit Supabase→localStorage-Fallback).
+
+---
+
+### [2026.3.2] – 2026-03-05
+#### 🎉 Erstveröffentlichung
+- Protokoll-Liste mit Gesamtbewertung je Protokoll
+- Kopfdaten: Auftraggeber, Standort, Anlagenart, Nennspannung, Prüfer, Datum, nächste Prüfung, Auftragsnummer
+- Stromkreis-Tabelle mit aufklappbaren Detailformularen
+- PE-Durchgangswiderstand R_PE (Ω)
+- Isolationswiderstand Riso L1/L2/L3/N-PE (MΩ) — 1- und 3-phasig
+- Schleifenimpedanz Zs (Ω) + Kurzschlussstrom Ik (A)
+- FI/RCD-Prüfung: IΔN, Typ (AC/A/F/B/S), t@IΔN, t@5×IΔN, t@½×IΔN, UB
+- Automatische Ampel-Bewertung nach VDE-Grenzwerten
+- Speicherung in `localStorage`
+- Dashboard-Integration mit amber/gold Farbschema

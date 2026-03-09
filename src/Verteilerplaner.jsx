@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { isSupabaseConfigured } from "./lib/supabase.js";
 import { loadProjekteDB, saveProjektDB, deleteProjektDB } from "./lib/db.js";
 import Toast from "./components/Toast.jsx";
+import { uid } from "./lib/utils.js";
 
 // ── Stammdaten ──
 const STD_SICHERUNGEN = [
@@ -49,8 +50,8 @@ const STD_ADERN          = [3,5,7,10];
 
 
 
-const SW_COLOR_DEFAULT = { KG:"var(--purple)",EG:"var(--svp)",OG:"#34c98a",OG1:"var(--green)",OG2:"#4bc8e8",DG:"var(--red)",Außen:"#e87040",Technik:"var(--text2)" };
-const SW_COLOR_PALETTE = ["var(--purple)","var(--svp)","var(--green)","#4bc8e8","var(--red)","#e87040","#d45db5","#5bc4a8","#a0c43a","#f06060","#60a0f0","#c07a30","var(--text2)"];
+const SW_COLOR_DEFAULT = { KG:"var(--purple)",EG:"var(--blue)",OG:"#34c98a",OG1:"var(--green)",OG2:"#4bc8e8",DG:"var(--red)",Außen:"#e87040",Technik:"var(--text2)" };
+const SW_COLOR_PALETTE = ["var(--purple)","var(--blue)","var(--green)","#4bc8e8","var(--red)","#e87040","#d45db5","#5bc4a8","#a0c43a","#f06060","#60a0f0","#c07a30","var(--text2)"];
 function randSwColor(used=[]) {
   const avail = SW_COLOR_PALETTE.filter(x=>!used.includes(x));
   return avail.length ? avail[Math.floor(Math.random()*avail.length)] : SW_COLOR_PALETTE[Math.floor(Math.random()*SW_COLOR_PALETTE.length)];
@@ -59,29 +60,29 @@ const PH_COLOR = { L1:"#ff6b6b", L2:"#f5a040", L3:"#4bc8e8" };
 const PH_BG    = { L1:"rgba(255,107,107,0.12)", L2:"rgba(245,160,64,0.12)", L3:"rgba(75,200,232,0.12)" };
 const PH_BORDER= { L1:"rgba(255,107,107,0.4)",  L2:"rgba(245,160,64,0.4)",  L3:"rgba(75,200,232,0.4)" };
 
-function uid() { return Math.random().toString(36).slice(2,9); }
 
 // Kabel = einzelne Ader/Leitung ohne Sicherungs-Zuordnung
 const mkKabel = (sw="EG") => ({
   id: uid(), bezeichnung:"", raum:"", stockwerk:sw,
-  kabelTyp:"NYM-J", kabelAdern:3, kabelQs:"1.5",
+  kabelTyp:"NYM-J", kabelAdern:3, kabelQs:"1.5", kabelLaenge:"",
 });
 
 // Sicherung = Leitungsschutzschalter mit 1–n Kabeln
 const mkSicherung = () => ({
   id: uid(), kabelIds:[], sicherung:"B16", phase:"Auto", istFILS:false, dreipolig:false,
-  filsBemessung:40, filsTyp:"A", filsFehlerstrom:30, filsPole:4,
+  filsBemessung:40, filsTyp:"A", filsFehlerstrom:30, filsPole:4, istReserve:false,
 });
 
-const mkFI = () => ({ id:uid(), bemessung:40, fiTyp:"A", fehlerstrom:30, pole:4, phasenschiene:true });
+const mkFI = () => ({ id:uid(), bemessung:40, fiTyp:"A", fehlerstrom:30, pole:4, phasenschiene:true, phasenschieneN:false });
 
 // ── Planverteilung ──
 function verteile(sicherungen, fiKonfigs) {
-  const normal = sicherungen.filter(s => !s.istFILS);
-  const fils   = sicherungen.filter(s =>  s.istFILS);
+  const normal  = sicherungen.filter(s => !s.istFILS && !s.istReserve);
+  const fils    = sicherungen.filter(s =>  s.istFILS && !s.istReserve);
+  const reserve = sicherungen.filter(s => !s.istFILS &&  s.istReserve);
   const warnungen = [];
   const gruppen = fiKonfigs.map(f => ({ ...f, stromkreise:[], belegteTE:0, lastA:0, phasen:{L1:0,L2:0,L3:0} }));
-  if (!fiKonfigs.length || !normal.length) return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
+  if (!fiKonfigs.length) return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
 
   const swFIs={}, raumFIs={};
   const sortiert = [...normal].sort((a,b) => {
@@ -121,6 +122,20 @@ function verteile(sicherungen, fiKonfigs) {
     if (!raumFIs[rKey]) raumFIs[rKey]=new Set();
     raumFIs[rKey].add(ziel);
   }
+  // Reserve-Sicherungen IMMER ans Ende der Gruppen (nach allen normalen)
+  if (gruppen.length > 0) {
+    reserve.forEach(sk => {
+      const sInfo = STD_SICHERUNGEN.find(s => s.id === sk.sicherung);
+      const te = sInfo?.te || 1;
+      let ziel = gruppen.findIndex(g => fiMaxTE(g.pole) - g.belegteTE >= te);
+      if (ziel < 0) {
+        warnungen.push(`⚠️ Kein Platz für Reserveplatz "${sk.sicherung}" – TE-Limit!`);
+        ziel = gruppen.reduce((b,g,i) => g.belegteTE < gruppen[b].belegteTE ? i : b, 0);
+      }
+      gruppen[ziel].stromkreise.push({ ...sk, assignedPhase:"—", is3p:false, istReserve:true, overflow:false });
+      gruppen[ziel].belegteTE += te;
+    });
+  }
   return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
 }
 
@@ -149,7 +164,7 @@ function klemmenFuerKabel(adern) {
   return { mitPE:1, ohnePE:Math.floor((a-3)/2) };
 }
 
-function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false) {
+function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false, alleSicherungen=[]) {
   if (!plan) return [];
   const items={};
   const add=(key,label,menge,kat)=>{ if(!items[key])items[key]={label,menge:0,kat}; items[key].menge+=menge; };
@@ -160,7 +175,8 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false) {
     add(`fi_${fi.bemessung}_${fi.fiTyp}_${fi.fehlerstrom}_${fi.pole}`,`FI-Schutzschalter ${fiBeschreibung(fi)}`,1,"FI-Schutzschalter");
     // Phasenschiene
     if (fi.phasenschiene) {
-      add(`ps_${fi.pole}p`,`Phasenschiene ${fiPhasenschiene(fi.pole)}`,1,"Phasenschiene");
+      const psTypLabel = fi.pole>=4 ? (fi.phasenschieneN ? "3-phasig+N (4-Leiter)" : "3-phasig (3-Leiter)") : "1-phasig";
+      add(`ps_${fi.pole}p_${fi.phasenschieneN?"4l":"3l"}`,`Phasenschiene ${psTypLabel}`,1,"Phasenschiene");
       add("abdeckung_ps","Abdeckung Phasenschiene (links+rechts)",2,"Phasenschiene");
       const leer=Math.max(0,fiMaxTE(fi.pole)-fi.belegteTE);
       if (leer>0) add("abdeckkappe_pol","Abdeckkappe (leere Polstelle)",leer,"Phasenschiene");
@@ -174,7 +190,7 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false) {
     });
     // Reihenklemmen pro FI-Block — exakt wie buildSeq
     if (mitRK) {
-      // Immer: PE-Einspeisung + N-Einspeisung
+      // Immer: PE-Einspeisung + N-Einspeisung (Klemmsteine immer vorhanden)
       add("pe_einspeisung","PE-Einspeiseklemme (Erdung)",1,"Reihenklemmen");
       add("n_einspeisung","N-Einspeiseklemme",1,"Reihenklemmen");
       // Kabelklemmen
@@ -198,7 +214,7 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false) {
       if (hatKlemmen>0||istKNX) {
         add("abdeckkappe_orange","Abdeckkappe orange (Endschutz Klemmenblock)",1,"Reihenklemmen");
       }
-      // N-Endklemme: immer (weil N-Einspeisung immer da ist)
+      // N-Endklemme: immer (Klemmstein immer vorhanden)
       add("n_endklemme","N-Endklemme",1,"Reihenklemmen");
     }
   });
@@ -214,13 +230,14 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false) {
         `FI-Schutzschalter ${filsBem}A Typ ${filsTyp} ${filsFs}mA ${filsPole}P (FILS)`,1,"FILS");
     if (mitRK) {
       // FILS: PE-Einspeiseklemme, dann Kabelklemmen, dann Kappe wenn Klemmen vorhanden
+      // rk_n_fils = 3-pol (PE+L1+N direkt) → 1× pro Kabel, kein rk_mit_pe
       add("pe_einspeisung","PE-Einspeiseklemme (Erdung)",1,"Reihenklemmen");
       let hatKlemmen=0;
       (sk.kabelIds||[]).forEach(kid => {
         const k = alleKabel.find(x=>x.id===kid);
         if (!k) return;
-        const {mitPE,ohnePE} = klemmenFuerKabel(k.kabelAdern);
-        add("rk_mit_pe","Reihenklemme mit PE (3-polig)",mitPE,"Reihenklemmen");
+        const {ohnePE} = klemmenFuerKabel(k.kabelAdern);
+        add("rk_n_fils","N-Klemme FILS (3-polig, PE+L1+N)",1,"Reihenklemmen"); // 1× pro Kabel
         if (ohnePE>0) add("rk_ohne_pe","Reihenklemme ohne PE (2-polig)",ohnePE,"Reihenklemmen");
         hatKlemmen++;
       });
@@ -229,7 +246,12 @@ function berechneStueckliste(plan, mitRK, alleKabel, istKNX=false) {
   });
 
   Object.entries(sichCount).forEach(([key,val])=>add(key,val.label,val.count,val.kat));
-  const order=["FI-Schutzschalter","Leitungsschutzschalter","FILS","Phasenschiene","Reihenklemmen"];
+
+  // Reserveplätze
+  const reserveCount = alleSicherungen.filter(s=>s.istReserve).length;
+  if (reserveCount > 0) add("reserve_lss","Reserveplatz (leer, mit Abdeckkappe)",reserveCount,"Reserveplätze");
+
+  const order=["FI-Schutzschalter","Leitungsschutzschalter","FILS","Reserveplätze","Phasenschiene","Reihenklemmen"];
   return Object.values(items).sort((a,b)=>order.indexOf(a.kat)-order.indexOf(b.kat));
 }
 
@@ -251,18 +273,24 @@ function empfehleSicherung(kabelIds, alleKabel, dreipolig=false) {
 }
 
 // ── Persistenz ──
-function loadProjekte() { try { return JSON.parse(localStorage.getItem("svp_projekte")||"[]"); } catch { return []; } }
-function saveProjekte(p) { localStorage.setItem("svp_projekte", JSON.stringify(p)); }
+// Migration: alte svp_* Keys → neue vp_* Keys (einmalig)
+(function migrateStorage() {
+  [["svp_projekte","vp_projekte"],["svp_settings","vp_settings"],["svp_api_config","vp_api_config"]].forEach(([alt,neu])=>{
+    if (!localStorage.getItem(neu) && localStorage.getItem(alt)) localStorage.setItem(neu, localStorage.getItem(alt));
+  });
+})();
+function loadProjekte() { try { return JSON.parse(localStorage.getItem("vp_projekte")||"[]"); } catch { return []; } }
+function saveProjekte(p) { localStorage.setItem("vp_projekte", JSON.stringify(p)); }
 
 // ── Einstellungen ──
-const SETTINGS_DEFAULTS = { firmenname:"SVP Elektrotechnik", defaultErsteller:"" };
-function loadSettings() { try { return {...SETTINGS_DEFAULTS,...JSON.parse(localStorage.getItem("svp_settings")||"{}")}; } catch { return {...SETTINGS_DEFAULTS}; } }
-function saveSettings(s) { localStorage.setItem("svp_settings",JSON.stringify(s)); }
+const SETTINGS_DEFAULTS = { firmenname:"", defaultErsteller:"" };
+function loadSettings() { try { return {...SETTINGS_DEFAULTS,...JSON.parse(localStorage.getItem("vp_settings")||"{}")}; } catch { return {...SETTINGS_DEFAULTS}; } }
+function saveSettings(s) { localStorage.setItem("vp_settings",JSON.stringify(s)); }
 
 // ── API ──
 const API_DEFAULTS = { url:"https://api.anthropic.com/v1/messages", model:"claude-sonnet-4-20250514", apiKey:"", format:"openai" };
-function ladeApiConfig() { try { return { ...API_DEFAULTS, ...JSON.parse(localStorage.getItem("svp_api_config")||"{}") }; } catch { return {...API_DEFAULTS}; } }
-function speichereApiConfig(cfg) { localStorage.setItem("svp_api_config", JSON.stringify(cfg)); }
+function ladeApiConfig() { try { return { ...API_DEFAULTS, ...JSON.parse(localStorage.getItem("vp_api_config")||"{}") }; } catch { return {...API_DEFAULTS}; } }
+function speichereApiConfig(cfg) { localStorage.setItem("vp_api_config", JSON.stringify(cfg)); }
 
 async function callVisionAPI(base64, prompt) {
   const cfg = ladeApiConfig();
@@ -323,7 +351,7 @@ const F = ({label,children}) => <div style={{marginBottom:10}}><div style={{font
 const G2 = ({children}) => <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{children}</div>;
 const St = ({label,val,color="var(--text2)"}) => <div><div style={{fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px"}}>{label}</div><div style={{fontSize:18,fontWeight:800,color,marginTop:1}}>{val}</div></div>;
 
-const bPrimary={background:"var(--svp)",border:"none",color:"#fff",borderRadius:8,padding:"11px 20px",cursor:"pointer",fontSize:13,fontWeight:700,transition:"opacity 0.15s,transform 0.15s"};
+const bPrimary={background:"var(--blue)",border:"none",color:"#fff",borderRadius:8,padding:"11px 20px",cursor:"pointer",fontSize:13,fontWeight:700,transition:"opacity 0.15s,transform 0.15s"};
 const bSec={background:"transparent",border:"1px solid var(--border2)",color:"var(--text2)",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:12,transition:"border-color 0.15s,color 0.15s"};
 const bSec2={background:"transparent",border:"1px solid var(--border)",color:"var(--text3)",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:11};
 const bDanger={background:"transparent",border:"1px solid rgba(255,107,107,0.25)",color:"#ff6b6b",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:11};
@@ -340,7 +368,7 @@ function ApiSettingsModal({ onClose }) {
     {label:"LM Studio",url:"http://localhost:1234/v1/chat/completions",model:"llava",format:"openai"},
   ];
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:480,padding:24}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <div style={{fontSize:16,fontWeight:800}}>⚙️ KI-API Einstellungen</div>
@@ -422,7 +450,7 @@ NUR JSON, keine Backticks, kein Text davor/danach.`;
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:600,maxHeight:"92vh",overflow:"auto",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
         <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
           <div>
@@ -490,10 +518,14 @@ NUR JSON, keine Backticks, kein Text davor/danach.`;
 // ══════════════════════════════════════════
 // ── Startfenster ──
 // ══════════════════════════════════════════
-function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
+function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   const [phase, setPhase] = useState("start"); // "start" | "neu" | "laden"
   const [form, setForm] = useState({ name:"", adresse:"", ersteller:"", standort:"" });
+  const [suche, setSuche] = useState("");
   const dbOk = isSupabaseConfigured();
+  const gefilterteProjekte = suche.trim()
+    ? projekte.filter(p => (p.name||"").toLowerCase().includes(suche.toLowerCase()) || (p.projekt?.adresse||"").toLowerCase().includes(suche.toLowerCase()))
+    : projekte;
 
   const handleNeu = () => {
     if (!form.name.trim()) return;
@@ -501,7 +533,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
   };
 
   if (phase === "neu") return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:18,width:"100%",maxWidth:480,padding:32}}>
         <button onClick={()=>setPhase("start")} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20,marginBottom:16,padding:0,display:"flex",alignItems:"center",gap:6}}>
           ← <span style={{fontSize:13}}>Zurück</span>
@@ -548,7 +580,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
   );
 
   if (phase === "laden") return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:18,width:"100%",maxWidth:520,maxHeight:"80vh",overflow:"auto",padding:28}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <div>
@@ -558,15 +590,22 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
           </div>
           <button onClick={()=>setPhase("start")} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20}}>←</button>
         </div>
-        {projekte.length === 0
-          ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:32}}>Keine gespeicherten Projekte</div>
-          : projekte.map(p => (
+        {projekte.length > 3 && (
+          <input
+            value={suche} onChange={e=>setSuche(e.target.value)}
+            placeholder="Projekt suchen…"
+            style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:8,padding:"8px 12px",color:"var(--text)",fontSize:13,marginBottom:12,boxSizing:"border-box"}}
+          />
+        )}
+        {gefilterteProjekte.length === 0
+          ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:32}}>{suche ? "Keine Projekte gefunden" : "Keine gespeicherten Projekte"}</div>
+          : gefilterteProjekte.map(p => (
               <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,background:"var(--bg3)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:700,color:"var(--text)",fontSize:14}}>{p.name}</div>
                   <div style={{fontSize:10,color:"var(--text3)",marginTop:3,display:"flex",gap:8,flexWrap:"wrap"}}>
                     <span>{p.datum}</span>
-                    {p.projekt?.ersteller && <span style={{color:"var(--svp)"}}>· {p.projekt.ersteller}</span>}
+                    {p.projekt?.ersteller && <span style={{color:"var(--blue)"}}>· {p.projekt.ersteller}</span>}
                     {p.projekt?.standort  && <span>· {p.projekt.standort}</span>}
                     <span>· {(p.kabel||p.stromkreise||[]).length} Kabel</span>
                   </div>
@@ -582,8 +621,8 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
 
   // Start-Phase
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{textAlign:"center",maxWidth:440,width:"100%"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{textAlign:"center",maxWidth:440,width:"100%",background:"var(--bg2)",borderRadius:18,padding:32,border:"1px solid var(--border)"}}>
         {/* Logo */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginBottom:32}}>
           <div style={{width:56,height:56,borderRadius:14,background:"rgba(33,150,201,0.12)",border:"1px solid rgba(33,150,201,0.3)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -596,7 +635,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
             </svg>
           </div>
           <div style={{textAlign:"left"}}>
-            <div style={{fontSize:22,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px",lineHeight:1}}>SVP Verteilerplaner</div>
+            <div style={{fontSize:22,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px",lineHeight:1}}>Verteilerplaner</div>
             <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Elektroverteiler planen & dokumentieren</div>
           </div>
         </div>
@@ -609,10 +648,10 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
           </button>
           <button onClick={()=>setPhase("laden")}
             style={{background:"var(--bg2)",border:"1px solid var(--border2)",color:"var(--text2)",borderRadius:12,padding:"15px 24px",cursor:"pointer",fontSize:14,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.15s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--svp)";e.currentTarget.style.color="var(--svp)";}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--blue)";e.currentTarget.style.color="var(--blue)";}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--text2)";}}>
             📂 Vorhandenes Projekt laden
-            {projekte.length > 0 && <span style={{background:"var(--svp)",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:11,fontWeight:800}}>{projekte.length}</span>}
+            {projekte.length > 0 && <span style={{background:"var(--blue)",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:11,fontWeight:800}}>{projekte.length}</span>}
           </button>
         </div>
 
@@ -620,7 +659,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt }) {
         <div style={{marginTop:24,fontSize:11,color:"var(--text3)"}}>
           {dbOk
             ? <span style={{color:"var(--green)"}}>● Datenbankverbindung aktiv</span>
-            : <span>💾 Lokale Speicherung · <a href="#" onClick={e=>{e.preventDefault();}} style={{color:"var(--svp)",textDecoration:"none"}}>Datenbank einrichten →</a></span>
+            : <span>💾 Lokale Speicherung · <a href="#" onClick={e=>{e.preventDefault();}} style={{color:"var(--blue)",textDecoration:"none"}}>Datenbank einrichten →</a></span>
           }
         </div>
       </div>
@@ -651,7 +690,7 @@ function SettingsModal({ settings, onSave, onClose }) {
   ];
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:520,maxHeight:"90vh",overflow:"auto",padding:28}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
           <div style={{fontSize:17,fontWeight:800,color:"var(--text)"}}>⚙️ Einstellungen</div>
@@ -660,11 +699,11 @@ function SettingsModal({ settings, onSave, onClose }) {
 
         {/* Firma & Export */}
         <div style={{marginBottom:20,paddingBottom:20,borderBottom:"1px solid var(--border)"}}>
-          <div style={{fontSize:11,color:"var(--svp)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>Firma & Export</div>
+          <div style={{fontSize:11,color:"var(--blue)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>Firma & Export</div>
           <div style={{marginBottom:10}}>
             <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:5,fontWeight:600}}>Firmenname (für Stückliste & Beschriftungsplan)</div>
             <input value={s.firmenname} onChange={e=>setS(x=>({...x,firmenname:e.target.value}))}
-              placeholder="z.B. SVP Elektrotechnik GmbH"
+              placeholder="z.B. Meine Firma GmbH"
               style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 12px",color:"var(--text)",fontSize:13}}/>
           </div>
           <div>
@@ -677,7 +716,7 @@ function SettingsModal({ settings, onSave, onClose }) {
 
         {/* KI-API */}
         <div style={{marginBottom:20}}>
-          <div style={{fontSize:11,color:"var(--svp)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>KI-Foto-Import (optional)</div>
+          <div style={{fontSize:11,color:"var(--blue)",textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:12}}>KI-Foto-Import (optional)</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:12}}>
             {apiPresets.map(p=>(
               <button key={p.label} onClick={()=>setApiCfg(c=>({...c,...p}))}
@@ -713,10 +752,71 @@ function SettingsModal({ settings, onSave, onClose }) {
   );
 }
 
+// ── Leitungsrechner (VDE 0100-520, Kupfer, cos φ=1, ΔU ≤ 3%) ──
+const LR_STROM = { "1.5":13.5, "2.5":18, "4":24, "6":31, "10":42, "16":56 };
+function berechneLeitungsQs(iA, laengeM) {
+  const aMin = (2 * iA * laengeM) / (56 * 6.9); // 56=κ(Cu), 6.9V=3%×230V
+  const auswahl = ["1.5","2.5","4","6","10","16"];
+  return auswahl.find(q => parseFloat(q) >= aMin && LR_STROM[q] >= iA) || null;
+}
+function maxLaenge(iA, qs) {
+  return Math.floor((56 * 6.9 * parseFloat(qs)) / (2 * iA));
+}
+function LeitungsRechner({ qs, laenge, onSelectQs }) {
+  const [nenn, setNenn] = React.useState("16");
+  const nennA = parseFloat(nenn) || 16;
+  const lm = parseFloat(laenge) || 0;
+  const empfohlen = lm > 0 ? berechneLeitungsQs(nennA, lm) : null;
+  const maxL = maxLaenge(nennA, qs);
+  const lmOk = lm === 0 || lm <= maxL;
+  return (
+    <div style={{marginTop:8,padding:"12px 14px",background:"rgba(33,150,201,0.06)",border:"1px solid rgba(33,150,201,0.2)",borderRadius:8}}>
+      <div style={{fontSize:10,color:"var(--blue)",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",marginBottom:8}}>⚡ Leitungsrechner — VDE 0100-520 (Cu, ΔU ≤ 3 %)</div>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
+        <div>
+          <div style={{fontSize:10,color:"var(--text3)",marginBottom:4}}>Nennstrom (A)</div>
+          <select value={nenn} onChange={e=>setNenn(e.target.value)}
+            style={{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 8px",color:"var(--text)",fontSize:12,fontFamily:"var(--mono)"}}>
+            {["6","10","13","16","20","25","32"].map(v=><option key={v}>{v}</option>)}
+          </select>
+        </div>
+        <div style={{fontSize:13}}>
+          <div style={{fontSize:10,color:"var(--text3)",marginBottom:4}}>Max. Leitungslänge @ {qs} mm²</div>
+          <span style={{fontWeight:700,fontFamily:"var(--mono)",color:lmOk?"var(--green)":"var(--red)"}}>{maxL} m</span>
+          {lm > 0 && !lmOk && <span style={{fontSize:11,color:"var(--red)",marginLeft:8}}>⚠ Eingabe ({lm}m) überschreitet Limit!</span>}
+          {lm > 0 && lmOk && <span style={{fontSize:11,color:"var(--text3)",marginLeft:8}}>✓ {lm}m liegt im erlaubten Bereich</span>}
+        </div>
+        {empfohlen && empfohlen !== qs && (
+          <div style={{display:"flex",alignItems:"flex-end",gap:8}}>
+            <div>
+              <div style={{fontSize:10,color:"var(--text3)",marginBottom:4}}>Empfohlener Querschnitt</div>
+              <span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--blue)",fontSize:13}}>{empfohlen} mm²</span>
+            </div>
+            <button onClick={()=>onSelectQs(empfohlen)}
+              style={{background:"rgba(33,150,201,0.1)",border:"1px solid rgba(33,150,201,0.3)",borderRadius:6,padding:"5px 10px",cursor:"pointer",color:"var(--blue)",fontSize:11,marginBottom:2}}>
+              Übernehmen
+            </button>
+          </div>
+        )}
+        {empfohlen === qs && lm > 0 && (
+          <span style={{fontSize:12,color:"var(--green)",paddingBottom:4}}>✓ Gewählter Querschnitt passend</span>
+        )}
+      </div>
+      <div style={{marginTop:8,display:"flex",gap:12,flexWrap:"wrap"}}>
+        {["1.5","2.5","4","6"].map(q=>(
+          <span key={q} style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>
+            {q}mm² → <span style={{color:"var(--text2)"}}>{maxLaenge(nennA,q)}m</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════
 // ── Hauptkomponente ──
 // ══════════════════════════════════════════
-export default function Verteilerplaner() {
+export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
   const [step, setStep] = useState(1);
   const [projekt, setProjekt]     = useState({ name:"", adresse:"", ersteller:"", standort:"" });
   const [kabel, setKabel]         = useState([]);          // Step 2: Kabel
@@ -742,6 +842,7 @@ export default function Verteilerplaner() {
   const [projekte, setProjekte]   = useState(loadProjekte);
   const [showSave, setShowSave]   = useState(false);
   const [showLoad, setShowLoad]   = useState(false);
+  const [ladesuche, setLadesuche] = useState("");
   const [saveName, setSaveName]   = useState("");
   const [newSW, setNewSW]         = useState("");
   const [newSWColor, setNewSWColor] = useState("var(--green)");
@@ -751,6 +852,7 @@ export default function Verteilerplaner() {
   const [showRaumInput, setShowRaumInput] = useState(false);
 
   const [showInfo, setShowInfo] = useState(false);
+  const [showLeiRechner, setShowLeiRechner] = useState(null); // kabel.id or null
   const [toasts, setToasts] = useState([]);
   const showToast = useCallback((msg, type="success", dur=2500) => {
     const id = Date.now();
@@ -956,6 +1058,8 @@ export default function Verteilerplaner() {
     db_id:    currentDbId,
     projekt:  { ...projekt, name: name || projekt.name },
     kabel, sicherungen, fiKonfigs, stockwerke, raeume, swColorMap,
+    plan,
+    uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
   });
 
   // ── Speichern (lokal + optional Supabase) ─────────────────────────────────
@@ -984,6 +1088,7 @@ export default function Verteilerplaner() {
       datum: new Date().toLocaleDateString("de-DE"),
       projekt: { ...projekt, name: nameToSave },
       fiKonfigs, kabel, sicherungen, stockwerke, raeume, swColorMap,
+      plan, uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
     };
     const neu = [entry, ...projekte.filter(p => p.name !== nameToSave && p.id !== entry.id)];
     setProjekte(neu); saveProjekte(neu); setShowSave(false); setSaveName("");
@@ -1005,6 +1110,7 @@ export default function Verteilerplaner() {
       id: currentDbId || uid(), db_id: currentDbId,
       name: projekt.name, datum: new Date().toLocaleDateString("de-DE"),
       projekt, fiKonfigs, kabel, sicherungen, stockwerke, raeume, swColorMap,
+      plan, uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
     };
     const neu = [entry, ...projekte.filter(p => p.name !== projekt.name && p.id !== entry.id)];
     setProjekte(neu); saveProjekte(neu);
@@ -1035,7 +1141,17 @@ export default function Verteilerplaner() {
     setStockwerke(p.stockwerke||[]);
     if(p.swColorMap) setSwColorMap({...SW_COLOR_DEFAULT,...p.swColorMap});
     setRaeume(p.raeume||[]);
-    setPlan(null); setMitRK(false); setStep(1); setShowLoad(false);
+    // UI-Zustand wiederherstellen
+    const ui = p.uiState || {};
+    setPlan(p.plan || null);
+    setStep(ui.step || 1);
+    setActiveTab(ui.activeTab || "plan");
+    setPlanTyp(ui.planTyp || "visuell");
+    setMitRK(ui.mitRK || false);
+    setMitQV(ui.mitQV || false);
+    setMitNBruecke(ui.mitNBruecke || false);
+    setIstKNX(ui.istKNX || false);
+    setShowLoad(false);
     setShowStartScreen(false);
   };
 
@@ -1093,7 +1209,7 @@ export default function Verteilerplaner() {
       }
       txt += `  ${item.menge}× ${item.label}\n`;
     });
-    txt += `\n– ${settings.firmenname||"SVP Elektrotechnik"}`;
+    txt += `\n– ${settings.firmenname||""}`;
     if(projekt.ersteller) txt += ` · ${projekt.ersteller}`;
     return txt;
   };
@@ -1129,7 +1245,7 @@ export default function Verteilerplaner() {
         txt += `  ${qNr}F1  ${sInfo?.label||""}  ${bezeichnung}\n`;
       });
     }
-    txt += `\n– ${settings.firmenname||"SVP Elektrotechnik"}`;
+    txt += `\n– ${settings.firmenname||""}`;
     if(projekt.ersteller) txt += ` · ${projekt.ersteller}`;
     return txt;
   };
@@ -1236,6 +1352,7 @@ export default function Verteilerplaner() {
     "pe_einspeisung": {bg:"rgba(82,217,138,0.12)",border:"rgba(82,217,138,0.5)",label:"PE",color:"var(--green)",w:22},
     "rk_mit_pe":     {bg:"#1a2e1a",border:"rgba(82,217,138,0.25)",label:"PE",color:"var(--green)",w:22},
     "rk_ohne_pe":    {bg:"#181818",border:"#44444466",label:"",color:"var(--text3)",w:22},
+    "rk_n_fils":     {bg:"rgba(33,150,201,0.12)",border:"rgba(33,150,201,0.45)",label:"N",color:"var(--blue)",w:22},
     "n_einspeisung": {bg:"rgba(33,150,201,0.1)",border:"rgba(33,150,201,0.35)",label:"NE",color:"var(--blue)",w:22},
     "n_endklemme":   {bg:"rgba(33,150,201,0.05)",border:"rgba(33,150,201,0.2)",label:"NX",color:"var(--text3)",w:22},
     "rk_reserve_knx":{bg:"#2a1a2a",border:"#d45db5",label:"R",color:"#d45db5",w:22},
@@ -1247,7 +1364,6 @@ export default function Verteilerplaner() {
     const groups=[];
     const addSpecial=(type,lbl=null)=>groups.push({kabelLabel:null,kabelColor:null,klemmen:[{type,label:lbl}]});
     if(!isFils){
-      // Immer: PE-Einspeisung + N-Einspeisung pro FI-Block
       addSpecial("pe_einspeisung","PE-Einsp.");
       addSpecial("n_einspeisung","N-Einsp.");
       let hatKlemmen=0;
@@ -1261,7 +1377,7 @@ export default function Verteilerplaner() {
           const klemmen=[];
           for(let i=0;i<mitPE;i++) klemmen.push({type:"rk_mit_pe",label:lbl});
           for(let i=0;i<ohnePE;i++) klemmen.push({type:"rk_ohne_pe",label:lbl});
-          groups.push({kabelLabel:lbl, kabelColor:col, klemmen, sicherung:sk.sicherung});
+          groups.push({kabelLabel:lbl, kabelColor:col, klemmen, sicherung:sk.sicherung, skId:sk.id});
           hatKlemmen++;
         });
       });
@@ -1274,21 +1390,21 @@ export default function Verteilerplaner() {
       if(hatKlemmen>0||istKNX){
         addSpecial("abdeckkappe_orange");
       }
-      // N-Endklemme: immer (weil N-Einspeisung immer da ist)
       addSpecial("n_endklemme","N-End.");
     } else {
       // FILS: kein NE/NX, aber PE-Klemme am Anfang
+      // Pro Kabel: rk_n_fils (3-pol: PE+L1+N direkt) + rk_ohne_pe (L2+L3 bei 5×)
       addSpecial("pe_einspeisung","FILS PE");
       let hatKlemmen=0;
       (filsSk.kabelIds||[]).forEach(kid=>{
         const k=kabel.find(x=>x.id===kid);
         if(!k)return;
-        const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
+        const {ohnePE}=klemmenFuerKabel(k.kabelAdern);
         const lbl=k.bezeichnung||k.raum||"?";
         const col=swColor(k.stockwerk);
         const klemmen=[];
-        for(let i=0;i<mitPE;i++) klemmen.push({type:"rk_mit_pe",label:lbl});
-        for(let i=0;i<ohnePE;i++) klemmen.push({type:"rk_ohne_pe",label:lbl});
+        klemmen.push({type:"rk_n_fils",label:lbl}); // 3-pol: PE+L1+N (immer bei FILS)
+        for(let i=0;i<ohnePE;i++) klemmen.push({type:"rk_ohne_pe",label:lbl}); // L2+L3 bei 5×
         groups.push({kabelLabel:lbl, kabelColor:col, klemmen});
         hatKlemmen++;
       });
@@ -1298,53 +1414,100 @@ export default function Verteilerplaner() {
   };
 
   // ── Querverbinder-Berechnung ──
-  // Normaler FI-Block: nur L-Querverbinder pro Sicherung mit n>=2 Kabeln
-  //   → N läuft über die gemeinsame N-Schiene (NE→NX-Brücke), kein separater N-QV nötig
-  // FILS: L- UND N-Querverbinder, weil FILS keine NE/NX-Schiene hat
+  // Klemmentypen in der Sequenz:
+  //   'L'  = rk_mit_pe   (L1 + PE + N-Schieber zur N-Schiene)
+  //   'LL' = rk_ohne_pe  (L2 + L3, 2-polig, kein N/PE — bei 5× und mehr)
+  //   'N'  = rk_n_fils   (N-Klemme, nur bei FILS — da keine N-Schiene vorhanden)
+  //
+  // Normale FI-Kreise: nur L-Bridge nötig ('LL'-Klemmen zwischen L1-Klemmen → abzwicken)
+  // FILS: L-Bridge + N-Bridge; 'LL'/'L' zwischen N-Klemmen → abzwicken (und umgekehrt)
+
+  // Flache Klemmensequenz für normale FI-Kreise
+  const buildKlemmenSeqNormal = (kids) => {
+    const seq=[];
+    kids.forEach(kid=>{
+      const k=kabel.find(x=>x.id===kid);
+      if(!k) return;
+      const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
+      for(let i=0;i<mitPE;i++) seq.push('L');   // L1+PE+N-Schieber
+      for(let i=0;i<ohnePE;i++) seq.push('LL'); // L2+L3 (2-polig)
+    });
+    return seq;
+  };
+
+  // Flache Klemmensequenz für FILS
+  // rk_n_fils ist 3-pol (PE+L1+N) → immer 'N' pro Kabel; rk_ohne_pe (L2+L3) → 'LL'
+  const buildKlemmenSeqFILS = (kids) => {
+    const seq=[];
+    kids.forEach(kid=>{
+      const k=kabel.find(x=>x.id===kid);
+      if(!k) return;
+      const {ohnePE}=klemmenFuerKabel(k.kabelAdern);
+      seq.push('N');                              // rk_n_fils: PE+L1+N (3-pol)
+      for(let i=0;i<ohnePE;i++) seq.push('LL'); // L2+L3
+    });
+    return seq;
+  };
+
+  // Berechnet Bridge-Span und Pins die abgezwickt werden müssen.
+  // targetType: 'L'|'N' — alle anderen Typen im Span werden als clipPins markiert.
+  const berechneBridge = (seq, targetType) => {
+    const targetIdx=seq.map((t,i)=>t===targetType?i:-1).filter(i=>i>=0);
+    if(targetIdx.length<2) return null;
+    const firstPos=targetIdx[0], lastPos=targetIdx[targetIdx.length-1];
+    const span=lastPos-firstPos+1;
+    // Pins abzwicken: jede Nicht-Ziel-Klemme zwischen erster und letzter Ziel-Klemme (1-indiziert)
+    const clipPins=seq.slice(firstPos,lastPos+1)
+      .map((t,i)=>t!==targetType?(i+1):-1).filter(i=>i>=0);
+    return {ports:span, clipPins, count:targetIdx.length};
+  };
+
   const berechneQuerverbinder = () => {
     if(!plan) return [];
     const result=[];
 
-    // Normale FI-Gruppen → nur L
+    // Normale FI-Gruppen → nur L-Bridge
+    // ('LL'-Klemmen zwischen L1-Klemmen müssen abgezwickt werden)
     plan.gruppen.forEach((fi,fiIdx)=>{
       fi.stromkreise.forEach((sk,skIdx)=>{
+        if(sk.istReserve) return;
         const kids=sk.kabelIds||[];
         if(kids.length<2) return;
-        let mitPE_total=0;
-        kids.forEach(kid=>{
-          const k=kabel.find(x=>x.id===kid);
-          if(!k) return;
-          mitPE_total+=klemmenFuerKabel(k.kabelAdern).mitPE;
-        });
-        if(mitPE_total<2) return;
-        const fLabel=`Q${fiIdx+1} / ${fiIdx+1}F${skIdx+1}`;
-        const skLabel=sk.kabel?.map(k=>k.bezeichnung||k.raum||'?').join(' + ')
-                      || kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean).map(k=>k.bezeichnung||k.raum||'?').join(' + ');
-        result.push({fLabel, skLabel, ports:mitPE_total, typ:'L', color:'#ff6b6b', fils:false});
+        const seq=buildKlemmenSeqNormal(kids);
+        const bridge=berechneBridge(seq,'L');
+        if(!bridge||bridge.count<2) return;
+        const fLabel=`Q${fiIdx+1}F${skIdx+1}`;
+        const skLabel=kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean)
+                         .map(k=>k.bezeichnung||k.raum||'?').join(' + ');
+        result.push({fLabel, skLabel, ports:bridge.ports, clipPins:bridge.clipPins,
+                     count:bridge.count, typ:'L', color:'#ff6b6b', fils:false});
       });
     });
 
-    // FILS → L + N (keine gemeinsame N-Schiene vorhanden)
+    // FILS → L-Bridge + N-Bridge (rk_n_fils = 3-pol PE+L1+N)
+    // Beide Brücken haben gleichen Span (L und N Seite der 3-pol Klemme)
+    // Bei 5×-Kabeln: zusätzlich LL-Bridge für rk_ohne_pe (L2+L3)
     plan.fils.forEach((sk,i)=>{
       const kids=sk.kabelIds||[];
       if(kids.length<2) return;
-      let mitPE_total=0, ohnePE_total=0;
-      kids.forEach(kid=>{
-        const k=kabel.find(x=>x.id===kid);
-        if(!k) return;
-        const {mitPE,ohnePE}=klemmenFuerKabel(k.kabelAdern);
-        mitPE_total+=mitPE; ohnePE_total+=ohnePE;
-      });
+      const seq=buildKlemmenSeqFILS(kids);
       const fLabel=`Q${plan.gruppen.length+i+1} FILS`;
-      const skLabel=sk.kabel?.map(k=>k.bezeichnung||k.raum||'?').join(' + ')
-                    || kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean).map(k=>k.bezeichnung||k.raum||'?').join(' + ');
-      if(mitPE_total>=2){
-        result.push({fLabel, skLabel, ports:mitPE_total, typ:'L', color:'#ff6b6b', fils:true});
-        result.push({fLabel, skLabel, ports:mitPE_total, typ:'N', color:'rgba(33,150,201,0.9)', fils:true});
+      const skLabel=kids.map(id=>kabel.find(x=>x.id===id)).filter(Boolean)
+                       .map(k=>k.bezeichnung||k.raum||'?').join(' + ');
+      const nBridge=berechneBridge(seq,'N');
+      if(nBridge&&nBridge.count>=2){
+        // L-QV: L1-Seite der 3-pol Klemmen brücken
+        result.push({fLabel,skLabel,ports:nBridge.ports,clipPins:nBridge.clipPins,
+                     count:nBridge.count,typ:'L',color:'#ff6b6b',fils:true});
+        // N-QV: N-Seite der 3-pol Klemmen brücken
+        result.push({fLabel,skLabel,ports:nBridge.ports,clipPins:nBridge.clipPins,
+                     count:nBridge.count,typ:'N',color:'#1d6dbf',fils:true});
       }
-      if(ohnePE_total>=2){
-        result.push({fLabel, skLabel, ports:ohnePE_total, typ:'N (2-pol)', color:'rgba(33,150,201,0.6)', fils:true});
-      }
+      // Bei 5×-Kabeln: LL-Bridge für rk_ohne_pe (L2+L3)
+      const llBridge=berechneBridge(seq,'LL');
+      if(llBridge&&llBridge.count>=2)
+        result.push({fLabel,skLabel,ports:llBridge.ports,clipPins:llBridge.clipPins,
+                     count:llBridge.count,typ:'LL',color:'#ff8c00',fils:true});
     });
 
     return result;
@@ -1361,7 +1524,7 @@ export default function Verteilerplaner() {
   })();
 const stueckliste = (() => {
     if(!plan) return [];
-    const base = berechneStueckliste(plan,mitRK,kabel,istKNX);
+    const base = berechneStueckliste(plan,mitRK,kabel,istKNX,sicherungen,mitNBruecke);
     if(!mitRK) return base;
     // Querverbinder hinzufügen wenn aktiviert
     if(mitQV && querverbinder.length>0) {
@@ -1372,7 +1535,8 @@ const stueckliste = (() => {
     // N-Brücke: Länge = (alle Klemmen im Block + Abdeckkappen) × Rastermaß 6,2mm
     // + 1× Abdeckung gleicher Länge je Block (identische Länge)
     if(mitNBruecke && plan.gruppen.length>0) {
-      plan.gruppen.forEach((fi,fiIdx) => {
+      const laengenMap = {};
+      plan.gruppen.forEach(fi => {
         let klemmenAnzahl = 2; // PE-Einspeisung + N-Einspeisung
         let kappenAnzahl  = 0;
         fi.stromkreise.forEach(sk => {
@@ -1383,12 +1547,15 @@ const stueckliste = (() => {
             klemmenAnzahl += mitPE + ohnePE;
           });
         });
-        if(istKNX){ klemmenAnzahl+=1; kappenAnzahl+=1; } // Reserve-Klemme + Trennkappe
-        if(klemmenAnzahl>2) kappenAnzahl+=1;              // Abdeckkappe nach Kabelklemmen
-        klemmenAnzahl+=1;                                 // N-Endklemme
+        if(istKNX){ klemmenAnzahl+=1; kappenAnzahl+=1; }
+        if(klemmenAnzahl>2) kappenAnzahl+=1;
+        klemmenAnzahl+=1; // N-Endklemme
         const laengeMM = Math.ceil((klemmenAnzahl * 6.2) + (kappenAnzahl * 2));
-        base.push({label:`N-Brücke ${laengeMM}mm (NE→NX, Q${fiIdx+1})`, menge:1, kat:"Reihenklemmen"});
-        base.push({label:`Abdeckung N-Brücke ${laengeMM}mm (Q${fiIdx+1})`, menge:1, kat:"Reihenklemmen"});
+        laengenMap[laengeMM] = (laengenMap[laengeMM]||0) + 1;
+      });
+      Object.entries(laengenMap).sort(([a],[b])=>Number(a)-Number(b)).forEach(([mm,cnt])=>{
+        base.push({label:`N-Brücke ${mm}mm (NE→NX)`, menge:cnt, kat:"Reihenklemmen"});
+        base.push({label:`Abdeckung N-Brücke ${mm}mm`, menge:cnt, kat:"Reihenklemmen"});
       });
     }
     return base;
@@ -1404,12 +1571,13 @@ const stueckliste = (() => {
           onNeu={handleNeuStart}
           onLaden={p => { lade(p); }}
           onLoescheProjekt={loescheProjekt}
+          onBack={onBack}
         />
       )}
       <style>{`
         .sichzone{transition:background 0.15s,border-color 0.15s,box-shadow 0.15s;}
-        .sichzone.dragover{background:rgba(33,150,201,0.05)!important;border-color:var(--svp)!important;box-shadow:0 0 0 2px rgba(33,150,201,0.15)!important;}
-        .sichzone.touch-over{background:rgba(33,150,201,0.05)!important;border-color:var(--svp)!important;}
+        .sichzone.dragover{background:rgba(33,150,201,0.05)!important;border-color:var(--blue)!important;box-shadow:0 0 0 2px rgba(33,150,201,0.15)!important;}
+        .sichzone.touch-over{background:rgba(33,150,201,0.05)!important;border-color:var(--blue)!important;}
         .main-wrap{max-width:960px;margin:0 auto;padding:20px 16px;}
         .step3-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
         .header-nav{display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;}
@@ -1445,16 +1613,42 @@ const stueckliste = (() => {
         .drag-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:0.85;transform:scale(1.05);box-shadow:0 8px 32px rgba(0,0,0,0.5);}
         @media(max-width:640px){
           .step3-grid{grid-template-columns:1fr;}
-          .header-nav button{padding:5px 8px!important;font-size:10px!important;}
-          .nav-label-long{display:none;}
-          .nav-label-short{display:inline!important;}
           .main-wrap{padding:10px 8px;}
-          .header-actions .btn-label{display:none;}
           select{min-height:40px;font-size:14px!important;}
           .mobile-stack{flex-direction:column!important;}
           .mobile-full{width:100%!important;flex:1 1 100%!important;}
           .mobile-hide{display:none!important;}
           .step-label{display:none;}
+          /* Header 2-Zeilen Layout auf Handy */
+          .header-outer{
+            flex-wrap:wrap!important;
+            height:auto!important;
+            padding:7px 10px 0!important;
+            gap:0!important;
+          }
+          .header-center-nav{
+            order:10;
+            flex:none!important;
+            width:100%!important;
+            max-width:none!important;
+            margin-left:0!important;
+            overflow-x:auto;
+            -webkit-overflow-scrolling:touch;
+            scrollbar-width:none;
+            padding:5px 0 7px!important;
+            border-top:1px solid var(--border);
+            justify-content:flex-start!important;
+            gap:5px!important;
+          }
+          .header-center-nav::-webkit-scrollbar{display:none;}
+          .header-center-nav button{padding:6px 10px!important;font-size:11px!important;white-space:nowrap!important;}
+          .header-logo-text{display:none!important;}
+          .header-version{display:none!important;}
+          .header-photo-btn{display:none!important;}
+          .header-settings-btn{display:none!important;}
+          .header-info-btn{display:none!important;}
+          .nav-label-long{display:none;}
+          .nav-label-short{display:inline!important;}
         }
         @media(min-width:641px){
           .nav-label-short{display:none;}
@@ -1466,26 +1660,33 @@ const stueckliste = (() => {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div className="no-print" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
+      <div className="no-print header-outer" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
 
-        {/* LEFT: Logo + Version */}
-        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="0" y="0" width="12" height="12" rx="2.5" fill="#2196C9"/>
-            <rect x="0" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
-            <rect x="7" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
-            <rect x="14" y="0" width="12" height="5" rx="1.5" fill="#2196C9" opacity="0.4"/>
-            <rect x="14" y="7" width="8" height="5" rx="1.5" fill="#2196C9" opacity="0.25"/>
-          </svg>
-          <div>
-            <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>SVP</div>
-            <div style={{fontSize:7.5,color:"var(--text3)",letterSpacing:"1.5px",fontWeight:500,textTransform:"uppercase",lineHeight:1,marginTop:2}}>Verteilerplaner</div>
+        {/* LEFT: Back + Logo */}
+        <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+          {onBack&&<button onClick={onBack} title="Zurück zum Dashboard"
+            style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0}}
+            onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
+            onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>←</button>}
+          <div onClick={()=>setShowStartScreen(true)} title="Zur Projektauswahl" style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",borderRadius:8,padding:"4px 6px",transition:"background 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.background="var(--bg3)"}
+            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="12" height="12" rx="2.5" fill="#2196C9"/>
+              <rect x="0" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
+              <rect x="7" y="14" width="5" height="5" rx="1" fill="#2196C9" opacity="0.7"/>
+              <rect x="14" y="0" width="12" height="5" rx="1.5" fill="#2196C9" opacity="0.4"/>
+              <rect x="14" y="7" width="8" height="5" rx="1.5" fill="#2196C9" opacity="0.25"/>
+            </svg>
+            <div className="header-logo-text">
+              <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>Verteilerplaner</div>
+            </div>
+            <span className="header-version" style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3.3</span>
           </div>
-          <span style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v1.5.0</span>
         </div>
 
         {/* CENTER: Step Navigation */}
-        <div className="header-nav" style={{flex:1,justifyContent:"center",maxWidth:520}}>
+        <div className="header-nav header-center-nav" style={{flex:1,justifyContent:"center",maxWidth:520}}>
           {[["1","Projekt","Proj"],["2","Kabel","Kabel"],["3","Sicherungen","Sich"],["4","FI","FI"],["5","Plan","Plan"]].map(([n,l,s])=>{
             const ni=Number(n); const active=step===ni; const done=step>ni;
             const erreichbar = ni<=2 || ni<=step || (ni===3&&kabel.length>0) || (ni===4&&kabel.length>0) || (ni===5&&!!plan);
@@ -1496,7 +1697,7 @@ const stueckliste = (() => {
             ) : "";
             const btn = (
               <button key={n} onClick={()=>{ if(erreichbar) setStep(ni); }}
-                style={{background:active?"var(--svp)":done?"rgba(33,150,201,0.08)":"transparent",border:`1px solid ${active?"var(--svp)":done?"rgba(33,150,201,0.25)":"var(--border)"}`,color:active?"#fff":done?"var(--svp)":erreichbar?"var(--text3)":"var(--border2)",borderRadius:6,padding:"5px 11px",cursor:erreichbar?"pointer":"not-allowed",fontSize:11,fontWeight:active?700:done?600:400,transition:"all 0.15s",display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap",opacity:erreichbar?1:0.45}}>
+                style={{background:active?"var(--blue)":done?"rgba(33,150,201,0.08)":"transparent",border:`1px solid ${active?"var(--blue)":done?"rgba(33,150,201,0.25)":"var(--border)"}`,color:active?"#fff":done?"var(--blue)":erreichbar?"var(--text3)":"var(--border2)",borderRadius:6,padding:"5px 11px",cursor:erreichbar?"pointer":"not-allowed",fontSize:11,fontWeight:active?700:done?600:400,transition:"all 0.15s",display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap",opacity:erreichbar?1:0.45}}>
                 {done&&!active&&<span style={{fontSize:8,opacity:0.8}}>✓</span>}
                 {!erreichbar&&<span style={{fontSize:9}}>🔒</span>}
                 <span className="nav-label-long">{l}</span>
@@ -1513,7 +1714,7 @@ const stueckliste = (() => {
         <div style={{display:"flex",gap:3,alignItems:"center",flexShrink:0}}>
           {undoStack.length>0&&(
             <button onClick={doUndo} title={`Rückgängig: ${undoStack[undoStack.length-1]?.label}`}
-              style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:6,border:"1px solid rgba(33,150,201,0.3)",background:"rgba(33,150,201,0.06)",color:"var(--svp)",cursor:"pointer",fontSize:11,fontWeight:600,transition:"all 0.15s"}}>
+              style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:6,border:"1px solid rgba(33,150,201,0.3)",background:"rgba(33,150,201,0.06)",color:"var(--blue)",cursor:"pointer",fontSize:11,fontWeight:600,transition:"all 0.15s"}}>
               ↩ <span className="nav-label-long" style={{fontSize:10}}>Undo</span>
             </button>
           )}
@@ -1523,7 +1724,7 @@ const stueckliste = (() => {
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>
             📂
-            {projekte.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"var(--svp)",color:"#fff",borderRadius:8,padding:"0 4px",fontSize:8,fontWeight:800,minWidth:14,textAlign:"center",lineHeight:"14px"}}>{projekte.length}</span>}
+            {projekte.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"var(--blue)",color:"#fff",borderRadius:8,padding:"0 4px",fontSize:8,fontWeight:800,minWidth:14,textAlign:"center",lineHeight:"14px"}}>{projekte.length}</span>}
           </button>
           <button onClick={()=>{setSaveName(projekt.name||"");setShowSave(true);}} title="Projekt speichern"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
@@ -1531,23 +1732,37 @@ const stueckliste = (() => {
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>💾</button>
           <div style={{width:1,height:18,background:"var(--border)",margin:"0 3px"}}/>
           <button onClick={()=>setShowFoto(true)} title="Kabelliste aus Foto importieren"
+            className="header-photo-btn"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>📷</button>
           <button onClick={()=>setShowSettings(true)} title="Einstellungen"
+            className="header-settings-btn"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>⚙️</button>
-          <button onClick={()=>setShowInfo(true)} title="Über SVP Verteilerplaner"
+          <button onClick={()=>setShowInfo(true)} title="Über Verteilerplaner"
+            className="header-info-btn"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>ℹ️</button>
+          <a href="https://github.com/Jedrimos/E-tools/issues/new" target="_blank" rel="noopener noreferrer"
+            title="Fehler melden oder Verbesserung vorschlagen"
+            style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",textDecoration:"none"}}
+            onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
+            onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>🐛</a>
+          {onToggleTheme&&<button onClick={onToggleTheme} title={theme==="dark"?"Hell-Modus aktivieren":"Dunkel-Modus aktivieren"}
+            style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
+            onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
+            onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>
+            {theme==="dark"?"☀️":"🌙"}
+          </button>}
         </div>
       </div>
 
       <div className="main-wrap">
-        {/* Step progress bar */}
-        <div className="no-print" style={{display:"flex",alignItems:"center",gap:0,marginBottom:20}}>
+        {/* Step progress bar – auf Mobile ausgeblendet (Header-Nav übernimmt) */}
+        <div className="no-print mobile-hide" style={{display:"flex",alignItems:"center",gap:0,marginBottom:20}}>
           {[1,2,3,4,5].map((n,i)=>{
             const active=step===n; const done=step>n;
             const labels=["Projekt","Kabel","Sicherungen","FI-Planung","Belegungsplan"];
@@ -1560,10 +1775,10 @@ const stueckliste = (() => {
             const dot = (
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:erreichbar2?"pointer":"not-allowed",opacity:erreichbar2?1:0.5}}
                 onClick={()=>{ if(erreichbar2) setStep(n); }}>
-                <div style={{width:28,height:28,borderRadius:"50%",background:active?"var(--svp)":done?"rgba(33,150,201,0.15)":erreichbar2?"var(--bg3)":"var(--bg2)",border:`2px solid ${active?"var(--svp)":done?"rgba(33,150,201,0.4)":erreichbar2?"var(--border)":"#2a3035"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:active?"#fff":done?"var(--svp)":erreichbar2?"var(--text3)":"var(--border2)",transition:"all 0.2s",flexShrink:0}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:active?"var(--blue)":done?"rgba(33,150,201,0.15)":erreichbar2?"var(--bg3)":"var(--bg2)",border:`2px solid ${active?"var(--blue)":done?"rgba(33,150,201,0.4)":erreichbar2?"var(--border)":"#2a3035"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:active?"#fff":done?"var(--blue)":erreichbar2?"var(--text3)":"var(--border2)",transition:"all 0.2s",flexShrink:0}}>
                   {done?<span style={{fontSize:10}}>✓</span>:erreichbar2?n:<span style={{fontSize:10}}>🔒</span>}
                 </div>
-                <div style={{fontSize:9,color:active?"var(--svp)":done?"var(--svp)":erreichbar2?"var(--text3)":"var(--border2)",fontWeight:active?700:done?500:400,whiteSpace:"nowrap",letterSpacing:"0.3px",transition:"color 0.2s"}} className="nav-label-long">{labels[i]}</div>
+                <div style={{fontSize:9,color:active?"var(--blue)":done?"var(--blue)":erreichbar2?"var(--text3)":"var(--border2)",fontWeight:active?700:done?500:400,whiteSpace:"nowrap",letterSpacing:"0.3px",transition:"color 0.2s"}} className="nav-label-long">{labels[i]}</div>
               </div>
             );
             return <div key={n} style={{display:"flex",alignItems:"center",flex:n<5?1:"none"}}>
@@ -1701,12 +1916,12 @@ const stueckliste = (() => {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
             <div>
               <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.3px"}}>🔌 Kabel erfassen</div>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:1,display:"flex",gap:10}}><span>{kabel.length} Kabel</span>{sicherungen.length>0&&<span style={{color:"var(--svp)"}}>· {kabel.filter(k=>sicherungen.some(s=>s.kabelIds.includes(k.id))).length} zugewiesen</span>}</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:1,display:"flex",gap:10}}><span>{kabel.length} Kabel</span>{sicherungen.length>0&&<span style={{color:"var(--blue)"}}>· {kabel.filter(k=>sicherungen.some(s=>s.kabelIds.includes(k.id))).length} zugewiesen</span>}</div>
             </div>
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button onClick={()=>setStep(1)} style={bSec}>← Zurück</button>
-              <button onClick={()=>setShowFoto(true)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>📷 Foto</button>
-              <button onClick={()=>setStep(3)} style={bPrimary}>Weiter → Sicherungen planen</button>
+              <button onClick={()=>setShowFoto(true)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>📷 <span className="nav-label-long">Foto</span></button>
+              <button onClick={()=>setStep(3)} style={{...bPrimary,flex:"1 1 auto",whiteSpace:"nowrap"}}>Weiter →<span className="nav-label-long"> Sicherungen planen</span></button>
             </div>
           </div>
 
@@ -1743,9 +1958,9 @@ const stueckliste = (() => {
                     style={{flexShrink:0,width:30,height:30,borderRadius:6,border:"1px solid var(--border2)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}
                     onMouseEnter={e=>e.currentTarget.style.color="var(--red)"} onMouseLeave={e=>e.currentTarget.style.color="var(--text3)"}>✕</button>
                 </div>
-                <div style={{display:"flex",gap:6,alignItems:"flex-end",paddingLeft:34}}>
+                <div style={{display:"flex",gap:6,alignItems:"flex-end",flexWrap:"wrap"}}>
                   {/* Kabeltyp */}
-                  <div style={{flex:"0 0 90px"}}>
+                  <div style={{flex:"1 1 80px",minWidth:75}}>
                     <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>Kabeltyp</div>
                     <select value={k.kabelTyp||"NYM-J"} onChange={e=>updKabel(k.id,"kabelTyp",e.target.value)}
                       style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",color:"var(--text2)",fontSize:11,appearance:"none",WebkitAppearance:"none"}}>
@@ -1753,7 +1968,7 @@ const stueckliste = (() => {
                     </select>
                   </div>
                   {/* Adern */}
-                  <div style={{flex:"0 0 90px"}}>
+                  <div style={{flex:"1 1 90px",minWidth:80}}>
                     <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>Adern</div>
                     <div style={{display:"flex",gap:2,marginBottom:3}}>
                       {STD_ADERN.map(a=>(
@@ -1768,16 +1983,28 @@ const stueckliste = (() => {
                       style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 8px",color:"var(--text)",fontSize:12,fontWeight:700,fontFamily:"var(--mono)",textAlign:"center"}}/>
                   </div>
                   {/* mm² */}
-                  <div style={{flex:"0 0 80px"}}>
+                  <div style={{flex:"1 1 68px",minWidth:62}}>
                     <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>mm²</div>
                     <select value={k.kabelQs||"1.5"} onChange={e=>updKabel(k.id,"kabelQs",e.target.value)}
                       style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",color:"var(--text2)",fontSize:12,fontWeight:700,fontFamily:"var(--mono)",appearance:"none",WebkitAppearance:"none"}}>
                       {KABEL_QS_OPTIONEN.map(q=><option key={q} value={q}>{q}</option>)}
                     </select>
                   </div>
-
-
+                  {/* Länge */}
+                  <div style={{flex:"1 1 62px",minWidth:56}}>
+                    <div style={{fontSize:8,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:3}}>Länge (m)</div>
+                    <input type="number" min={0} placeholder="—" value={k.kabelLaenge||""} onChange={e=>updKabel(k.id,"kabelLaenge",e.target.value)}
+                      style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",color:"var(--text)",fontSize:12,fontFamily:"var(--mono)"}} />
+                  </div>
+                  {/* Leitungsrechner-Toggle */}
+                  <div style={{flex:"0 0 28px",display:"flex",alignItems:"flex-end",paddingBottom:4}}>
+                    <button onClick={()=>setShowLeiRechner(showLeiRechner===k.id?null:k.id)}
+                      title="Leitungsrechner"
+                      style={{background:showLeiRechner===k.id?"rgba(33,150,201,0.15)":"transparent",border:"1px solid var(--border)",borderRadius:6,padding:"5px 6px",cursor:"pointer",color:"var(--blue)",fontSize:11,lineHeight:1}}>⚡</button>
+                  </div>
                 </div>
+                {/* Leitungsrechner-Panel */}
+                {showLeiRechner===k.id && <LeitungsRechner qs={k.kabelQs||"1.5"} laenge={k.kabelLaenge} onSelectQs={qs=>updKabel(k.id,"kabelQs",qs)} />}
               </div>
             );
           })}
@@ -1802,7 +2029,7 @@ const stueckliste = (() => {
             <div>
               <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.3px"}}>⚡ Sicherungen zuweisen</div>
               <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>
-                Kabel per Drag&Drop auf Sicherungen ziehen · {kabelImPool.length>0?<span style={{color:"var(--svp)"}}>{kabelImPool.length} noch nicht zugewiesen</span>:<span style={{color:"var(--green)"}}>✓ Alle zugewiesen</span>}
+                Kabel per Drag&Drop auf Sicherungen ziehen · {kabelImPool.length>0?<span style={{color:"var(--blue)"}}>{kabelImPool.length} noch nicht zugewiesen</span>:<span style={{color:"var(--green)"}}>✓ Alle zugewiesen</span>}
               </div>
             </div>
             <div style={{display:"flex",gap:8}}>
@@ -1817,7 +2044,7 @@ const stueckliste = (() => {
             <div>
               <div style={{fontSize:11,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"1px",marginBottom:8,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
                 🔌 Kabel-Pool
-                {kabelImPool.length>0&&<span style={{background:"#f0a50022",border:"1px solid #f0a50044",color:"var(--svp)",borderRadius:10,padding:"1px 7px",fontSize:9}}>{kabelImPool.length} offen</span>}
+                {kabelImPool.length>0&&<span style={{background:"#f0a50022",border:"1px solid #f0a50044",color:"var(--blue)",borderRadius:10,padding:"1px 7px",fontSize:9}}>{kabelImPool.length} offen</span>}
               </div>
               {kabelImPool.length===0
                 ? <div style={{background:"rgba(82,217,138,0.05)",border:"1px solid rgba(82,217,138,0.2)",borderRadius:10,padding:"20px",textAlign:"center"}}><div style={{fontSize:20,marginBottom:6}}>✓</div><div style={{color:"var(--green)",fontSize:13,fontWeight:700}}>Alle Kabel zugewiesen</div><div style={{color:"var(--text3)",fontSize:11,marginTop:4}}>Kabel können weiterhin aus Sicherungen hierher gezogen werden</div></div>
@@ -1949,7 +2176,7 @@ const stueckliste = (() => {
                       weiseKabelZu(dragKabelId.current, si.id);
                       dragKabelId.current=null;
                     }}
-                    style={{background:si.istFILS?"#14121e":"var(--bg2)",border:`1px solid ${si.istFILS?"rgba(167,139,250,0.15)":is3p?"rgba(167,139,250,0.1)":"var(--border)"}`,borderRadius:10,marginBottom:8,overflow:"hidden"}}>
+                    style={{background:si.istReserve?"#141618":si.istFILS?"#14121e":"var(--bg2)",border:`1px solid ${si.istReserve?"rgba(90,99,112,0.25)":si.istFILS?"rgba(167,139,250,0.15)":is3p?"rgba(167,139,250,0.1)":"var(--border)"}`,borderRadius:10,marginBottom:8,overflow:"hidden",opacity:si.istReserve?0.7:1}}>
 
                     {/* Sicherungs-Header */}
                     <div style={{padding:"8px 12px",background:"var(--bg3)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
@@ -1978,6 +2205,12 @@ const stueckliste = (() => {
                       <button onClick={()=>updSicherung(si.id,"istFILS",!si.istFILS)}
                         style={{padding:"3px 8px",borderRadius:5,border:`1px solid ${si.istFILS?"var(--purple)":"var(--border2)"}`,background:si.istFILS?"rgba(167,139,250,0.1)":"transparent",color:si.istFILS?"var(--purple)":"var(--text3)",cursor:"pointer",fontSize:10,fontWeight:700}}>
                         {si.istFILS?"⚡FILS":"FILS"}
+                      </button>
+                      {/* Reserve */}
+                      <button onClick={()=>updSicherung(si.id,"istReserve",!si.istReserve)}
+                        title="Als Reserveplatz markieren (leerer Sicherungsplatz)"
+                        style={{padding:"3px 8px",borderRadius:5,border:`1px solid ${si.istReserve?"var(--text2)":"var(--border2)"}`,background:si.istReserve?"rgba(158,166,175,0.15)":"transparent",color:si.istReserve?"var(--text2)":"var(--text3)",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                        {si.istReserve?"↩ Reserve":"Reserve"}
                       </button>
                       <div style={{flex:1}}/>
                       <span style={{fontSize:10,color:"var(--text3)"}}>{siKabel.length} Kabel</span>
@@ -2075,7 +2308,7 @@ const stueckliste = (() => {
             <St label="Sicherungen" val={sicherungen.length}/>
             <St label="FILS" val={sicherungen.filter(s=>s.istFILS).length} color="var(--purple)"/>
             <St label="TE benötigt" val={`${teBenoetigt} TE`}/>
-            {kabelImPool.length>0&&<span style={{fontSize:12,color:"var(--svp)",fontWeight:600}}>⚠ {kabelImPool.length} Kabel noch nicht zugewiesen</span>}
+            {kabelImPool.length>0&&<span style={{fontSize:12,color:"var(--blue)",fontWeight:600}}>⚠ {kabelImPool.length} Kabel noch nicht zugewiesen</span>}
           </div>
           <div style={{display:"flex",gap:10,marginTop:12}}>
             <button onClick={()=>setStep(2)} style={bSec}>← Zurück</button>
@@ -2104,7 +2337,7 @@ const stueckliste = (() => {
               <div style={{background:"var(--bg2)",border:`1px solid ${diff<0?"var(--red)":diff<4?"#f0a50044":"var(--border)"}`,borderRadius:10,padding:"12px 16px",marginBottom:14,display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
                 <St label="TE benötigt" val={`${teBenoetigt} TE`}/>
                 <St label="TE verfügbar" val={`${teVerfuegbar} TE`}/>
-                <St label="Reserve" val={`${diff} TE`} color={diff<0?"var(--red)":diff<4?"var(--svp)":"var(--green)"}/>
+                <St label="Reserve" val={`${diff} TE`} color={diff<0?"var(--red)":diff<4?"var(--blue)":"var(--green)"}/>
                 <St label="FI-Gruppen" val={fiKonfigs.length}/>
                 {diff<0&&<span style={{fontSize:11,color:"var(--red)",fontWeight:600}}>⚠ Zu wenig TE!</span>}
               </div>
@@ -2200,10 +2433,10 @@ const stueckliste = (() => {
               {plan.warnungen?.length>0&&plan.warnungen.map((w,i)=><div key={i} style={{fontSize:11,color:"var(--red)",marginTop:4}}>⚠ {w}</div>)}
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:"1.5px",fontFamily:"var(--mono)"}}>{settings.firmenname||"SVP Elektrotechnik"}</div>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:"1.5px",fontFamily:"var(--mono)"}}>{settings.firmenname||""}</div>
               {projekt.ersteller&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1,fontFamily:"var(--mono)"}}>{projekt.ersteller}</div>}
               {projekt.standort&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1,fontFamily:"var(--mono)"}}>📍 {projekt.standort}</div>}
-              <div style={{fontSize:11,color:"var(--svp)",marginTop:3,fontFamily:"var(--mono)",fontWeight:600}}>{new Date().toLocaleDateString("de-DE")}</div>
+              <div style={{fontSize:11,color:"var(--blue)",marginTop:3,fontFamily:"var(--mono)",fontWeight:600}}>{new Date().toLocaleDateString("de-DE")}</div>
               <div style={{display:"flex",gap:10,marginTop:6,justifyContent:"flex-end"}}>
                 <span style={{fontSize:10,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:700}}>{plan.gruppen.length} FI</span>
                 <span style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)"}}>{sicherungen.filter(s=>!s.istFILS).length} LS</span>
@@ -2228,7 +2461,7 @@ const stueckliste = (() => {
                     {fi.phasenschiene&&<span style={{background:"rgba(82,217,138,0.08)",border:"1px solid #52c07a33",borderRadius:5,padding:"2px 8px",fontSize:10,color:"var(--green)"}}>Phasenschiene {fiPhasenschiene(fi.pole)}</span>}
                     <div style={{flex:1,minWidth:80}}>
                       <div style={{fontSize:9,color:"var(--text3)",marginBottom:2}}>{sicherTE}/{fiMaxTE(fi.pole)} TE · {ausl}%</div>
-                      <div style={{height:4,background:"var(--border)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(100,ausl)}%`,background:ausl>100?"var(--red)":ausl>85?"var(--svp)":"var(--green)",borderRadius:2}}/></div>
+                      <div style={{height:4,background:"var(--border)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(100,ausl)}%`,background:ausl>100?"var(--red)":ausl>85?"var(--blue)":"var(--green)",borderRadius:2}}/></div>
                     </div>
                     <div style={{display:"flex",gap:5}}>{Object.entries(fi.phasen).map(([ph,amp])=><span key={ph} style={{fontSize:10,background:PH_BG[ph],border:`1px solid ${PH_BORDER[ph]}`,borderRadius:4,padding:"2px 7px",color:PH_COLOR[ph],fontWeight:700,fontFamily:"var(--mono)"}}>{ph}: {amp}A</span>)}</div>
                   </div>
@@ -2256,6 +2489,16 @@ const stueckliste = (() => {
                         const siKabel=si.kabel||[];
                         const swColors=[...new Set(siKabel.map(k=>swColor(k.stockwerk)))];
                         const w=(sInfo?.te||1)*28+((sInfo?.te||1)-1)*4;
+                        if(si.istReserve) return(
+                          <div key={si.id} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                            <div style={{width:w,background:"rgba(255,200,40,0.03)",border:"1.5px dashed rgba(255,200,40,0.3)",borderRadius:6,height:90,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3}}>
+                              <div style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",fontWeight:700}}>{fLabel}</div>
+                              <div style={{fontSize:7,color:"rgba(255,200,40,0.5)",textTransform:"uppercase",letterSpacing:"0.5px"}}>Reserve</div>
+                              <div style={{fontSize:9,color:"rgba(255,200,40,0.4)",fontFamily:"var(--mono)"}}>{sInfo?.label}</div>
+                            </div>
+                            <div style={{fontSize:8,color:"var(--text3)",fontWeight:700,marginTop:3,fontFamily:"var(--mono)"}}>{fLabel}</div>
+                          </div>
+                        );
                         return(
                           <div key={si.id} draggable
                             onDragStart={e=>{onPlanDragStart(si.id,fi.id); e.currentTarget.style.opacity="0.4";}}
@@ -2299,25 +2542,63 @@ const stueckliste = (() => {
                         </div>
                       ))}
                     </div>
-                    {/* ── Phasenschiene ── */}
-                    {fi.phasenschiene&&(
-                      <div style={{marginTop:6,display:"flex",gap:3,alignItems:"center",minWidth:"max-content",padding:"5px 6px",background:"rgba(26,122,191,0.04)",borderRadius:6,border:"1px solid rgba(26,122,191,0.12)"}}>
-                        <span style={{fontSize:7,color:"var(--text3)",marginRight:4,flexShrink:0,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:700}}>Schiene</span>
-                        {(fi.pole>=4
-                          ? [{l:"L1",c:"#a05428"},{l:"L2",c:"#2d2d2d"},{l:"L3",c:"#6b7280"},{l:"N",c:"#1d6dbf"}]
-                          : [{l:"L1",c:"#a05428"},{l:"N",c:"#1d6dbf"}]
-                        ).map(({l,c})=>(
-                          <div key={l} style={{display:"flex",alignItems:"center",gap:3,background:c+"22",border:`1px solid ${c}55`,borderRadius:4,padding:"2px 6px 2px 4px"}}>
-                            <div style={{width:6,height:6,borderRadius:2,background:c,flexShrink:0}}/>
-                            <span style={{fontSize:8,color:c,fontFamily:"var(--mono)",fontWeight:800}}>{l}</span>
+                    {/* ── Phasenschiene – Pin-Sequenz ── */}
+                    {fi.phasenschiene&&(()=>{
+                      // DIN-Aderfarben: L1=braun, L2=schwarz, L3=grau, N=blau
+                      const C={L1:"#a05428",L2:"#555555",L3:"#7a8899",N:"#1d6dbf"};
+                      // 3-Leiter: LS-Bereich zyklisch L1/L2/L3
+                      // 4-Leiter+N: gesamte Schiene zyklisch L1/L2/L3/N
+                      const mit4L = fi.pole>=4 && fi.phasenschieneN;
+                      const lsCycle = fi.pole>=4
+                        ? (mit4L ? ["L1","L2","L3","N"] : ["L1","L2","L3"])
+                        : ["L1"];
+                      let ci=0;
+                      const Pin=({l,dim})=>(
+                        <div style={{width:28,height:14,borderRadius:3,flexShrink:0,
+                          background:C[l]+(dim?"18":"33"),border:`1px solid ${C[l]}${dim?"44":"99"}`,
+                          display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <span style={{fontSize:7,color:C[l]+(dim?"88":""),fontWeight:800,fontFamily:"var(--mono)"}}>{l}</span>
+                        </div>
+                      );
+                      // FI-Pins: L1,L2,L3,N für 4-pol / L1,N für 2-pol
+                      const fiPins=fi.pole>=4?["L1","L2","L3","N"]:["L1","N"];
+                      const fiW=(fi.pole||4)*28+((fi.pole||4)-1)*4;
+                      // LS-Pins aufbauen
+                      const lsPins=[];
+                      fi.stromkreise.forEach(sk=>{
+                        const sInfo=STD_SICHERUNGEN.find(s=>s.id===sk.sicherung);
+                        const te=sInfo?.te||1;
+                        if(!mit4L && sk.is3p && fi.pole>=4){
+                          // 3-Leiter: 3-phasige LS → L1,L2,L3
+                          lsPins.push({l:"L1",dim:sk.istReserve});
+                          lsPins.push({l:"L2",dim:sk.istReserve});
+                          lsPins.push({l:"L3",dim:sk.istReserve});
+                          ci+=3;
+                        } else {
+                          for(let j=0;j<te;j++){
+                            lsPins.push({l:lsCycle[ci%lsCycle.length],dim:!!sk.istReserve});
+                            ci++;
+                          }
+                        }
+                      });
+                      // Leerstellen
+                      const usedTE=fi.stromkreise.reduce((s,sk)=>{const inf=STD_SICHERUNGEN.find(x=>x.id===sk.sicherung);return s+(inf?.te||1);},0);
+                      for(let i=0;i<Math.max(0,fiMaxTE(fi.pole)-usedTE);i++){
+                        lsPins.push({l:lsCycle[ci%lsCycle.length],dim:true});ci++;
+                      }
+                      return(
+                        <div style={{marginTop:3,display:"flex",gap:4,alignItems:"center",minWidth:"max-content"}}>
+                          {/* FI-Pins */}
+                          <div style={{display:"flex",gap:4,width:fiW,flexShrink:0}}>
+                            {fiPins.map((l,idx)=><Pin key={idx} l={l} dim={false}/>)}
                           </div>
-                        ))}
-                        {fi.pole>=4&&<div style={{display:"flex",alignItems:"center",gap:3,background:"#4ade8022",border:"1px solid #4ade8055",borderRadius:4,padding:"2px 6px 2px 4px"}}>
-                          <div style={{width:6,height:6,borderRadius:2,background:"#22c55e",flexShrink:0}}/>
-                          <span style={{fontSize:8,color:"#4ade80",fontFamily:"var(--mono)",fontWeight:800}}>PE</span>
-                        </div>}
-                      </div>
-                    )}
+                          {/* Trennlinie (entspricht Separator im Plan) */}
+                          <div style={{width:11,flexShrink:0}}/>
+                          {/* LS-Pins */}
+                          {lsPins.map((p,idx)=><Pin key={idx} l={p.l} dim={p.dim}/>)}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -2443,23 +2724,48 @@ const stueckliste = (() => {
                 <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid var(--border)"}}>
                   <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:10,fontWeight:700}}>Benötigte Querverbinder</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                    {querverbinder.map((qv,i)=>(
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:10,background:"var(--bg)",border:`1px solid ${qv.color}55`,borderRadius:10,padding:"8px 12px",minWidth:180}}>
-                        <div style={{position:"relative",flexShrink:0}}>
+                    {querverbinder.map((qv,i)=>{
+                      const hasClips=qv.clipPins&&qv.clipPins.length>0;
+                      const clipSet=new Set(qv.clipPins||[]);
+                      return(
+                      <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,background:"var(--bg)",border:`1px solid ${hasClips?"#f59e0b55":qv.color+"55"}`,borderRadius:10,padding:"8px 12px",minWidth:200}}>
+                        <div style={{flexShrink:0}}>
+                          {/* Brücken-Balken oben */}
+                          <div style={{height:5,borderRadius:"3px 3px 0 0",opacity:0.85,
+                            background:hasClips
+                              ? `repeating-linear-gradient(90deg,${qv.color} 0px,${qv.color} 8px,transparent 8px,transparent 12px)`
+                              : qv.color,
+                            width:(qv.ports*10+(qv.ports-1)*3)}}/>
+                          {/* Pins */}
                           <div style={{display:"flex",gap:3,alignItems:"flex-end"}}>
-                            {Array.from({length:Math.min(qv.ports,6)}).map((_,pi)=>(
-                              <div key={pi} style={{width:10,height:28,borderRadius:3,background:qv.color+"22",border:`1.5px solid ${qv.color}88`,flexShrink:0}}/>
-                            ))}
+                            {Array.from({length:qv.ports}).map((_,pi)=>{
+                              const pinNr=pi+1;
+                              const clip=clipSet.has(pinNr);
+                              return(
+                                <div key={pi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                                  <div style={{width:10,height:clip?14:22,borderRadius:3,
+                                    background:clip?"#44444433":qv.color+"22",
+                                    border:`1.5px solid ${clip?"#55555588":qv.color+"88"}`,
+                                    flexShrink:0,position:"relative"}}>
+                                    {clip&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:8,color:"#f59e0b",fontWeight:900,lineHeight:1}}>✂</div>}
+                                  </div>
+                                  {clip&&<div style={{fontSize:6,color:"#f59e0b",fontWeight:800,fontFamily:"var(--mono)",lineHeight:1}}>{pinNr}</div>}
+                                </div>
+                              );
+                            })}
                           </div>
-                          <div style={{position:"absolute",top:0,left:0,right:0,height:5,background:qv.color,borderRadius:"3px 3px 0 0",opacity:0.8}}/>
                         </div>
                         <div>
                           <div style={{fontSize:12,fontWeight:800,color:"var(--text)",fontFamily:"var(--mono)"}}>{qv.ports}-fach</div>
                           <div style={{fontSize:10,fontWeight:600,color:qv.color,marginTop:1}}>{qv.typ}-Querverbinder{qv.fils?" (FILS)":""}</div>
                           <div style={{fontSize:9,color:"var(--text3)",marginTop:2}}>{qv.fLabel}</div>
+                          {hasClips&&<div style={{fontSize:9,color:"#f59e0b",marginTop:3,fontWeight:600}}>
+                            ✂ Pin {qv.clipPins.join(", ")} abzwicken
+                          </div>}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div style={{marginTop:10,display:"flex",flexWrap:"wrap",gap:6}}>
                     <span style={{fontSize:10,color:"var(--text3)"}}>Gesamt:</span>
@@ -2481,6 +2787,16 @@ const stueckliste = (() => {
                 const groups=buildSeq(fi.stromkreise,false,null);
                 const klemmenAnzahl=groups.reduce((n,g)=>n+g.klemmen.length,0);
                 const kabelKlemmen=groups.filter(g=>g.kabelLabel).reduce((n,g)=>n+g.klemmen.length,0);
+                // Klemmenbezeichnungen: X1, X1.1, X1.2 ...
+                const xNr=fiIdx+1;
+                let xCounter=0;
+                const xLabels=new Map();
+                groups.forEach((grp,gi)=>{grp.klemmen.forEach((kl,ki)=>{
+                  if(kl.type==='pe_einspeisung') xLabels.set(`${gi}-${ki}`,`X${xNr}`);
+                  else if(['rk_mit_pe','rk_ohne_pe','rk_n_fils'].includes(kl.type)){
+                    xCounter++; xLabels.set(`${gi}-${ki}`,`X${xNr}.${xCounter}`);
+                  }
+                });});
                 return(
                   <div key={fi.id} style={{background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
                     <div style={{padding:"10px 16px",background:"var(--bg3)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderBottom:"1px solid var(--border)"}}>
@@ -2491,9 +2807,37 @@ const stueckliste = (() => {
                       </span>
                     </div>
                     <div style={{padding:"14px 16px",overflowX:"auto"}}>
+                      {/* ── QV-Brücken Overlay (über den Klemmen) ── */}
+                      {mitQV&&(()=>{
+                        const bySkId={};
+                        groups.forEach((grp,gi)=>{
+                          if(!grp.skId) return;
+                          if(!bySkId[grp.skId]) bySkId[grp.skId]=[];
+                          bySkId[grp.skId].push(gi);
+                        });
+                        const bridges=Object.values(bySkId).filter(idxs=>idxs.length>=2);
+                        if(!bridges.length) return null;
+                        const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
+                        return(<div style={{marginBottom:4}}>{bridges.map((idxs,bi)=>{
+                          const first=idxs[0],last=idxs[idxs.length-1];
+                          const leftPx=groups.slice(0,first).reduce((s,g)=>s+gw(g)+4,0);
+                          const widthPx=groups.slice(first,last+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
+                          const lCount=groups.slice(first,last+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type==="rk_mit_pe").length,0);
+                          return(
+                            <div key={bi} style={{marginBottom:2,marginLeft:leftPx,width:widthPx,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
+                              <div style={{fontSize:7,color:"#ff6b6b",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginBottom:1,letterSpacing:"0.5px"}}>{lCount}-fach QV</div>
+                              <div style={{height:4,background:"#ff6b6b",borderRadius:"2px 2px 0 0",opacity:0.85}}/>
+                            </div>
+                          );
+                        })}</div>);
+                      })()}
                       <div style={{display:"flex",flexWrap:"nowrap",gap:4,alignItems:"flex-end",minWidth:"max-content"}}>
-                        {groups.map((grp,gi)=>(
-                          <div key={gi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+                        {groups.map((grp,gi)=>{
+                          const isKappeGrp=grp.klemmen[0]?.type==="abdeckkappe_orange";
+                          const prevIsKappeGrp=gi>0&&groups[gi-1].klemmen[0]?.type==="abdeckkappe_orange";
+                          return(
+                          <div key={gi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0,
+                            marginLeft:isKappeGrp||prevIsKappeGrp?-3:0}}>
                             {grp.kabelLabel
                               ? <div style={{fontSize:7,color:grp.kabelColor||"var(--text2)",fontWeight:700,fontFamily:"var(--mono)",
                                   maxWidth:Math.max(24,grp.klemmen.length*26)+"px",
@@ -2508,15 +2852,22 @@ const stueckliste = (() => {
                               {grp.klemmen.map((s,si)=>{
                                 const st=KLEMME_STYLES[s.type]||{bg:"var(--bg2)",border:"var(--text3)",label:"?",color:"var(--text3)",w:22};
                                 const isKappe=s.type==="abdeckkappe_orange";
+                                const xl=xLabels?.get(`${gi}-${si}`);
                                 return(
-                                  <div key={si} title={s.label||s.type}
-                                    style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
-                                      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
-                                      boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
-                                    {(s.type==="pe_einspeisung"||s.type==="rk_mit_pe")&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
-                                    {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
-                                    {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
-                                    {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
+                                  <div key={si} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+                                    <div title={xl||s.label||s.type}
+                                      style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
+                                        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
+                                        boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
+                                      {s.type==="pe_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
+                                      {s.type==="rk_mit_pe"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>3pol</span>}
+                                      {s.type==="rk_ohne_pe"&&<span style={{fontSize:7,color:"var(--text3)",fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>2pol</span>}
+                                      {s.type==="rk_n_fils"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>N</span>}
+                                      {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
+                                      {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
+                                      {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
+                                    </div>
+                                    {xl&&<span style={{fontSize:5.5,color:s.type==="pe_einspeisung"?"var(--blue)":"var(--text3)",fontFamily:"var(--mono)",fontWeight:700,marginTop:2,letterSpacing:0,lineHeight:1,userSelect:"none"}}>{xl}</span>}
                                   </div>
                                 );
                               })}
@@ -2531,20 +2882,23 @@ const stueckliste = (() => {
                               : <div style={{height:4}}/>
                             }
                           </div>
-                        ))}
+                        ); })}
                       </div>
-                      {/* ── N-Schiene ── */}
-                      {(()=>{
+                      {/* ── N-Schiene (nur wenn aktiviert) ── */}
+                      {mitNBruecke&&(()=>{
                         const neIdx=groups.findIndex(g=>g.klemmen[0]?.type==="n_einspeisung");
                         const nxIdx=groups.findIndex(g=>g.klemmen[0]?.type==="n_endklemme");
                         if(neIdx<0||nxIdx<0) return null;
                         const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
                         const left=groups.slice(0,neIdx).reduce((s,g)=>s+gw(g)+4,0);
                         const width=groups.slice(neIdx,nxIdx+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
+                        const klemCnt=groups.slice(neIdx,nxIdx+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type!=="abdeckkappe_orange").length,0);
+                        const kapCnt=groups.slice(neIdx,nxIdx+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type==="abdeckkappe_orange").length,0);
+                        const laengeMM=Math.ceil(klemCnt*6.2+kapCnt*2);
                         return(
                           <div style={{marginTop:4,marginLeft:left,width:width,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
                             <div style={{height:6,background:"rgba(33,150,201,0.75)",borderRadius:3,boxShadow:"0 0 6px rgba(33,150,201,0.35)"}}/>
-                            <div style={{fontSize:7,color:"rgba(33,150,201,0.7)",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:2,letterSpacing:"0.5px"}}>N-Schiene</div>
+                            <div style={{fontSize:7,color:"rgba(33,150,201,0.7)",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:2,letterSpacing:"0.5px"}}>N-Schiene · {laengeMM}mm</div>
                           </div>
                         );
                       })()}
@@ -2557,6 +2911,16 @@ const stueckliste = (() => {
               {plan.fils.map((sk,i)=>{
                 const groups=buildSeq(null,true,sk);
                 const klemmenAnzahl=groups.reduce((n,g)=>n+g.klemmen.length,0);
+                // Klemmenbezeichnungen für FILS: X(n+1)
+                const xNr=plan.gruppen.length+i+1;
+                let xCounter=0;
+                const xLabels=new Map();
+                groups.forEach((grp,gi)=>{grp.klemmen.forEach((kl,ki)=>{
+                  if(kl.type==='pe_einspeisung') xLabels.set(`${gi}-${ki}`,`X${xNr}`);
+                  else if(['rk_mit_pe','rk_ohne_pe','rk_n_fils'].includes(kl.type)){
+                    xCounter++; xLabels.set(`${gi}-${ki}`,`X${xNr}.${xCounter}`);
+                  }
+                });});
                 return(
                   <div key={sk.id} style={{background:"#14121e",border:"1px solid rgba(167,139,250,0.15)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
                     <div style={{padding:"10px 16px",background:"rgba(167,139,250,0.05)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderBottom:"1px solid rgba(167,139,250,0.1)"}}>
@@ -2566,8 +2930,12 @@ const stueckliste = (() => {
                     </div>
                     <div style={{padding:"14px 16px",overflowX:"auto"}}>
                       <div style={{display:"flex",flexWrap:"nowrap",gap:4,alignItems:"flex-end",minWidth:"max-content"}}>
-                        {groups.map((grp,gi)=>(
-                          <div key={gi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+                        {groups.map((grp,gi)=>{
+                          const isKappeGrp=grp.klemmen[0]?.type==="abdeckkappe_orange";
+                          const prevIsKappeGrp=gi>0&&groups[gi-1].klemmen[0]?.type==="abdeckkappe_orange";
+                          return(
+                          <div key={gi} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0,
+                            marginLeft:isKappeGrp||prevIsKappeGrp?-3:0}}>
                             {grp.kabelLabel
                               ? <div style={{fontSize:7,color:grp.kabelColor||"var(--text2)",fontWeight:700,fontFamily:"var(--mono)",
                                   maxWidth:Math.max(24,grp.klemmen.length*26)+"px",
@@ -2582,15 +2950,22 @@ const stueckliste = (() => {
                               {grp.klemmen.map((s,si)=>{
                                 const st=KLEMME_STYLES[s.type]||{bg:"var(--bg2)",border:"var(--text3)",label:"?",color:"var(--text3)",w:22};
                                 const isKappe=s.type==="abdeckkappe_orange";
+                                const xl=xLabels?.get(`${gi}-${si}`);
                                 return(
-                                  <div key={si} title={s.label||s.type}
-                                    style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
-                                      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
-                                      boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
-                                    {(s.type==="pe_einspeisung"||s.type==="rk_mit_pe")&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
-                                    {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
-                                    {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
-                                    {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
+                                  <div key={si} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+                                    <div title={xl||s.label||s.type}
+                                      style={{width:st.w,height:48,borderRadius:isKappe?2:5,background:st.bg,border:`1.5px solid ${st.border}`,
+                                        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,
+                                        boxShadow:isKappe?"none":"0 1px 4px rgba(0,0,0,0.3)"}}>
+                                      {s.type==="pe_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>PE</span>}
+                                      {s.type==="rk_mit_pe"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>3pol</span>}
+                                      {s.type==="rk_ohne_pe"&&<span style={{fontSize:7,color:"var(--text3)",fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>2pol</span>}
+                                      {s.type==="rk_n_fils"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>N</span>}
+                                      {s.type==="n_einspeisung"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NE</span>}
+                                      {s.type==="n_endklemme"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>NX</span>}
+                                      {s.type==="rk_reserve_knx"&&<span style={{fontSize:7,color:st.color,fontWeight:800,fontFamily:"var(--mono)",writingMode:"vertical-rl",userSelect:"none"}}>R</span>}
+                                    </div>
+                                    {xl&&<span style={{fontSize:5.5,color:s.type==="pe_einspeisung"?"var(--blue)":"var(--text3)",fontFamily:"var(--mono)",fontWeight:700,marginTop:2,letterSpacing:0,lineHeight:1,userSelect:"none"}}>{xl}</span>}
                                   </div>
                                 );
                               })}
@@ -2605,8 +2980,24 @@ const stueckliste = (() => {
                               : <div style={{height:4}}/>
                             }
                           </div>
-                        ))}
+                        ); })}
                       </div>
+                      {/* ── FILS QV-Brücken Overlay ── */}
+                      {mitQV&&(()=>{
+                        const gw=g=>g.klemmen.reduce((s,k)=>s+(KLEMME_STYLES[k.type]?.w||22),0)+Math.max(0,g.klemmen.length-1)*2;
+                        const cableIdxs=groups.map((g,i)=>g.kabelLabel?i:-1).filter(i=>i>=0);
+                        if(cableIdxs.length<2) return null;
+                        const first=cableIdxs[0],last=cableIdxs[cableIdxs.length-1];
+                        const leftPx=groups.slice(0,first).reduce((s,g)=>s+gw(g)+4,0);
+                        const widthPx=groups.slice(first,last+1).reduce((s,g,i,a)=>s+gw(g)+(i<a.length-1?4:0),0);
+                        const nCount=groups.slice(first,last+1).reduce((s,g)=>s+g.klemmen.filter(k=>k.type==="rk_n_fils").length,0);
+                        return(<>
+                          {nCount>=2&&<div style={{marginTop:3,marginLeft:leftPx,width:widthPx,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
+                            <div style={{height:3,background:"rgba(33,150,201,0.8)",borderRadius:2}}/>
+                            <div style={{fontSize:7,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:700,textAlign:"center",marginTop:1,letterSpacing:"0.5px"}}>{nCount}-fach QV</div>
+                          </div>}
+                        </>);
+                      })()}
                     </div>
                   </div>
                 );
@@ -2636,15 +3027,37 @@ const stueckliste = (() => {
             const alleZeilen=[];
             plan.gruppen.forEach((fi,fiIdx)=>{
               const qNr=fiIdx+1;
-              alleZeilen.push({typ:"fi",qNr,fi});
+              const xNr=fiIdx+1;
+              alleZeilen.push({typ:"fi",qNr,fi,xLabel:`X${xNr}`});
+              // X-Klemmenbezeichnungen: Terminal-Zähler pro FI
+              const grps=buildSeq(fi.stromkreise,false,null);
+              const skToX={};
+              let xC=0;
+              grps.forEach(grp=>{
+                if(!grp.skId)return;
+                const first=xC+1;
+                grp.klemmen.forEach(kl=>{if(['rk_mit_pe','rk_ohne_pe'].includes(kl.type))xC++;});
+                if(!skToX[grp.skId]) skToX[grp.skId]={from:first,to:xC};
+                else skToX[grp.skId].to=xC;
+              });
               fi.stromkreise.forEach((si,siIdx)=>{
-                alleZeilen.push({typ:"ls",qNr,fNr:siIdx+1,si});
+                const x=skToX[si.id];
+                const xLabel=x?(x.from===x.to?`X${xNr}.${x.from}`:`X${xNr}.${x.from}–${x.to}`):"";
+                alleZeilen.push({typ:"ls",qNr,fNr:siIdx+1,si,xLabel});
               });
             });
             plan.fils.forEach((si,i)=>{
               const qNr=plan.gruppen.length+i+1;
-              alleZeilen.push({typ:"fi",qNr,fils:true,si});
-              alleZeilen.push({typ:"ls",qNr,fNr:1,si});
+              const xNr=qNr;
+              alleZeilen.push({typ:"fi",qNr,fils:true,si,xLabel:`X${xNr}`});
+              // FILS Terminals: rk_n_fils + rk_ohne_pe
+              const grps=buildSeq(null,true,si);
+              let xC=0;
+              grps.forEach(grp=>{
+                grp.klemmen.forEach(kl=>{if(['rk_n_fils','rk_ohne_pe'].includes(kl.type))xC++;});
+              });
+              const xLabel=xC>0?(xC===1?`X${xNr}.1`:`X${xNr}.1–${xNr}.${xC}`):"";
+              alleZeilen.push({typ:"ls",qNr,fNr:1,si,xLabel});
             });
             return <>
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:500,overflowY:"auto",padding:"20px 16px"}} onClick={()=>setShowBeschriftung(false)}>
@@ -2675,7 +3088,7 @@ const stueckliste = (() => {
                       const filsBem=z.si?.filsBemessung||40, filsTyp=z.si?.filsTyp||"A", filsFs=z.si?.filsFehlerstrom||30, filsPole=z.si?.filsPole||4;
                       return(
                         <tr key={`q${z.qNr}`} style={{background:"#1a1a2e",borderBottom:"1px solid #2a2a3a"}}>
-                          <td style={{padding:"8px 12px",fontFamily:"var(--mono)",fontWeight:900,fontSize:14,color:z.fils?"var(--purple)":"var(--blue)"}}>Q{z.qNr}</td>
+                          <td style={{padding:"8px 12px",fontFamily:"var(--mono)",fontWeight:900,fontSize:14,color:z.fils?"var(--purple)":"var(--blue)"}}>Q{z.qNr}{z.xLabel&&<span style={{fontSize:9,color:"var(--text3)",fontWeight:500,marginLeft:6}}>{z.xLabel}</span>}</td>
                           <td style={{padding:"8px 12px",color:"var(--text2)",fontStyle:"italic",fontSize:11}}>
                             {z.fils?`FILS – FI/RCD ${filsBem}A Typ ${filsTyp} ${filsFs}mA ${filsPole}P`:`FI-Schutzschalter · ${z.fi?fiBeschreibung(z.fi):""}`}
                           </td>
@@ -2692,7 +3105,10 @@ const stueckliste = (() => {
                     const swColors=[...new Set(siKabel.map(k=>k.stockwerk))];
                     return(
                       <tr key={fLabel} style={{borderBottom:"1px solid #161616",background:"var(--bg2)"}}>
-                        <td style={{padding:"7px 12px",fontFamily:"var(--mono)",fontWeight:800,fontSize:13,color:"var(--text)"}}>{fLabel}</td>
+                        <td style={{padding:"7px 12px",fontFamily:"var(--mono)",fontWeight:800,fontSize:13,color:"var(--text)"}}>
+                          {fLabel}
+                          {z.xLabel&&<div style={{fontSize:9,color:"var(--text3)",fontWeight:500,marginTop:1}}>{z.xLabel}</div>}
+                        </td>
                         <td style={{padding:"7px 12px",fontWeight:600,color:"var(--text2)"}}>{siKabel.map(k=>k.bezeichnung||k.raum||"?").join(" + ")||"—"}</td>
                         <td style={{padding:"7px 12px",color:"var(--text3)"}}>{[...new Set(siKabel.map(k=>k.raum).filter(Boolean))].join(", ")||"—"}</td>
                         <td style={{padding:"7px 12px"}}>{swColors.map(sw=><span key={sw} style={{background:swColor(sw)+"22",color:swColor(sw),borderRadius:4,padding:"1px 7px",fontSize:10,fontWeight:700,marginRight:3}}>{sw}</span>)}</td>
@@ -2762,7 +3178,7 @@ const stueckliste = (() => {
             </button>
             <button onClick={()=>{setShowStueckliste(true);}}
               style={{flex:1,background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text)",borderRadius:10,padding:"13px 20px",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--svp)";e.currentTarget.style.color="var(--svp)";}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--blue)";e.currentTarget.style.color="var(--blue)";}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--text)";}}>
               📦 Stückliste erstellen
             </button>
@@ -2778,7 +3194,7 @@ const stueckliste = (() => {
           if(!fi)return null;
           const qNr=plan.gruppen.indexOf(fi)+1;
           return(
-            <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
               <div style={{background:"var(--bg2)",border:"1px solid rgba(33,150,201,0.2)",borderRadius:16,padding:24,width:"100%",maxWidth:420}} onClick={e=>e.stopPropagation()}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2819,6 +3235,23 @@ const stueckliste = (() => {
                     {fi.phasenschiene?"✓ Phasenschiene aktiv":"Phasenschiene aus"}
                   </button>
                 </F>
+                {fi.phasenschiene&&fi.pole>=4&&(
+                  <F label="Phasenschienen-Typ">
+                    <div style={{display:"flex",gap:4}}>
+                      {[{v:false,label:"3-Leiter",sub:"L1·L2·L3"},{v:true,label:"4-Leiter +N",sub:"L1·L2·L3·N"}].map(({v,label,sub})=>(
+                        <button key={String(v)} onClick={()=>updPlanFI(fi.id,"phasenschieneN",v)}
+                          style={{flex:1,padding:"7px 6px",borderRadius:7,
+                            border:`1px solid ${fi.phasenschieneN===v?"var(--blue)":"var(--border)"}`,
+                            background:fi.phasenschieneN===v?"rgba(33,150,201,0.1)":"transparent",
+                            color:fi.phasenschieneN===v?"var(--blue)":"var(--text3)",
+                            cursor:"pointer",textAlign:"center"}}>
+                          <div style={{fontSize:11,fontWeight:700}}>{label}</div>
+                          <div style={{fontSize:9,opacity:0.7,fontFamily:"var(--mono)",marginTop:1}}>{sub}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </F>
+                )}
                 <button onClick={closePlanEdit} style={{...bPrimary,width:"100%",marginTop:8}}>Fertig</button>
               </div>
             </div>
@@ -2831,7 +3264,7 @@ const stueckliste = (() => {
           const qNr=plan.gruppen.indexOf(fi)+1;
           const fNr=fi.stromkreise.indexOf(si)+1;
           return(
-            <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
               <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:24,width:"100%",maxWidth:460}} onClick={e=>e.stopPropagation()}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2898,7 +3331,7 @@ const stueckliste = (() => {
 
       {/* ── INFO MODAL ── */}
       {showInfo&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.94)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowInfo(false)}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowInfo(false)}>
           <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:20,width:"100%",maxWidth:560,padding:32,position:"relative"}} onClick={e=>e.stopPropagation()}>
             <button onClick={()=>setShowInfo(false)} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"var(--text3)",fontSize:22,cursor:"pointer",lineHeight:1}}>✕</button>
 
@@ -2906,8 +3339,8 @@ const stueckliste = (() => {
             <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
               <div style={{width:48,height:48,borderRadius:12,background:"rgba(33,150,201,0.12)",border:"1px solid rgba(33,150,201,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>⚡</div>
               <div>
-                <div style={{fontSize:20,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px"}}>SVP Verteilerplaner</div>
-                <div style={{fontSize:12,color:"var(--svp)",fontFamily:"var(--mono)",fontWeight:600,marginTop:2}}>Version 1.5.0 · by Jedrimos</div>
+                <div style={{fontSize:20,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px"}}>Verteilerplaner</div>
+                <div style={{fontSize:12,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:600,marginTop:2}}>Version 2026.3 · by Jedrimos</div>
               </div>
             </div>
 
@@ -2944,9 +3377,7 @@ const stueckliste = (() => {
                 Lokale Datenspeicherung · Keine Cloud · Keine Werbung
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)"}}>SVP Elektrotechnik</span>
-                <div style={{width:4,height:4,borderRadius:"50%",background:"var(--border2)"}}/>
-                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)"}}>© 2025 Jedrimos</span>
+                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)"}}>© 2026 Jedrimos</span>
               </div>
             </div>
           </div>
@@ -2954,7 +3385,7 @@ const stueckliste = (() => {
       )}
 
       {showSave&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:24,width:"100%",maxWidth:400}}>
             <div style={{fontSize:16,fontWeight:700,marginBottom:16,color:"var(--text)"}}>💾 Projekt speichern</div>
             <input value={saveName} onChange={e=>setSaveName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&speichere()} placeholder="Projektname..." autoFocus
@@ -2968,21 +3399,25 @@ const stueckliste = (() => {
       )}
 
       {showLoad&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:14,padding:24,width:"100%",maxWidth:480,maxHeight:"80vh",overflow:"auto"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
               <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>📂 Projekt laden</div>
-              <button onClick={()=>setShowLoad(false)} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer"}}>✕</button>
+              <button onClick={()=>{setShowLoad(false);setLadesuche("");}} style={{background:"none",border:"none",color:"var(--text3)",fontSize:20,cursor:"pointer"}}>✕</button>
             </div>
-            {projekte.length===0
-              ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:24}}>Keine gespeicherten Projekte</div>
-              : projekte.map(p=>(
+            {projekte.length > 3 && (
+              <input value={ladesuche} onChange={e=>setLadesuche(e.target.value)} placeholder="Projekt suchen…"
+                style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",borderRadius:8,padding:"8px 12px",color:"var(--text)",fontSize:13,marginBottom:12,boxSizing:"border-box"}} />
+            )}
+            {projekte.filter(p=>!ladesuche||p.name?.toLowerCase().includes(ladesuche.toLowerCase())).length===0
+              ? <div style={{color:"var(--text3)",fontSize:13,textAlign:"center",padding:24}}>{ladesuche?"Keine Projekte gefunden":"Keine gespeicherten Projekte"}</div>
+              : projekte.filter(p=>!ladesuche||p.name?.toLowerCase().includes(ladesuche.toLowerCase())).map(p=>(
                   <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 14px",marginBottom:8}}>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:600,color:"var(--text)"}}>{p.name}</div>
                       <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{p.datum} · {(p.kabel||p.stromkreise||[]).length} Kabel</div>
                     </div>
-                    <button onClick={()=>lade(p)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>Laden</button>
+                    <button onClick={()=>{lade(p);setShowLoad(false);setLadesuche("");}} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>Laden</button>
                     <button onClick={()=>loescheProjekt(p.id)} style={bDanger}>✕</button>
                   </div>
                 ))

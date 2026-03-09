@@ -105,11 +105,11 @@ export async function loadProjekteForImport() {
     try {
       const data = await loadProjekteDB();
       if (data && data.length > 0) return data;
-    } catch (_) { /* fallthrough */ }
+    } catch { /* fallthrough to localStorage */ }
   }
   // localStorage-Fallback
   try {
-    return JSON.parse(localStorage.getItem("svp_projekte") || "[]");
+    return JSON.parse(localStorage.getItem("vp_projekte") || localStorage.getItem("svp_projekte") || "[]");
   } catch {
     return [];
   }

@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.3.4-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.3.5-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -27,6 +27,19 @@ Professionelle Planung und Dokumentation von Elektroverteiler-Belegungen.
 - **Schritt 4 – FI-Konfiguration:** FI-Schutzschalter (RCD) nach Bemessungsstrom, Typ (AC/A/F/B), Fehlerstrom und Polzahl konfigurieren.
 - **Schritt 5 – Belegungsplan:** Visuelle und tabellarische Ansicht, Klemmenleisten-Visualisierung, Stückliste, Beschriftungsplan.
 
+**Klemmenleiste (Schritt 5 → Tab "Klemmenleiste"):**
+- Jede FI-Gruppe bekommt eine Klemmleisten-Nummer (X1, X2, …); Klemmen fortlaufend X1.1, X1.2, …
+- Labels erscheinen unter jeder Klemme und im Beschriftungsplan neben der Sicherungs-Bezeichnung
+- FILS-Gruppen erhalten die nächste X-Nummer nach den FI-Gruppen
+- **Querverbinder-Visualisierung:** L-QV und N-QV Brücken-Overlay über den Klemmen; Clip-Pins (abzwicken) korrekt berechnet
+- **FILS-Querverbinder:** L-QV + N-QV für die 3-pol Klemme; bei 5×-Kabeln zusätzlich LL-QV (L2/L3)
+- **N-Schiene:** Optional zuschaltbar — visualisiert die Verbindung von N-Einspeisung bis N-Endklemme inkl. Länge in mm
+- Querverbinder-Stückliste: zeigt alle benötigten QV-Typen mit Port-Anzahl, Clip-Pins und Beschriftung
+
+**Projektstand speichern:**
+- Beim Speichern werden jetzt auch Schritt, aktiver Tab, alle Toggles (RK, QV, N-Brücke, KNX) und der generierte Plan mitgespeichert
+- Beim Laden öffnet sich das Projekt genau dort, wo man aufgehört hat
+
 ---
 
 ### ⏱ Stundenbuch
@@ -36,10 +49,14 @@ Einfache Zeiterfassung für Elektriker und Monteure.
 **Features:**
 - Einträge mit Datum, Von/Bis-Zeit, Pause, Projekt/Baustelle, Tätigkeit und Notiz
 - Automatische Netto-Stundenberechnung
+- **Monats-Chart:** SVG-Balkendiagramm der Stunden pro Tag (Farbkodierung, 8h-Linie)
+- Wochenstunden-Anzeige in der Kopfzeile
+- Start/Stop-Timer: Von/Bis automatisch befüllen
 - Monats- und Projektfilter
 - CSV-Export als Stundennachweis (mit Firmenname)
 - Projekte/Baustellen per Autocomplete
 - Optionale Synchronisierung mit Supabase
+- **Mobiloptimiert:** Eintrags-Karten responsives 2-Spalten-Layout auf kleinen Bildschirmen
 
 ---
 
@@ -79,7 +96,53 @@ VDE-konforme Messprotokollierung für Erst- und Wiederholungsprüfungen nach VDE
   - UB ≤ 50 V
   - ½×IΔN: Auslösung = Fehler
 - **Import aus Verteilerplaner:** Stromkreise direkt aus einem gespeicherten Verteiler-Projekt übernehmen (Bezeichnung, Nennstrom, Sicherungstyp, 3-phasig)
+- **PDF-Export:** Professionelles A4-Prüfprotokoll als PDF (DIN VDE 0100-600), lazy-geladen — direkt aus der Liste oder dem Editor
+- Drucken via `window.print()` + Print-CSS
 - Optionale Synchronisierung mit Supabase
+- **Mobiloptimiert:** Stromkreis-Tabelle horizontal scrollbar, Formulare 2-spaltig, Header-Buttons wrappend
+
+---
+
+### 🔧 Wartungsprotokoll
+
+Wiederkehrende Wartungsaufgaben verwalten und nachverfolgen.
+
+**Features:**
+- Aufgaben anlegen mit Kategorie (E-Check, Blitzschutz, Notbeleuchtung, Brandschutz, Aufzug u.a.), Intervall und Zuständigem
+- Intervalle: monatlich, vierteljährlich, halbjährlich, jährlich, 2-jährlich
+- „Zuletzt durchgeführt"-Datum → nächster Termin wird automatisch berechnet
+- Farbkodierter Status: rot = überfällig, gelb = in ≤ 30 Tagen fällig, grün = OK
+- „✓ Erledigt"-Button setzt Datum auf heute und berechnet Fälligkeit neu
+- Filter nach Kategorie und Suche; Sortierung nach Fälligkeit, Name oder Kategorie
+- Supabase-Sync + localStorage-Fallback; im Backup-Export enthalten
+
+---
+
+### ⚡ Elektrorechner
+
+Rechner und Formelsammlung für Elektrofachkräfte — 5 Tabs, kein Datenbankzugriff.
+
+**Tab 1 — Leitungsberechnung (VDE 0100-520):**
+- Eingaben: Strom (A), Länge (m), Verlegeart (B1/B2/C/E), Material (Cu/Al), Phasenzahl (1P/3P), cos φ
+- Empfehlung des Mindest-Querschnitts (nächste Normstufe ≥ rechnerischer Wert)
+- Spannungsfall-Tabelle für alle Normstufen 1,5 … 120 mm²: ΔU (V), ΔU (%), max. Strom, max. Länge
+
+**Tab 2 — Strom & Leistung:**
+- Leistungsrechner: P/U/I/cosφ für Einphasig (230 V) und Drehstrom (400 V) — beliebige Größe berechnen
+- Scheinleistung S (kVA), Blindleistung Q (kVAr)
+- Ohm'sches Gesetz: U/I/R — beliebige Größe berechnen
+
+**Tab 3 — Motorstrom:**
+- Nennstrom und Anlaufstrom für Drehstrommotoren (P kW, U, cosφ, Wirkungsgrad η)
+- Anlaufstrom-Faktor wählbar (DOL 5-8×, Stern-Dreieck / FU 2×)
+- Empfohlene Sicherungsgröße und Leitungsquerschnitt (Richtwert)
+
+**Tab 4 — cos φ Korrektur:**
+- Blindleistungskompensation: Q_C (kVAr) und Kondensatorgröße (µF)
+- Stromeinsparung ΔI und neue Scheinleistung S₂
+
+**Tab 5 — Formelsammlung:**
+- Aufklappbare Formelgruppen: Ohm, 1P/3P Wechselstrom, Leitungsberechnung, Kompensation, Schutzmaßnahmen (VDE 0100-410/-600), Konstanten
 
 ---
 
@@ -189,6 +252,21 @@ CREATE TABLE stunden (
 );
 ALTER TABLE stunden ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON stunden FOR ALL USING (true) WITH CHECK (true);
+
+-- Wartungsprotokoll
+CREATE TABLE wartungsaufgaben (
+  id          text PRIMARY KEY,
+  bezeichnung text NOT NULL,
+  kategorie   text DEFAULT '',
+  intervall   text DEFAULT 'jaehrlich',
+  letzte      text DEFAULT '',
+  naechste    text DEFAULT '',
+  zustaendig  text DEFAULT '',
+  notiz       text DEFAULT '',
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE wartungsaufgaben ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON wartungsaufgaben FOR ALL USING (true) WITH CHECK (true);
 ```
 
 4. Environment Variables setzen:
@@ -199,6 +277,18 @@ CREATE POLICY "allow_all" ON stunden FOR ALL USING (true) WITH CHECK (true);
 5. App neu deployen.
 
 Ohne Supabase-Konfiguration fällt die App automatisch auf `localStorage` zurück.
+
+### PWA — Als App installieren
+
+Die App ist als **Progressive Web App (PWA)** eingerichtet und kann auf Mobilgeräten und Desktop als eigenständige App installiert werden:
+
+- **Android (Chrome):** Beim Aufrufen der URL erscheint "Zum Startbildschirm hinzufügen"
+- **iOS (Safari):** Teilen → "Zum Home-Bildschirm"
+- **Desktop (Chrome/Edge):** Adressleiste → Installations-Icon
+
+Offline-Fähigkeit: Assets werden gecacht, Supabase-Aufrufe laufen immer live.
+
+---
 
 ### Lokale Installation
 
@@ -243,6 +333,7 @@ src/
 │   └── Toast.jsx              # Gemeinsame Toast-Komponente
 ├── lib/
 │   ├── supabase.js            # Supabase-Client
+│   ├── utils.js               # Gemeinsame Hilfsfunktionen (uid, …)
 │   ├── db.js                  # DB-Layer: Verteilerplaner
 │   ├── db_pruefprotokoll.js   # DB-Layer: Prüfprotokoll
 │   ├── db_stundenbuch.js      # DB-Layer: Stundenbuch

@@ -3,6 +3,10 @@ import Verteilerplaner from "./Verteilerplaner.jsx";
 import Stundenbuch from "./Stundenbuch.jsx";
 import Pruefprotokoll from "./Pruefprotokoll.jsx";
 import Wissensdatenbank from "./Wissensdatenbank.jsx";
+import Wartungsprotokoll from "./Wartungsprotokoll.jsx";
+import Leitungsberechnung from "./Leitungsberechnung.jsx";
+import KNXPlaner from "./KNXPlaner.jsx";
+import { isSupabaseConfigured, supabase } from "./lib/supabase.js";
 
 // ── Lokaler Speicher für Konfiguration ──
 const CONFIG_KEY = "elektronikertools_config";
@@ -12,6 +16,101 @@ function loadConfig() {
 }
 function saveConfig(cfg) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+// ── Ablauf-Check Prüfprotokoll ──
+function ladeAblaufInfo() {
+  try {
+    const protokolle = JSON.parse(localStorage.getItem("elektronikertools_pruefprotokoll")) || [];
+    const heute = new Date().toISOString().slice(0, 10);
+    const in30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    const abgelaufen = protokolle.filter(p => p.naechste_pruefung && p.naechste_pruefung < heute).length;
+    const baldFaellig = protokolle.filter(p => p.naechste_pruefung && p.naechste_pruefung >= heute && p.naechste_pruefung <= in30).length;
+    return { abgelaufen, baldFaellig };
+  } catch { return { abgelaufen: 0, baldFaellig: 0 }; }
+}
+
+// ── Live-Stats ──
+function ladeLiveStats() {
+  try {
+    const projekte   = JSON.parse(localStorage.getItem("vp_projekte") || "[]");
+    const protokolle = JSON.parse(localStorage.getItem("elektronikertools_pruefprotokoll") || "[]");
+    const eintraege  = JSON.parse(localStorage.getItem("elektronikertools_stundenbuch") || "[]");
+    const monat = new Date().toISOString().slice(0, 7);
+    const minuten = eintraege
+      .filter(e => e.datum?.startsWith(monat))
+      .reduce((sum, e) => {
+        const von = e.von?.split(":").map(Number); const bis = e.bis?.split(":").map(Number);
+        if (!von || !bis) return sum;
+        return sum + Math.max(0, (bis[0]*60+bis[1]) - (von[0]*60+von[1]) - (e.pause||0));
+      }, 0);
+    return {
+      projekte: projekte.length,
+      protokolle: protokolle.length,
+      stundenMonat: Math.floor(minuten / 60),
+      minutenRest: minuten % 60,
+    };
+  } catch { return { projekte: 0, protokolle: 0, stundenMonat: 0, minutenRest: 0 }; }
+}
+
+// ── Backup / Restore ──
+const BACKUP_KEYS = [
+  "elektronikertools_config",
+  "elektronikertools_pruefprotokoll",
+  "elektronikertools_stundenbuch",
+  "elektronikertools_wissen",
+  "elektronikertools_wartung",
+  "vp_projekte",
+  "knx_gruppen",
+  "knx_raeume",
+  "knx_checkliste",
+];
+
+function exportBackup() {
+  const data = {};
+  BACKUP_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    if (v) data[k] = JSON.parse(v);
+  });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `elektronikertools_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(file, onDone) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      let count = 0;
+      BACKUP_KEYS.forEach(k => {
+        if (data[k] !== undefined) { localStorage.setItem(k, JSON.stringify(data[k])); count++; }
+      });
+      onDone(count);
+    } catch { onDone(0); }
+  };
+  reader.readAsText(file);
+}
+
+// ── Zuletzt geöffnet ──
+const RECENT_KEY = "elektronikertools_zuletzt";
+function ladeZuletzt() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
+}
+function trackZuletzt(appId, name) {
+  const prev = ladeZuletzt().filter(x => !(x.appId === appId && x.name === name));
+  localStorage.setItem(RECENT_KEY, JSON.stringify([{ appId, name, ts: Date.now() }, ...prev].slice(0, 3)));
+}
+function zeitVor(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return "gerade eben";
+  if (diff < 3600000) return `vor ${Math.floor(diff / 60000)} Min.`;
+  if (diff < 86400000) return `vor ${Math.floor(diff / 3600000)} Std.`;
+  return `vor ${Math.floor(diff / 86400000)} Tag(en)`;
 }
 
 // ── App-Definitionen ──
@@ -48,9 +147,35 @@ const APPS = [
     farbe: "#06b6d4",
     bg: "#001a1f",
   },
+  {
+    id: "wartung",
+    name: "Wartungsprotokoll",
+    icon: "🔧",
+    beschreibung: "Wiederkehrende Wartungen verwalten: E-Check, Blitzschutz, Notbeleuchtung. Intervalle, Fälligkeiten und Zuständigkeiten im Blick.",
+    farbe: "#a855f7",
+    bg: "#140d1f",
+  },
+  {
+    id: "leitungsberechnung",
+    name: "Elektrorechner",
+    icon: "⚡",
+    beschreibung: "Rechner und Formelsammlung: Leitungsberechnung, Strom & Leistung, Motorstrom, cos φ-Korrektur, VDE-Formelreferenz.",
+    farbe: "#f97316",
+    bg: "#1a0e00",
+  },
+  {
+    id: "knxplaner",
+    name: "KNX-Planer",
+    icon: "🏡",
+    beschreibung: "KNX-Gruppenadress-Planer, Raumplan mit GA-Zuordnung, Inbetriebnahme-Checkliste und Adress-/DPT-Rechner.",
+    farbe: "#e11d48",
+    bg: "#1a0008",
+  },
 ];
 
 // ── Konfigurations-Felder ──
+const GITHUB_ISSUES_URL = "https://github.com/Jedrimos/E-tools/issues/new";
+
 const CONFIG_FELDER = [
   { key: "firma",       label: "Firmenname",        placeholder: "z.B. Elektro Mustermann GmbH", icon: "🏢" },
   { key: "mitarbeiter", label: "Mitarbeiter / Name", placeholder: "z.B. Max Mustermann",          icon: "👤" },
@@ -67,8 +192,30 @@ export default function Dashboard() {
   const [config, setConfig] = useState(loadConfig);
   const [showConfig, setShowConfig] = useState(false);
   const [configDraft, setConfigDraft] = useState({});
+  const [ablauf, setAblauf] = useState(ladeAblaufInfo);
+  const [dbStatus, setDbStatus] = useState(() => isSupabaseConfigured() ? "unbekannt" : "nicht-konfiguriert");
+  const [importMsg, setImportMsg] = useState("");
+  const [stats, setStats] = useState(ladeLiveStats);
+  const [zuletzt, setZuletzt] = useState(ladeZuletzt);
+  const [theme, setTheme] = useState(() => localStorage.getItem("ui_theme") || "dark");
+
+  // Theme auf <html> anwenden
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("ui_theme", theme);
+  }, [theme]);
+
+  function toggleTheme() { setTheme(t => t === "dark" ? "light" : "dark"); }
 
   useEffect(() => { saveConfig(config); }, [config]);
+
+  // Supabase-Ping
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    supabase.from("projekte").select("id", { head: true, count: "exact" }).then(({ error }) => {
+      setDbStatus(error ? "fehler" : "ok");
+    }).catch(() => setDbStatus("fehler"));
+  }, []);
 
   function openConfig() {
     setConfigDraft({ ...config });
@@ -80,13 +227,35 @@ export default function Dashboard() {
     setShowConfig(false);
   }
 
+  function handleImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    importBackup(file, count => {
+      setImportMsg(count > 0 ? `${count} Datenbereiche wiederhergestellt. Seite neu laden!` : "Ungültige Backup-Datei.");
+      setTimeout(() => setImportMsg(""), 6000);
+    });
+    e.target.value = "";
+  }
+
+  function oeffneApp(appId) {
+    const app = APPS.find(a => a.id === appId);
+    if (app) { trackZuletzt(appId, app.name); setZuletzt(ladeZuletzt()); }
+    setAktiveApp(appId);
+  }
+
   // App rendern
+  function zurueck() {
+    setAktiveApp(null);
+    setAblauf(ladeAblaufInfo());
+    setStats(ladeLiveStats());
+    setZuletzt(ladeZuletzt());
+  }
+
   if (aktiveApp === "verteilerplaner") {
     return (
       <div>
-        <TopBar label="Verteilerplaner" icon="⚡" farbe="#4bc8e8" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
-        <Verteilerplaner />
+        <Verteilerplaner onBack={zurueck} theme={theme} onToggleTheme={toggleTheme} />
       </div>
     );
   }
@@ -94,7 +263,7 @@ export default function Dashboard() {
   if (aktiveApp === "stundenbuch") {
     return (
       <div>
-        <TopBar label="Stundenbuch" icon="⏱" farbe="#3dcc7e" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        <TopBar label="Stundenbuch" icon="⏱" farbe="#3dcc7e" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Stundenbuch config={config} />
       </div>
@@ -104,7 +273,7 @@ export default function Dashboard() {
   if (aktiveApp === "pruefprotokoll") {
     return (
       <div>
-        <TopBar label="Prüfprotokoll" icon="📋" farbe="#f59e0b" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        <TopBar label="Prüfprotokoll" icon="📋" farbe="#f59e0b" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Pruefprotokoll config={config} />
       </div>
@@ -114,9 +283,39 @@ export default function Dashboard() {
   if (aktiveApp === "wissen") {
     return (
       <div>
-        <TopBar label="Wissensdatenbank" icon="📚" farbe="#06b6d4" onBack={() => setAktiveApp(null)} config={config} onConfig={openConfig} />
+        <TopBar label="Wissensdatenbank" icon="📚" farbe="#06b6d4" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Wissensdatenbank config={config} />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "wartung") {
+    return (
+      <div>
+        <TopBar label="Wartungsprotokoll" icon="🔧" farbe="#a855f7" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <Wartungsprotokoll config={config} />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "leitungsberechnung") {
+    return (
+      <div>
+        <TopBar label="Elektrorechner" icon="⚡" farbe="#f97316" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <Leitungsberechnung />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "knxplaner") {
+    return (
+      <div>
+        <TopBar label="KNX-Planer" icon="🏡" farbe="#e11d48" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <KNXPlaner />
       </div>
     );
   }
@@ -133,6 +332,28 @@ export default function Dashboard() {
         <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />
       )}
 
+      {/* Feedback + Theme-Toggle oben rechts */}
+      <div style={{ position: "fixed", top: 14, right: 14, zIndex: 100, display: "flex", gap: 8 }}>
+        <a href={GITHUB_ISSUES_URL} target="_blank" rel="noopener noreferrer"
+          title="Fehler melden oder Verbesserung vorschlagen"
+          style={{
+            background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 20,
+            padding: "6px 12px", cursor: "pointer", fontSize: 14, color: "var(--text2)",
+            display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            textDecoration: "none",
+          }}>
+          🐛 <span style={{ fontSize: 11, fontWeight: 600 }}>Feedback</span>
+        </a>
+        <button onClick={toggleTheme} title={theme === "dark" ? "Light Mode" : "Dark Mode"} style={{
+          background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 20,
+          padding: "6px 12px", cursor: "pointer", fontSize: 16, color: "var(--text2)",
+          display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+        }}>
+          {theme === "dark" ? "☀" : "🌙"}
+          <span style={{ fontSize: 11, fontWeight: 600 }}>{theme === "dark" ? "Hell" : "Dunkel"}</span>
+        </button>
+      </div>
+
       {/* Logo & Titel */}
       <div style={{ textAlign: "center", marginBottom: 48 }}>
         <div style={{ fontSize: 56, marginBottom: 8 }}>🔧</div>
@@ -147,35 +368,130 @@ export default function Dashboard() {
         <div style={{ color: "var(--text3)", fontSize: 13, marginTop: 4 }}>
           Werkzeuge für Elektrofachkräfte
         </div>
+        {(stats.projekte > 0 || stats.protokolle > 0 || stats.stundenMonat > 0) && (
+          <div style={{ display: "flex", gap: 20, marginTop: 16, justifyContent: "center", flexWrap: "wrap" }}>
+            {stats.projekte > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#4bc8e8", fontFamily: "var(--mono)" }}>{stats.projekte}</div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>Verteiler</div>
+              </div>
+            )}
+            {stats.protokolle > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#f59e0b", fontFamily: "var(--mono)" }}>{stats.protokolle}</div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>Protokolle</div>
+              </div>
+            )}
+            {stats.stundenMonat > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--green)", fontFamily: "var(--mono)" }}>
+                  {stats.stundenMonat}h{stats.minutenRest > 0 ? ` ${stats.minutenRest}min` : ""}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>diesen Monat</div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Zuletzt geöffnet */}
+      {zuletzt.length > 0 && (
+        <div style={{ maxWidth: 800, width: "100%", marginBottom: 24 }}>
+          <div style={{ fontSize: 11, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: 700, marginBottom: 10 }}>Zuletzt geöffnet</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {zuletzt.map(z => {
+              const app = APPS.find(a => a.id === z.appId);
+              if (!app) return null;
+              return (
+                <button key={z.appId + z.ts} onClick={() => oeffneApp(z.appId)} style={{
+                  background: "var(--bg2)", border: `1px solid ${app.farbe}30`, borderRadius: 10,
+                  padding: "8px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                  color: "var(--text)", transition: "border-color 0.15s",
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = app.farbe}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = `${app.farbe}30`}
+                >
+                  <span style={{ fontSize: 16 }}>{app.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{app.name}</span>
+                  <span style={{ fontSize: 11, color: "var(--text3)" }}>{zeitVor(z.ts)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* App-Karten */}
-      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center", maxWidth: 800, width: "100%", marginBottom: 48 }}>
-        {APPS.map(app => (
-          <button
-            key={app.id}
-            onClick={() => setAktiveApp(app.id)}
-            style={{
-              background: app.bg,
-              border: `2px solid ${app.farbe}30`,
-              borderRadius: 18,
-              padding: "32px 28px",
-              cursor: "pointer",
-              textAlign: "left",
-              color: "var(--text)",
-              flex: "1 1 280px",
-              maxWidth: 340,
-              transition: "border-color 0.2s, transform 0.15s",
-              outline: "none",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = app.farbe; e.currentTarget.style.transform = "translateY(-2px)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = `${app.farbe}30`; e.currentTarget.style.transform = "none"; }}
-          >
-            <div style={{ fontSize: 40, marginBottom: 12 }}>{app.icon}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: app.farbe, marginBottom: 8 }}>{app.name}</div>
-            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>{app.beschreibung}</div>
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center", maxWidth: 800, width: "100%", marginBottom: 32 }}>
+        {APPS.map(app => {
+          const badge = app.id === "pruefprotokoll" && (ablauf.abgelaufen > 0 || ablauf.baldFaellig > 0);
+          return (
+            <button
+              key={app.id}
+              onClick={() => { oeffneApp(app.id); if (app.id === "pruefprotokoll") setAblauf(ladeAblaufInfo()); }}
+              style={{
+                background: app.bg,
+                border: `2px solid ${app.farbe}30`,
+                borderRadius: 18,
+                padding: "32px 28px",
+                cursor: "pointer",
+                textAlign: "left",
+                color: "var(--text)",
+                flex: "1 1 280px",
+                maxWidth: 340,
+                transition: "border-color 0.2s, transform 0.15s",
+                outline: "none",
+                position: "relative",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = app.farbe; e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = `${app.farbe}30`; e.currentTarget.style.transform = "none"; }}
+            >
+              {badge && (
+                <div style={{
+                  position: "absolute", top: 12, right: 12,
+                  display: "flex", gap: 4, flexDirection: "column", alignItems: "flex-end",
+                }}>
+                  {ablauf.abgelaufen > 0 && (
+                    <span style={{ background: "var(--red)", color: "#fff", borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 800 }}>
+                      {ablauf.abgelaufen} abgelaufen
+                    </span>
+                  )}
+                  {ablauf.baldFaellig > 0 && (
+                    <span style={{ background: "#f59e0b", color: "#000", borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 800 }}>
+                      {ablauf.baldFaellig} bald fällig
+                    </span>
+                  )}
+                </div>
+              )}
+              <div style={{ fontSize: 40, marginBottom: 12 }}>{app.icon}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: app.farbe, marginBottom: 8 }}>{app.name}</div>
+              <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>{app.beschreibung}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Supabase-Status */}
+      <div style={{ marginBottom: 20, fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 6 }}>
+        {dbStatus === "ok" && <span style={{ color: "var(--green)" }}>● Datenbank verbunden</span>}
+        {dbStatus === "fehler" && <span style={{ color: "var(--red)" }}>● Datenbank nicht erreichbar</span>}
+        {dbStatus === "nicht-konfiguriert" && <span>💾 Lokale Speicherung (kein Supabase)</span>}
+      </div>
+
+      {/* Backup / Restore */}
+      {importMsg && (
+        <div style={{ marginBottom: 12, background: "rgba(82,217,138,0.1)", border: "1px solid rgba(82,217,138,0.3)", borderRadius: 8, padding: "8px 16px", color: "var(--green)", fontSize: 13 }}>
+          {importMsg}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", justifyContent: "center" }}>
+        <button onClick={exportBackup} style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text3)", borderRadius: 8, padding: "7px 16px", cursor: "pointer", fontSize: 12 }}>
+          ↓ Backup exportieren
+        </button>
+        <label style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text3)", borderRadius: 8, padding: "7px 16px", cursor: "pointer", fontSize: 12 }}>
+          ↑ Backup einlesen
+          <input type="file" accept=".json" onChange={handleImport} style={{ display: "none" }} />
+        </label>
       </div>
 
       {/* Einstellungen Button */}
@@ -184,21 +500,38 @@ export default function Dashboard() {
         style={{
           background: "transparent", border: "1px solid var(--border)",
           color: "var(--text3)", borderRadius: 10, padding: "10px 20px",
-          cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8
+          cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8,
+          marginBottom: 12,
         }}
       >
         ⚙ Einstellungen & Konfiguration
       </button>
+
+      {/* Feedback / Issues */}
+      <a
+        href={GITHUB_ISSUES_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "flex", alignItems: "center", gap: 8,
+          background: "transparent", border: "1px solid var(--border)",
+          color: "var(--text3)", borderRadius: 10, padding: "9px 20px",
+          fontSize: 13, textDecoration: "none", cursor: "pointer",
+        }}
+      >
+        🐛 Fehler melden oder Verbesserung vorschlagen
+      </a>
     </div>
   );
 }
 
 // ── Top-Bar (wenn App geöffnet) ──
-function TopBar({ label, icon, farbe, onBack, config, onConfig }) {
+function TopBar({ label, icon, farbe, onBack, config, onConfig, theme, onToggleTheme }) {
   return (
     <div style={{
       background: "var(--bg)", borderBottom: "1px solid var(--border)",
-      padding: "10px 20px", display: "flex", alignItems: "center", gap: 12
+      padding: "10px 20px", display: "flex", alignItems: "center", gap: 12,
+      position: "sticky", top: 0, zIndex: 150,
     }}>
       <button
         onClick={onBack}
@@ -212,6 +545,21 @@ function TopBar({ label, icon, farbe, onBack, config, onConfig }) {
       <span style={{ fontWeight: 700, color: farbe, fontSize: 15 }}>{label}</span>
       {config.firma && <span style={{ color: "var(--text3)", fontSize: 13 }}>| {config.firma}</span>}
       <div style={{ flex: 1 }} />
+      {onToggleTheme && (
+        <button onClick={onToggleTheme} title={theme === "dark" ? "Light Mode" : "Dark Mode"}
+          style={{ background: "transparent", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 15, padding: "0 4px" }}>
+          {theme === "dark" ? "☀" : "🌙"}
+        </button>
+      )}
+      <a
+        href={GITHUB_ISSUES_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Fehler melden oder Verbesserung vorschlagen (GitHub)"
+        style={{ background: "transparent", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 16, padding: "0 4px", textDecoration: "none", lineHeight: 1, display: "flex", alignItems: "center" }}
+      >
+        🐛
+      </a>
       <button
         onClick={onConfig}
         style={{ background: "transparent", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 16 }}

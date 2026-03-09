@@ -80,6 +80,23 @@ ALTER TABLE wissensdatenbank ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON wissensdatenbank FOR ALL USING (true) WITH CHECK (true);
 
 
+-- ── 5. Wartungsprotokoll ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS wartungsaufgaben (
+  id          text PRIMARY KEY,
+  bezeichnung text NOT NULL,
+  kategorie   text DEFAULT '',
+  intervall   text DEFAULT 'jaehrlich',
+  letzte      text DEFAULT '',
+  naechste    text DEFAULT '',
+  zustaendig  text DEFAULT '',
+  notiz       text DEFAULT '',
+  created_at  timestamptz DEFAULT now()
+);
+
+ALTER TABLE wartungsaufgaben ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON wartungsaufgaben FOR ALL USING (true) WITH CHECK (true);
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Optional: updated_at Trigger (automatisch bei UPDATE setzen)
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -95,3 +112,46 @@ CREATE TRIGGER trg_projekte_updated_at          BEFORE UPDATE ON projekte       
 CREATE TRIGGER trg_pruefprotokolle_updated_at   BEFORE UPDATE ON pruefprotokolle   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_stunden_updated_at           BEFORE UPDATE ON stunden           FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_wissensdatenbank_updated_at  BEFORE UPDATE ON wissensdatenbank  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+
+-- ── KNX-Planer ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS knx_gruppen (
+  id            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  hauptgruppe   integer NOT NULL DEFAULT 0,
+  mittelgruppe  integer NOT NULL DEFAULT 0,
+  untergruppe   integer NOT NULL DEFAULT 0,
+  name          text NOT NULL DEFAULT '',
+  funktion      text NOT NULL DEFAULT 'Licht',
+  dpt           text NOT NULL DEFAULT '1.001',
+  raum_id       uuid,
+  notiz         text DEFAULT '',
+  created_at    timestamptz DEFAULT now(),
+  updated_at    timestamptz DEFAULT now()
+);
+ALTER TABLE knx_gruppen ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON knx_gruppen FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS knx_raeume (
+  id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name       text NOT NULL DEFAULT '',
+  etage      text NOT NULL DEFAULT 'EG',
+  typ        text NOT NULL DEFAULT 'Wohnzimmer',
+  position   integer DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE knx_raeume ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON knx_raeume FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS knx_checkliste (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  raum_id     uuid,
+  kategorie   text NOT NULL DEFAULT 'Allgemein',
+  bezeichnung text NOT NULL DEFAULT '',
+  erledigt    boolean DEFAULT false,
+  notiz       text DEFAULT '',
+  position    integer DEFAULT 0,
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE knx_checkliste ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON knx_checkliste FOR ALL USING (true) WITH CHECK (true);

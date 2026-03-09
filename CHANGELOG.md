@@ -6,115 +6,263 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
-## [2026.3.4] – 2026-03-05
+## [2026.3.5] – 2026-03-09
 
-### Neues Tool: Wissensdatenbank + docs/ Ordner + CLAUDE.md
+### 🐛 Bugfix — Verteilerplaner Header & Light-Mode
+
+- **Doppelter Header entfernt**: TopBar wird im Verteilerplaner nicht mehr aus Dashboard gerendert — der Verteilerplaner hat seinen eigenen vollständigen Header
+- **← Zurück-Button** wieder im Verteilerplaner-Header (links, vor dem Logo)
+- **☀️/🌙 Theme-Toggle** direkt im Verteilerplaner-Header (rechts, neben 🐛) — kein Wechsel ins Dashboard nötig
+- **Light-Mode schwarze Flächen behoben**: Alle Modal-Overlays (`rgba(10,12,14,...)`) durch theme-neutrale `rgba(0,0,0,0.55/0.65)` ersetzt
+- **Start-Screen Light-Mode**: Innerer Container bekommt `var(--bg2)` Hintergrund statt transparentem Overlay
+
+---
+
+## [2026.3.4] – 2026-03-09
+
+### ✨ Neu — KNX-Planer (neue App)
+
+- **GA-Planer**: Gruppenadresse anlegen (HG 0–31 / MG 0–7 / UG 0–255), Funktion, DPT, Raum-Zuweisung, Notiz — sortierte Liste nach Adresse, Filter nach Funktion / HG / Suche, CSV-Export (ETS-kompatibel)
+- **Raumplan**: Räume nach Etage anlegen (Name, Etage, Typ), GA-Chips per Raum, direkte Zuweisung/Entfernung, nach Neuerstellung direkt auf richtigen Etagen-Tab springen
+- **Inbetriebnahme-Checkliste**: Vorlagen-Templates (Licht, Dimmen, Jalousie, Heizung, Szene, Allgemein), eigene Prüfpunkte, Gesamt- und Raum-Fortschrittsbalken
+- **KNX-Rechner**: Physikalische Adresse (Bereich.Linie.Gerät → Dez/Hex/Binär), GA↔Dezimal-Umrechnung, Projekt-Statistik, DPT-Kurzreferenz
+- localStorage-Datenspeicherung mit Supabase-Fallback (`knx_gruppen`, `knx_raeume`, `knx_checkliste`)
+- App-Farbe: `#e11d48` (rose-red, KNX-Branding), KNX-Daten in globalem Backup integriert
+
+### ✨ Neu — Roadmap-Features
+
+**🌙 Dark-/Light-Mode Umschalter**
+- Toggle-Button oben rechts im Dashboard und in der TopBar jeder App
+- Einstellung persistent in `localStorage`, beim Start sofort angewendet
+- Vollständiges Light-Mode-Farbschema via `[data-theme="light"]` in `index.css`
+
+**🐛 Fehler melden / Verbesserung vorschlagen**
+- Link-Button im Dashboard-Footer und 🐛-Icon in jeder App-TopBar
+- Öffnet direkt `https://github.com/Jedrimos/E-tools/issues/new` in neuem Tab
+
+**📧 Tagesbericht per E-Mail (Stundenbuch)**
+- Button „📧 E-Mail" im Tagesbericht-Modal
+- `mailto:` mit vorausgefülltem Betreff (Datum, Mitarbeiter) und allen Einträgen als Tabelle
+
+**📋 Projektliste verwalten (Stundenbuch)**
+- Button „📋 Projekte" in der Toolbar öffnet Mini-Modal
+- Feste Projekte anlegen/löschen (`stundenbuch_projekte`), erscheinen als Vorschläge im Eintrag-Formular
+
+### 🐛 Bugfixes KNX-Planer
+
+- Kyrillisches `м` in `aktRaумId` → korrektes ASCII `aktRaumId`
+- `csvExport()` mutierte React-State via `.sort()` → `[...gaListe].sort()`
+- `URL.revokeObjectURL()` nach CSV-Download ergänzt (Memory-Leak)
+- `GAForm`: `useEffect` synct Formular-State beim GA-Wechsel (stale prop)
+- Sequentielle `await`-Schleifen → `Promise.all` (Vorlagen, Raum löschen)
+- Etagen-Tab-Filter: widersprüchliche `|| raeume.length===0`-Bedingung entfernt
+- `byFunk`: O(n×m) → O(n) Single-Pass `reduce`
+- `useMemo` für `gefiltert`, `grouped`, `hgListe`, `raumMap`
+- Leer-Zustand "Keine Ergebnisse" bei aktivem Filter
+- Doppelter Filter für unassigned GAs auf Variable extrahiert
+- `uid()` in `db_knx.js` und `KNXPlaner.jsx` → zentrales `src/lib/utils.js`
+
+---
+
+## [2026.3.5] – 2026-03-07
+
+### ✨ Neu / Geändert
+
+**Elektrorechner (erweitert aus Leitungsberechnung)**
+- App umbenannt von „Leitungsberechnung" zu „Elektrorechner" mit 5 Tabs:
+- **Leitungsberechnung** (unverändert): Querschnitt + Spannungsfall nach VDE 0100-520
+- **Strom & Leistung**: P/U/I/cosφ für 1-phasig und Drehstrom; Schein- und Blindleistung; Ohm'sches Gesetz (U/I/R)
+- **Motorstrom**: Nennstrom/Anlaufstrom (P, U, cosφ, η, Anlauf-Faktor), Sicherungsempfehlung, Leitungsquerschnitt-Richtwert
+- **cos φ Korrektur**: Q_C (kVAr), Kondensatorgröße (µF), Stromeinsparung ΔI
+- **Formelsammlung**: 7 Gruppen — Ohm, 1P/3P Wechselstrom, Leitungsberechnung, Kompensation, Schutzmaßnahmen VDE, Konstanten
+
+---
+
+## [2026.3.4] – 2026-03-07
 
 ### ✨ Neu
-- **Tool: Wissensdatenbank** — Firmeninternes Wissen für das Team.
-  - Artikel mit Titel, Kategorie (10 Voreinstellungen), Tags, Autor und Markdown-Inhalt
-  - Volltextsuche (Titel, Inhalt, Tags, Autor) + Kategoriefilter in Echtzeit
-  - Artikel-Karten-Übersicht + Detailansicht mit gerendertem Markdown
-  - Markdown-Renderer: `# Überschriften`, `**fett**`, `*kursiv*`, `` `code` ``, `- Listen`, `1. nummeriert`, `> Blockquote`, ` ``` Codeblöcke ``` `
-  - Live-Vorschau im Editor
-  - Team-Sharing via Supabase (`☁ Geteilt im Team`-Indikator)
-  - Warnung wenn Supabase nicht konfiguriert
-  - Farbthema: Teal `#06b6d4`
-- **`src/lib/db_wissen.js`** — Supabase CRUD für `wissensdatenbank`-Tabelle
-- **`docs/`** — Vollständige Projektdokumentation:
-  - `docs/index.md` — Übersicht & Navigation
-  - `docs/setup.md` — Installation, Coolify, Supabase-Setup
-  - `docs/supabase.sql` — Vollständiges SQL-Schema aller 4 Tabellen mit Trigger
-  - `docs/development.md` — Neue App anlegen, CSS-Konventionen, Supabase-Muster
-  - `docs/apps/verteilerplaner.md` — Verteilerplaner-Dokumentation
-  - `docs/apps/stundenbuch.md` — Stundenbuch-Dokumentation
-  - `docs/apps/pruefprotokoll.md` — Prüfprotokoll + VDE-Grenzwerte-Tabelle
-  - `docs/apps/wissensdatenbank.md` — Wissensdatenbank + Markdown-Syntax-Referenz
-- **`CLAUDE.md`** — Projektregeln für Claude Code: Pflichtaufgaben nach jeder Änderung, Checkliste neue App, CSS-Konventionen, App-Farben
+
+**Wartungsprotokoll (neue App)**
+- Wiederkehrende Wartungsaufgaben erfassen: E-Check, Blitzschutz, Notbeleuchtung, Brandschutz u.v.m.
+- Kategorien, Intervalle (monatlich / vierteljährlich / halbjährlich / jährlich / 2-jährlich)
+- Fälligkeits-Automatik: „Zuletzt durchgeführt" → Nächster Termin wird automatisch berechnet
+- Farbkodierter Status: überfällig (rot), bald fällig (gelb), OK (grün)
+- „Erledigt"-Button setzt Datum auf heute und berechnet Fälligkeit neu
+- Supabase-Sync + localStorage-Fallback; im Backup-Export enthalten
+
+**Leitungsberechnung (neue App)**
+- Eigenständiges Berechnungstool nach VDE 0100-520
+- Eingaben: Strom (A), Länge (m), Verlegeart (B1/B2/C/E), Material (Cu/Al), Phasenzahl (1P/3P), cos φ
+- Empfehlung des Mindest-Querschnitts (nächste Normstufe ≥ rechnerischer Wert)
+- Spannungsfall-Tabelle: ΔU (V), ΔU (%), max. Belastungsstrom, max. Leitungslänge für alle Normstufen
+- Grenzwert ΔU ≤ 3 % nach VDE 0100-520, Überschreitung farbkodiert
+- Kein Datenbankzugriff – reines Rechentool
+
+---
+
+## [2026.3.3] – 2026-03-07
+
+### ✨ Neu
+
+**Verteilerplaner — Klemmenbezeichnungen**
+- Jede FI-Gruppe (Q1, Q2, …) bekommt eine Klemmleisten-Nummer: X1, X2, …
+- Die PE-Einspeisung jeder Klemmleiste trägt das Strip-Label (z.B. "X1")
+- Jede Reihenklemme (rk_mit_pe, rk_ohne_pe, rk_n_fils) wird fortlaufend nummeriert: X1.1, X1.2, X1.3 …
+- FILS-Gruppen erhalten die nächste verfügbare Nummer nach den FI-Gruppen
+- Labels erscheinen unter jeder Klemme in der Klemmenleisten-Visualisierung
+- Im Beschriftungsplan: Q-Zeile zeigt "Q1 X1", LS-Zeile zeigt "1F1 / X1.1" (oder X1.2–X1.4 bei mehreren Klemmen)
+
+**Verteilerplaner — FILS Querverbinder komplett**
+- L-QV + N-QV für die L- und N-Seite der 3-pol rk_n_fils Klemme (beide Brücken benötigt)
+- Bei 5×-Kabeln in FILS: zusätzlich LL-QV für rk_ohne_pe (L2+L3)
+- QV-Overlay jetzt **über** den Klemmen dargestellt (physikalisch korrekt: QV wird von oben aufgesteckt)
+
+**Verteilerplaner — Projektstand persistieren**
+- Beim Speichern werden jetzt mitgespeichert: aktueller Schritt, aktiver Tab, Plantyp (visuell/tabelle), alle Toggles (RK, QV, N-Brücke, KNX) sowie der generierte Belegungsplan
+- Beim Laden eines Projekts öffnet die App direkt auf dem zuletzt genutzten Schritt / Tab — kein manuelles Weiterklicken mehr nötig
+
+**Mobile Responsiveness — alle Tools**
+- *Verteilerplaner:* Header auf Mobilgeräten zweizeilig: Zeile 1 mit Logo-Icon + Laden/Speichern, Zeile 2 mit Step-Navigation (horizontal scrollbar). Logo-Text, Version-Badge, Foto/Einstellungen/Info-Buttons auf kleinen Screens ausgeblendet.
+- *Verteilerplaner:* Redundanter Step-Fortschrittsbalken in der Hauptansicht auf Mobile ausgeblendet (Header-Nav übernimmt)
+- *Stundenbuch:* Eintrags-Karten responsives 2-Spalten-Grid auf < 600 px; Pause-Spalte automatisch ausgeblendet
+- *Prüfprotokoll:* Stromkreis-Tabelle mit horizontalem Scroll auf Mobile; StromkreisForm 2-spaltig; Anlagendaten-Grid 2-spaltig; Header-Aktionsbuttons wrappen in neue Zeile
+
+**Info-Buttons — alle Tools**
+- ℹ️-Button in Stundenbuch, Prüfprotokoll und Wissensdatenbank (analog zum Verteilerplaner)
+- Jede App zeigt ein App-spezifisches Info-Modal mit Beschreibung, Features und Versionsnummer
+
+**Normreferenzen im Prüfprotokoll**
+- ⓘ-Buttons direkt bei den Messabschnitten: PE-Durchgangswiderstand, Isolationswiderstand, Schleifenimpedanz, FI/RCD
+- Popover zeigt Normreferenz (DIN VDE 0100-600 §xx), Grenzwert und technische Begründung
+- Beispiel Schleifenimpedanz: Formel Zs ≤ U₀/(5×Ia) mit konkreten Beispielwerten für gängige Sicherungstypen
+
+**Leitungsberechnung im Verteilerplaner**
+- Neues Feld "Länge (m)" pro Kabel in Schritt 2 (wird gespeichert)
+- ⚡-Button öffnet Inline-Leitungsrechner direkt im Kabel-Formular
+- Rechner: Nennstrom wählen → Max-Länge für gewählten Querschnitt + Empfehlung + "Übernehmen"-Button
+- Formel: VDE 0100-520, Kupfer, cos φ=1, ΔU ≤ 3 % (6,9 V)
+
+**Tagesberichte im Stundenbuch**
+- Button "📄 Tagesbericht" im Header
+- Datum wählen → strukturierte Tabelle aller Einträge des Tages: Von/Bis, Pause, Nettozeit, Projekt, Tätigkeit, Notiz
+- Gesamt-Stunden-Auswertung, Unterschriftsfelder für Mitarbeiter und Auftraggeber
+- Druckfunktion (Browserdruckdialog)
+
+**Zuletzt geöffnet im Dashboard**
+- Dashboard zeigt die letzten 3 geöffneten Apps als Schnellzugriff-Buttons über den App-Karten
+- Zeitstempel (z.B. "vor 2 Std.") direkt am Button
+
+**Todo.md**
+- Neue Datei `Todo.md` im Repository: zentrale Aufgabenliste für Ideen die während der Arbeit einfallen
+- PocketBase-Migration als offene Aufgabe eingetragen
+
+### 🐛 Bugfixes
+
+- Verteilerplaner: `buildSeq`-Kontext in der Beschriftungs-Klemmen-Zählung korrekt (FILS-Gruppe hatte fehlende `xLabels`-Definition → `?.get()` als sicherer Fallback)
+- Prüfprotokoll: FL-Komponente akzeptiert kein `className` — 3-polig-Feld korrekt in eigenen `div` gewrappt
+- Verteilerplaner: Step-2-Buttons overflow auf schmalen Screens behoben (flexWrap + whiteSpace:nowrap)
+
+---
+
+## [2026.3.1] – 2026-03-06
+
+### ✨ Neu
+
+**PDF-Export (Prüfprotokoll)**
+- Button "⬇ PDF" in der Protokollliste und im Editor
+- Erzeugt ein professionelles A4-PDF nach DIN VDE 0100-600 mit Kopfzeile, Metadaten-Box, Gesamtergebnis-Banner und Stromkreis-Tabelle
+- Lazy-geladen: jsPDF wird erst beim ersten PDF-Klick heruntergeladen (spart ~250kB beim Seitenstart)
+
+**PWA — App installierbar**
+- `public/manifest.json` mit Name, Icons, Theme-Color
+- Service Worker mit Cache-Strategie (Supabase-Requests nie gecacht)
+- Meta-Tags für iOS Safari; App kann auf Android/iOS als eigenständige App installiert werden
+
+**Stundenbuch: Monats-Chart**
+- SVG-Balkendiagramm direkt über der Eintrags-Liste
+- Stunden pro Tag, farbkodiert: grün ≥ 8h, blau 4–8h, grau < 4h
+- Gestrichelte 8h-Referenzlinie, heutiger Tag hervorgehoben
+
+**Prüfprotokoll**
+- Fortschrittsring (SVG) im Editor-Header: zeigt % der gemessenen Stromkreise live an
+- Ctrl+S / Cmd+S speichert das Protokoll direkt aus dem Editor
+- Drucken-Button im Protokoll-Editor (`window.print()`)
+- Ablaufwarnung direkt an jedem Protokoll in der Liste: roter Badge bei abgelaufener Prüffrist, gelber Badge bei Fälligkeit in 30 Tagen
+- Print-CSS verbessert: saubere Druckansicht, Buttons werden ausgeblendet, helle Hintergrundfarben
+
+**Stundenbuch**
+- Ctrl+S / Cmd+S speichert den Stunden-Eintrag im offenen Formular
+- Feierabend-Hinweis: läuft der Timer ≥ 8h, erscheint eine diskrete Meldung mit der Gesamtzeit
+- Wochenstunden-Anzeige: Netto-Stunden der aktuellen Woche direkt im Header
+- Start/Stop-Timer: Zeitmessung per Klick, füllt beim Stopp automatisch Von/Bis-Felder im neuen Eintrag
+
+**Dashboard**
+- Live-Stats unterhalb des Titels: Verteiler-Anzahl, Protokoll-Anzahl, Arbeitsstunden diesen Monat
+- Stats aktualisieren sich automatisch beim Zurücknavigieren
+- Ablaufdatum-Badge auf der Prüfprotokoll-Karte: zeigt Anzahl abgelaufener und bald fälliger Protokolle
+- Supabase-Verbindungsstatus-Indikator (grün/rot/grau) direkt im Dashboard
+- Backup-Export: alle App-Daten als JSON-Datei herunterladen
+- Backup-Import: JSON-Backup einlesen und localStorage wiederherstellen
+
+**Verteilerplaner**
+- Projekt-Suche in beiden Lade-Dialogen (StartScreen + Mid-Session-Modal), erscheint ab 4 Projekten
+- Reserveplatz-Markierung: Sicherung als "Reserve" flaggen (erscheint grau/gedimmt), wird in der Stückliste als "Reserveplatz (leer)" aufgeführt
+
+### 🐛 Bugfixes
+
+- **Stundenbuch**: Timer-Prefill-State war nach der nutzenden Funktion deklariert — Reihenfolge korrigiert
+- **Prüfprotokoll**: Totes Ternary in L2-PE-Label entfernt
+
+### ♻ Refactoring
+
+- `uid()` in alle Dateien war dupliziert → `src/lib/utils.js` zentralisiert, alle Importe aktualisiert
+
+---
+
+## [2026.3.0] – 2026-03-06
+
+### 🎉 Elektronikertools – Erster vollständiger Release
+
+Kompletter Neuaufbau von Grund auf: Dashboard, 4 Tools, Supabase-Anbindung, vollständige Dokumentation und öffentliche Veröffentlichung.
+
+### ✨ Neu
+
+**Dashboard & Infrastruktur**
+- Dashboard als Startseite mit App-Auswahl und globaler Konfiguration (Firma, Mitarbeiter, Ort, Supabase)
+- Gemeinsame Toast-Komponente (`src/components/Toast.jsx`) für alle Apps
+- Globale CSS Design-Tokens (`--bg`, `--blue`, `--green`, `--red` …) in `index.css`
+- Vollständige Projektdokumentation unter `docs/` (Setup, SQL-Schema, Entwickler-Guide, App-Docs)
+- `CLAUDE.md` — Projektregeln und Konventionen für die Entwicklung
+
+**Tool: Verteilerplaner** *(ehemals eigenständiges Projekt, jetzt integriert)*
+- "← Dashboard"-Button im Startfenster und im Header
+- Logo-Klick führt zurück zur Projektauswahl
+
+**Tool: Stundenbuch** *(neu)*
+- Zeiterfassung mit Datum, Von/Bis, Pause, Projekt, Tätigkeit und Notiz
+- Monats- und Projektfilter, CSV-Export als Stundennachweis
+- Supabase-Sync
+
+**Tool: Prüfprotokoll** *(neu)*
+- VDE-konforme Messprotokollierung nach VDE 0100-600
+- PE-Durchgangswiderstand, Isolationswiderstand, Schleifenimpedanz, FI/RCD-Prüfung
+- Automatische Ampel-Bewertung nach VDE-Grenzwerten
+- Import aus Verteilerplaner (Stromkreise, Nennstrom, Sicherungstyp)
+- Supabase-Sync
+
+**Tool: Wissensdatenbank** *(neu)*
+- Firmeninternes Wissen mit Titel, Kategorie, Tags, Autor und Markdown-Inhalt
+- Volltextsuche + Kategoriefilter, Markdown-Renderer mit Live-Vorschau
+- Team-Sharing via Supabase
 
 ### 🔧 Geändert
-- Dashboard: Wissensdatenbank als App #4 registriert (teal, `#001a1f` Hintergrund)
-- README: Wissensdatenbank-Sektion, docs/-Link, vollständiges SQL für alle 4 Tabellen, aktualisierte Projektstruktur
-- ROADMAP: Wissensdatenbank als erledigt markiert
+- Branding bereinigt: alle internen Bezeichnungen neutral, kein voreingestellter Firmenname
+- CSS-Variablen: `--svp`/`--svp2` → `--blue`/`--blue2`
+- localStorage-Keys: `svp_*` → `vp_*` mit automatischer Migration
 
 ---
 
-## [2026.3.3] – 2026-03-05
-
-### Gemeinsame Datenbank + Verteilerplaner-Import im Prüfprotokoll
-
-### ✨ Neu
-- **Prüfprotokoll → Supabase-Sync:** Beim Start automatisch aus Supabase laden, nach jedem Speichern/Löschen async synchronisieren. `☁ Datenbank`-Indikator wenn aktiv.
-- **Stundenbuch → Supabase-Sync:** Gleicher Mechanismus wie Prüfprotokoll. `db_id` pro Eintrag für sicheres Update/Delete.
-- **Import aus Verteilerplaner:** Im Prüfprotokoll können gespeicherte Verteiler-Projekte direkt importiert werden. Übernommen werden: Auftraggeber, Anlagenstandort, Prüfer sowie alle Stromkreise (Bezeichnung aus Kabel-Namen, Nennstrom + Sicherungstyp aus LSS z.B. "B16", 3-phasig-Flag).
-- **`src/lib/db_pruefprotokoll.js`:** DB-Layer für `pruefprotokolle`-Tabelle (CRUD + `loadProjekteForImport` mit Supabase→localStorage-Fallback).
-- **`src/lib/db_stundenbuch.js`:** DB-Layer für `stunden`-Tabelle (CRUD).
-- SQL-Migrationsskripte als Kommentare in den jeweiligen DB-Layer-Dateien.
-
----
-
-## [2026.3.2] – 2026-03-05
-
-### Neues Tool: Prüfprotokoll
-
-### ✨ Neu
-- **Tool: Prüfprotokoll** — VDE-konforme Messprotokollierung nach VDE 0100-600.
-  - Protokoll-Liste mit Gesamtbewertung je Protokoll
-  - Kopfdaten: Auftraggeber, Standort, Anlagenart, Nennspannung, Prüfer, Datum, nächste Prüfung, Auftragsnummer
-  - Stromkreis-Tabelle mit aufklappbaren Detailformularen
-  - **PE-Durchgangswiderstand** R_PE (Ω)
-  - **Isolationswiderstand** Riso L1/L2/L3/N-PE (MΩ) — 1- und 3-phasig
-  - **Schleifenimpedanz** Zs (Ω) + Kurzschlussstrom Ik (A)
-  - **FI/RCD-Prüfung:** IΔN (10–500 mA), Typ (AC/A/F/B/S), t@IΔN, t@5×IΔN, t@½×IΔN, UB
-  - Automatische Ampel-Bewertung nach VDE-Grenzwerten pro Messwert und Stromkreis
-  - Speicherung in localStorage
-- **Dashboard:** Prüfprotokoll als App #3 mit amber/gold Farbschema registriert.
-
----
-
-## [2026.3.1] – 2026-03-05
-
-### Code-Qualität: Globale CSS-Variablen, gemeinsamer Toast, Aufräumen
-
-### ✨ Neu
-- **`src/components/Toast.jsx`:** Gemeinsame Toast-Komponente + `useToasts`-Hook für alle Apps. Stundenbuch und Verteilerplaner importieren daraus statt eigene Implementierung zu führen.
-- **CSS-Design-Tokens global:** `:root`-Variablen (`--bg`, `--green`, `--red`, `--svp` …), Font-Import, globale Resets, Keyframes und Print-Stile in `index.css` ausgelagert. Alle Apps haben die Variablen verfügbar, ohne dass Verteilerplaner zuerst geladen werden muss.
-
-### 🗑 Entfernt
-- `src/App.jsx` — Vite-Template-Überrest (tote Datei)
-- `src/App.css` — Vite-Template-Überrest (leere Datei)
-- `src/assets/react.svg` — Vite-Template-Überrest
-- Doppelter CSS-Block in `Verteilerplaner.jsx` (`:root`, Font, Resets, Keyframes, Print) — jetzt in `index.css`
-- Lokale `Toast`-Implementierung in `Stundenbuch.jsx` — ersetzt durch gemeinsame Komponente
-
-### 🔧 Geändert
-- `index.html`: Sprache `en` → `de`, Titel `mein-sicherungsplaner` → `Elektronikertools`, Meta-Description ergänzt
-- `index.css`: Background-Farbe auf `var(--bg)` vereinheitlicht (war `#0f172a` ≠ `--bg`)
-- `Dashboard.jsx`: Alle hardcodierten Hex-Farben durch CSS-Variablen ersetzt
-- `Stundenbuch.jsx`: Alle hardcodierten Hex-Farben durch CSS-Variablen ersetzt
-
----
-
-## [2026.3.0] – 2026-03-05
-
-### 🎉 Elektronikertools – Neustart
-
-Das Projekt wurde von "SVP Verteilerplaner" zu **Elektronikertools** umstrukturiert und erweitert.
-
-### ✨ Neu
-- **Dashboard** — Neue Startseite zur Tool-Auswahl. Alle Tools auf einen Blick, direkt anwählbar.
-- **Globale Konfiguration** — Einstellungsmodal mit Firmenname, Mitarbeiter, Ort, Datenbank-Name und Supabase-Credentials. Einstellungen gelten für alle Tools.
-- **Stundenbuch** — Neues Tool zur Zeiterfassung: Einträge mit Datum, Von/Bis, Pause, Projekt/Baustelle, Tätigkeit und Notiz. Monatsfilter, Projektfilter, CSV-Export als Stundennachweis.
-- **Verteilerplaner** — Der bisherige SVP Verteilerplaner ist als eigenständiges Tool integriert (keine Funktionsänderungen gegenüber 1.6.0).
-
-### 🔧 Geändert
-- Paketname: `mein-sicherungsplaner` → `elektronikertools`
-- Einstiegspunkt: `App.jsx` → `Dashboard.jsx` (App-Logik in `Verteilerplaner.jsx` ausgelagert)
-- Versionierungsschema: Semver → `JAHR.MONAT.PATCH`
-
----
-
-## Ältere Versionen (SVP Verteilerplaner, Semver)
+## Ältere Versionen (vor Elektronikertools, Semver)
 
 ### [1.6.0] – 2026-03-05
 

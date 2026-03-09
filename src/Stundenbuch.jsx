@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import Toast, { useToasts } from "./components/Toast.jsx";
+import Toast from "./components/Toast.jsx";
+import { useToasts } from "./lib/useToasts.js";
 import { loadStundenDB, saveEintragDB, deleteEintragDB } from "./lib/db_stundenbuch.js";
-
-// ── Helpers ──
-function uid() { return Math.random().toString(36).slice(2, 9); }
+import { supabaseFehlermeldung } from "./lib/supabase.js";
+import { uid } from "./lib/utils.js";
 
 function formatDuration(minutes) {
   const h = Math.floor(minutes / 60);
@@ -21,12 +21,6 @@ function timeToMinutes(timeStr) {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(":").map(Number);
   return h * 60 + m;
-}
-
-function minutesToTime(minutes) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
 }
 
 const PAUSE_OPTIONS = [0, 15, 30, 45, 60];
@@ -65,6 +59,18 @@ function EintragForm({ initial, onSave, onCancel, projekte }) {
   const netto = calcNetto(form);
 
   function set(key, val) { setForm(f => ({ ...f, [key]: val })); }
+
+  // Ctrl+S speichert
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        onSave(form);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onSave, form]);
 
   return (
     <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 16 }}>
@@ -132,13 +138,145 @@ function EintragForm({ initial, onSave, onCancel, projekte }) {
   );
 }
 
+// ── Wochenstunden berechnen ──
+function aktuelleWocheMinuten(eintraege) {
+  const heute = new Date();
+  const tag = heute.getDay();
+  // Montag dieser Woche
+  const montag = new Date(heute);
+  montag.setDate(heute.getDate() - (tag === 0 ? 6 : tag - 1));
+  const montagStr = montag.toISOString().slice(0, 10);
+  const sonntagStr = new Date(montag.getTime() + 6 * 864e5).toISOString().slice(0, 10);
+  return eintraege
+    .filter(e => e.datum >= montagStr && e.datum <= sonntagStr)
+    .reduce((sum, e) => sum + calcNetto(e), 0);
+}
+
+// ── Monats-Chart ─────────────────────────────────────────────────────────────
+function MonatsChart({ eintraege, monat }) {
+  const [jahr, mon] = monat.split("-").map(Number);
+  const tageImMonat = new Date(jahr, mon, 0).getDate();
+  const heute = new Date().toISOString().slice(0, 10);
+
+  // Minuten pro Tag
+  const perTag = {};
+  eintraege.forEach(e => {
+    if (!e.datum?.startsWith(monat)) return;
+    const tag = parseInt(e.datum.slice(8), 10);
+    perTag[tag] = (perTag[tag] || 0) + calcNetto(e);
+  });
+
+  const maxMin = Math.max(...Object.values(perTag), 480); // min. 8h Skalierung
+  const W = 28;  // Balkenbreite
+  const GAP = 4;
+  const H = 80;  // max Balkenhöhe
+  const svgW = tageImMonat * (W + GAP);
+
+  if (Object.keys(perTag).length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 20, background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px" }}>
+      <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8, fontWeight: 600 }}>
+        Stunden pro Tag — {monat}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <svg width={svgW} height={H + 20} style={{ display: "block", minWidth: svgW }}>
+          {Array.from({ length: tageImMonat }, (_, i) => {
+            const tag = i + 1;
+            const min = perTag[tag] || 0;
+            const barH = min > 0 ? Math.max(4, Math.round((min / maxMin) * H)) : 0;
+            const x = i * (W + GAP);
+            const datumStr = `${monat}-${String(tag).padStart(2, "0")}`;
+            const istHeute = datumStr === heute;
+            const h8 = Math.round((480 / maxMin) * H); // 8h-Linie
+            return (
+              <g key={tag}>
+                {/* 8h-Referenzlinie */}
+                {i === 0 && (
+                  <line x1={0} y1={H - h8} x2={svgW} y2={H - h8}
+                    stroke="var(--border2)" strokeWidth={1} strokeDasharray="3 3" />
+                )}
+                {/* Balken */}
+                {barH > 0 && (
+                  <rect x={x} y={H - barH} width={W} height={barH} rx={4}
+                    fill={min >= 480 ? "var(--green)" : min >= 240 ? "#4bc8e8" : "var(--text3)"}
+                    opacity={0.85}
+                  />
+                )}
+                {/* Heute-Marker */}
+                {istHeute && (
+                  <rect x={x} y={0} width={W} height={H} rx={4}
+                    fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
+                )}
+                {/* Tag-Zahl */}
+                <text x={x + W / 2} y={H + 14} textAnchor="middle"
+                  fontSize={9} fill={istHeute ? "var(--text)" : "var(--text3)"} fontWeight={istHeute ? 700 : 400}>
+                  {tag}
+                </text>
+                {/* Stunden-Label wenn > 0 */}
+                {barH > 14 && (
+                  <text x={x + W / 2} y={H - barH + 11} textAnchor="middle"
+                    fontSize={9} fill="var(--bg)" fontWeight={700}>
+                    {Math.floor(min / 60)}h
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 11, color: "var(--text3)" }}>
+        <span><span style={{ color: "var(--green)" }}>■</span> ≥ 8h</span>
+        <span><span style={{ color: "#4bc8e8" }}>■</span> 4–8h</span>
+        <span style={{ marginLeft: "auto" }}>— 8h-Linie</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Haupt-Komponente ──
 export default function Stundenbuch({ config = {} }) {
   const [eintraege, setEintraegeLive] = useState(loadData);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [filter, setFilter] = useState({ monat: new Date().toISOString().slice(0, 7), projekt: "" });
+  const [timerStart, setTimerStart] = useState(null);
+  const [timerNow, setTimerNow] = useState(null);
+  const [timerVorbelegung, setTimerVorbelegung] = useState(null);
+  const [showInfo, setShowInfo] = useState(false);
+  const [showTagesbericht, setShowTagesbericht] = useState(false);
+  const [tagesberichtDatum, setTagesberichtDatum] = useState(new Date().toISOString().slice(0,10));
+  const [gespeicherteProjekte, setGespeicherteProjekte] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("stundenbuch_projekte") || "[]"); } catch { return []; }
+  });
+  const [showProjekteMgr, setShowProjekteMgr] = useState(false);
+  const [neuProjekt, setNeuProjekt] = useState("");
   const { toasts, addToast } = useToasts();
+
+  // Timer-Tick jede Sekunde
+  useEffect(() => {
+    if (!timerStart) return;
+    const iv = setInterval(() => setTimerNow(new Date()), 1000);
+    return () => clearInterval(iv);
+  }, [timerStart]);
+
+  function timerStarten() {
+    setTimerStart(new Date());
+    setTimerNow(new Date());
+  }
+
+  function timerStoppen() {
+    if (!timerStart) return;
+    const jetzt = new Date();
+    const vonStr = `${timerStart.getHours().toString().padStart(2,"0")}:${timerStart.getMinutes().toString().padStart(2,"0")}`;
+    const bisStr = `${jetzt.getHours().toString().padStart(2,"0")}:${jetzt.getMinutes().toString().padStart(2,"0")}`;
+    const datum = timerStart.toISOString().slice(0, 10);
+    setTimerStart(null);
+    setTimerNow(null);
+    setTimerVorbelegung({ datum, von: vonStr, bis: bisStr });
+    setEditId(null);
+    setShowForm(true);
+  }
 
   function setEintraege(fn) {
     setEintraegeLive(prev => {
@@ -152,10 +290,29 @@ export default function Stundenbuch({ config = {} }) {
   useEffect(() => {
     loadStundenDB()
       .then(data => { if (data) setEintraege(data); })
-      .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      .catch(e => addToast("Datenbank: " + supabaseFehlermeldung(e), "error"));
+  }, [addToast]);
 
-  const projekte = [...new Set(eintraege.map(e => e.projekt).filter(Boolean))].sort();
+  // Projektliste: gespeicherte + auto-extrahierte aus Einträgen (ohne Duplikate)
+  const projekte = [...new Set([
+    ...gespeicherteProjekte,
+    ...eintraege.map(e => e.projekt).filter(Boolean),
+  ])].sort();
+
+  function projektHinzufuegen() {
+    const name = neuProjekt.trim();
+    if (!name || gespeicherteProjekte.includes(name)) return;
+    const neu = [...gespeicherteProjekte, name].sort();
+    setGespeicherteProjekte(neu);
+    localStorage.setItem("stundenbuch_projekte", JSON.stringify(neu));
+    setNeuProjekt("");
+  }
+
+  function projektLoeschen(p) {
+    const neu = gespeicherteProjekte.filter(x => x !== p);
+    setGespeicherteProjekte(neu);
+    localStorage.setItem("stundenbuch_projekte", JSON.stringify(neu));
+  }
 
   async function handleSave(form) {
     if (editId) {
@@ -167,14 +324,14 @@ export default function Stundenbuch({ config = {} }) {
       try {
         const saved = await saveEintragDB(updated);
         if (saved) setEintraege(prev => prev.map(e => e.id === editId ? { ...e, db_id: saved.db_id } : e));
-      } catch (_) {}
+      } catch { /* fire-and-forget */ }
     } else {
       setEintraege(prev => [form, ...prev]);
       addToast("Eintrag gespeichert");
       try {
         const saved = await saveEintragDB(form);
         if (saved) setEintraege(prev => prev.map(e => e.id === form.id ? { ...e, db_id: saved.db_id } : e));
-      } catch (_) {}
+      } catch { /* fire-and-forget */ }
     }
     setShowForm(false);
   }
@@ -185,7 +342,7 @@ export default function Stundenbuch({ config = {} }) {
     setEintraege(prev => prev.filter(e => e.id !== id));
     addToast("Eintrag gelöscht");
     if (eintrag?.db_id) {
-      try { await deleteEintragDB(eintrag.db_id); } catch (_) {}
+      try { await deleteEintragDB(eintrag.db_id); } catch { /* fire-and-forget */ }
     }
   }
 
@@ -225,30 +382,116 @@ export default function Stundenbuch({ config = {} }) {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px", color: "var(--text)" }}>
+      <style>{`
+        .stunden-eintrag{display:grid;grid-template-columns:110px 80px 80px 70px 1fr auto;gap:12px;align-items:center;font-size:14px;}
+        @media(max-width:600px){
+          .stunden-eintrag{grid-template-columns:1fr 1fr;gap:6px 10px;font-size:13px;}
+          .stunden-eintrag .se-pause{display:none;}
+          .stunden-eintrag .se-info{grid-column:1/-1;font-size:12px;}
+          .stunden-eintrag .se-btns{justify-self:end;}
+        }
+      `}</style>
       <Toast toasts={toasts} />
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>⏱ Stundenbuch</h2>
           <div style={{ color: "var(--text3)", fontSize: 13 }}>Zeiterfassung{config.firma ? ` – ${config.firma}` : ""}{config.mitarbeiter ? ` | ${config.mitarbeiter}` : ""}</div>
         </div>
         <div style={{ flex: 1 }} />
+        <button onClick={() => setShowProjekteMgr(true)} style={btnStyle("rgba(139,92,246,0.1)", "#8b5cf6")} title="Projektliste verwalten">📋 Projekte</button>
+        <button onClick={() => setShowTagesbericht(true)} style={btnStyle("rgba(245,158,11,0.1)", "#f59e0b")}>📄 Tagesbericht</button>
         <button onClick={exportCSV} style={btnStyle("rgba(33,150,201,0.1)", "var(--blue)")}>↓ CSV Export</button>
-        <button onClick={() => { setEditId(null); setShowForm(s => !s); }} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>
+        <button onClick={() => { setEditId(null); setTimerVorbelegung(null); setShowForm(s => !s); }} style={btnStyle("rgba(82,217,138,0.1)", "var(--green)")}>
           {showForm && !editId ? "✕ Schließen" : "+ Neuer Eintrag"}
         </button>
+        <button onClick={() => setShowInfo(true)} title="Info" style={{...btnStyle("rgba(82,217,138,0.08)","var(--green)"),padding:"6px 10px"}}>ℹ</button>
+      </div>
+
+      {showInfo && (
+        <div onClick={() => setShowInfo(false)} style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.94)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e => e.stopPropagation()} style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:20,padding:28,maxWidth:480,width:"100%",position:"relative",maxHeight:"90vh",overflowY:"auto"}}>
+            <button onClick={() => setShowInfo(false)} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"var(--text2)",fontSize:18,cursor:"pointer",padding:4,lineHeight:1}}>✕</button>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
+              <div style={{fontSize:28}}>⏱</div>
+              <div>
+                <div style={{fontSize:20,fontWeight:800}}>Stundenbuch</div>
+                <div style={{fontSize:12,color:"var(--green)"}}>Version 2026.3 · by Jedrimos</div>
+              </div>
+            </div>
+            <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>
+              Digitale Zeiterfassung für Elektrofachkräfte. Einträge mit Datum, Von/Bis, Pause, Projekt und Tätigkeit — mit optionalem Supabase-Sync für das ganze Team.
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:24}}>
+              {[
+                ["⏱","Timer","Start/Stop direkt im Header"],
+                ["📅","Monats-Filter","Filtern nach Monat und Projekt"],
+                ["📊","Chart","SVG-Balkendiagramm pro Tag"],
+                ["⬇","CSV-Export","Stundennachweis als CSV-Datei"],
+                ["💾","Auto-Save","Lokal + optional in Supabase"],
+                ["⌨","Shortcut","Ctrl+S speichert den Eintrag"],
+              ].map(([icon,titel,sub])=>(
+                <div key={titel} style={{display:"flex",alignItems:"flex-start",gap:10,background:"var(--bg3)",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontSize:16,lineHeight:1}}>{icon}</div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700}}>{titel}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{borderTop:"1px solid var(--border)",paddingTop:16,fontSize:11,color:"var(--text3)",textAlign:"center"}}>
+              Lokale Datenspeicherung · Keine Cloud erforderlich · Keine Werbung · © 2026 Jedrimos
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wochenstunden + Timer */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 16px", fontSize: 13 }}>
+          Diese Woche: <strong style={{ color: "var(--green)" }}>{formatDuration(aktuelleWocheMinuten(eintraege))}</strong>
+        </div>
+        {timerStart ? (() => {
+          const vergangen = timerNow ? timerNow - timerStart : 0;
+          const minuten = Math.floor(vergangen / 60000);
+          const sek = Math.floor((vergangen % 60000) / 1000);
+          const istFeierabend = minuten >= 480; // 8h
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={timerStoppen} style={{ ...btnStyle("rgba(255,107,107,0.12)", "var(--red)"), display: "flex", alignItems: "center", gap: 8 }}>
+                ⏹ Stop
+                <span style={{ fontFamily: "var(--mono)", fontSize: 13 }}>
+                  {Math.floor(minuten / 60)}:{String(minuten % 60).padStart(2,"0")}:{String(sek).padStart(2,"0")}
+                </span>
+              </button>
+              {istFeierabend && (
+                <span style={{ fontSize: 12, color: "var(--green)", background: "rgba(82,217,138,0.08)", border: "1px solid rgba(82,217,138,0.2)", borderRadius: 8, padding: "4px 10px" }}>
+                  Feierabend? 🎯 {Math.floor(minuten / 60)}h {minuten % 60}min
+                </span>
+              )}
+            </div>
+          );
+        })() : (
+          <button onClick={timerStarten} style={btnStyle("rgba(82,217,138,0.08)", "var(--green)")}>
+            ▶ Timer starten
+          </button>
+        )}
       </div>
 
       {/* Formular */}
       {showForm && (
         <EintragForm
-          initial={editEintrag}
+          initial={editEintrag || timerVorbelegung || undefined}
           projekte={projekte}
-          onSave={handleSave}
-          onCancel={() => { setShowForm(false); setEditId(null); }}
+          onSave={e => { handleSave(e); setTimerVorbelegung(null); }}
+          onCancel={() => { setShowForm(false); setEditId(null); setTimerVorbelegung(null); }}
         />
       )}
+
+      {/* Monats-Chart */}
+      {filter.monat && <MonatsChart eintraege={eintraege} monat={filter.monat} />}
 
       {/* Filter */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -281,30 +524,140 @@ export default function Stundenbuch({ config = {} }) {
           {gefiltert.map(e => {
             const netto = calcNetto(e);
             return (
-              <div key={e.id} style={{
+              <div key={e.id} className="stunden-eintrag" style={{
                 background: "var(--bg2)", border: "1px solid var(--border)",
                 borderRadius: 10, padding: "12px 16px",
-                display: "grid", gridTemplateColumns: "110px 80px 80px 70px 1fr auto",
-                gap: 12, alignItems: "center", fontSize: 14
               }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{formatDate(e.datum)}</div>
-                </div>
+                <div style={{ fontWeight: 600 }}>{formatDate(e.datum)}</div>
                 <div style={{ color: "var(--text2)" }}>{e.von} – {e.bis}</div>
-                <div style={{ color: "var(--text2)" }}>-{e.pause}min Pause</div>
+                <div className="se-pause" style={{ color: "var(--text2)" }}>-{e.pause}min Pause</div>
                 <div style={{ fontWeight: 700, color: "var(--green)" }}>{formatDuration(netto)}</div>
-                <div>
+                <div className="se-info">
                   {e.projekt && <span style={{ background: "var(--bg3)", color: "var(--blue)", borderRadius: 6, padding: "2px 8px", fontSize: 12, marginRight: 6 }}>{e.projekt}</span>}
                   {e.taetigkeit && <span style={{ color: "var(--text2)" }}>{e.taetigkeit}</span>}
                   {e.notiz && <span style={{ color: "var(--text3)", fontSize: 12, display: "block", marginTop: 2 }}>{e.notiz}</span>}
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div className="se-btns" style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => handleEdit(e)} style={iconBtn("var(--bg3)")}>✎</button>
                   <button onClick={() => handleDelete(e.id)} style={iconBtn("rgba(255,107,107,0.1)")}>✕</button>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Tagesbericht-Modal */}
+      {showTagesbericht && (() => {
+        const tagEintraege = eintraege.filter(e => e.datum === tagesberichtDatum);
+        const tagMinuten = tagEintraege.reduce((s, e) => s + calcNetto(e), 0);
+        return (
+          <div onClick={() => setShowTagesbericht(false)} style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+            <div onClick={e => e.stopPropagation()} style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:28,maxWidth:640,width:"100%",maxHeight:"90vh",overflowY:"auto",position:"relative"}}>
+              <button onClick={() => setShowTagesbericht(false)} style={{position:"absolute",top:14,right:14,background:"none",border:"none",color:"var(--text3)",fontSize:18,cursor:"pointer"}}>✕</button>
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>📄 Tagesbericht</div>
+                <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                  <input type="date" value={tagesberichtDatum} onChange={e=>setTagesberichtDatum(e.target.value)}
+                    style={{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 10px",color:"var(--text)",fontSize:14}} />
+                  <button onClick={() => window.print()} style={{...btnStyle("rgba(245,158,11,0.1)","#f59e0b"),fontSize:12}}>🖨 Drucken</button>
+                  <button onClick={() => {
+                    const betreff = `Tagesbericht ${formatDate(tagesberichtDatum)}${config.mitarbeiter ? " – " + config.mitarbeiter : ""}`;
+                    const kopf = `${config.firma || "Tagesbericht"}\nDatum: ${formatDate(tagesberichtDatum)}${config.mitarbeiter ? "\nMitarbeiter: " + config.mitarbeiter : ""}\n\n`;
+                    const zeilen = tagEintraege.map(e =>
+                      `${e.von}–${e.bis} | ${e.pause}min Pause | ${formatDuration(calcNetto(e))} | ${e.projekt || "–"} | ${e.taetigkeit || "–"}${e.notiz ? " [" + e.notiz + "]" : ""}`
+                    ).join("\n");
+                    const fuss = `\n\nGesamt: ${formatDuration(tagMinuten)} (${(tagMinuten/60).toFixed(2)} h)`;
+                    window.location.href = `mailto:?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(kopf + zeilen + fuss)}`;
+                  }} style={{...btnStyle("rgba(59,130,246,0.1)","#3b82f6"),fontSize:12}}>📧 E-Mail</button>
+                </div>
+              </div>
+              <div className="tagesbericht-print" style={{background:"var(--bg)",borderRadius:10,padding:20,border:"1px solid var(--border)"}}>
+                <div style={{borderBottom:"2px solid var(--green)",paddingBottom:12,marginBottom:16}}>
+                  <div style={{fontSize:16,fontWeight:800}}>{config.firma || "Stundennachweis"}</div>
+                  {config.mitarbeiter && <div style={{fontSize:13,color:"var(--text2)",marginTop:2}}>Mitarbeiter: {config.mitarbeiter}</div>}
+                  <div style={{fontSize:13,color:"var(--text2)",marginTop:2}}>Datum: {formatDate(tagesberichtDatum)}</div>
+                </div>
+                {tagEintraege.length === 0 ? (
+                  <div style={{textAlign:"center",color:"var(--text3)",padding:"24px 0"}}>Keine Einträge für diesen Tag.</div>
+                ) : (
+                  <>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,marginBottom:16}}>
+                      <thead>
+                        <tr style={{borderBottom:"1px solid var(--border)"}}>
+                          {["Von","Bis","Pause","Netto","Projekt","Tätigkeit","Notiz"].map(h=>(
+                            <th key={h} style={{textAlign:"left",padding:"4px 8px",color:"var(--text3)",fontWeight:600,fontSize:11}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tagEintraege.map(e=>(
+                          <tr key={e.id} style={{borderBottom:"1px solid var(--border)"}}>
+                            <td style={{padding:"6px 8px"}}>{e.von}</td>
+                            <td style={{padding:"6px 8px"}}>{e.bis}</td>
+                            <td style={{padding:"6px 8px",color:"var(--text3)"}}>{e.pause}min</td>
+                            <td style={{padding:"6px 8px",fontWeight:700,color:"var(--green)"}}>{formatDuration(calcNetto(e))}</td>
+                            <td style={{padding:"6px 8px"}}>{e.projekt||"—"}</td>
+                            <td style={{padding:"6px 8px"}}>{e.taetigkeit||"—"}</td>
+                            <td style={{padding:"6px 8px",color:"var(--text3)",fontSize:12}}>{e.notiz||""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div style={{display:"flex",justifyContent:"flex-end",gap:24,padding:"8px 8px 0",borderTop:"2px solid var(--border)"}}>
+                      <span style={{fontSize:13,color:"var(--text2)"}}>Einträge: <strong>{tagEintraege.length}</strong></span>
+                      <span style={{fontSize:14,fontWeight:800}}>Gesamt: <span style={{color:"var(--green)"}}>{formatDuration(tagMinuten)}</span> ({(tagMinuten/60).toFixed(2)} h)</span>
+                    </div>
+                    <div style={{marginTop:32,display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+                      <div style={{fontSize:12,color:"var(--text3)"}}>
+                        <div style={{marginBottom:4,fontWeight:600}}>Unterschrift Mitarbeiter</div>
+                        <div style={{borderBottom:"1px solid var(--border)",height:32}}/>
+                        <div style={{marginTop:4}}>{config.mitarbeiter||"____________________"}</div>
+                      </div>
+                      <div style={{fontSize:12,color:"var(--text3)"}}>
+                        <div style={{marginBottom:4,fontWeight:600}}>Unterschrift Auftraggeber</div>
+                        <div style={{borderBottom:"1px solid var(--border)",height:32}}/>
+                        <div style={{marginTop:4,color:"var(--border2)"}}>____________________</div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Projektliste-Manager */}
+      {showProjekteMgr && (
+        <div onClick={() => setShowProjekteMgr(false)} style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e => e.stopPropagation()} style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:24,maxWidth:440,width:"100%",position:"relative"}}>
+            <button onClick={() => setShowProjekteMgr(false)} style={{position:"absolute",top:12,right:12,background:"none",border:"none",color:"var(--text3)",fontSize:18,cursor:"pointer"}}>✕</button>
+            <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>📋 Projektliste</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>Projekte vorausfüllen — erscheinen als Vorschläge im Eintrag-Formular</div>
+            {/* Neue hinzufügen */}
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              <input value={neuProjekt} onChange={e => setNeuProjekt(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && projektHinzufuegen()}
+                placeholder="Projektname…"
+                style={{flex:1,background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",padding:"8px 10px",fontSize:14,outline:"none",fontFamily:"inherit"}} />
+              <button onClick={projektHinzufuegen} style={btnStyle("rgba(139,92,246,0.15)","#8b5cf6")}>+ Hinzufügen</button>
+            </div>
+            {/* Liste */}
+            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:260,overflowY:"auto"}}>
+              {projekte.length === 0 && <div style={{fontSize:13,color:"var(--text3)",textAlign:"center",padding:16}}>Noch keine Projekte</div>}
+              {projekte.map(p => (
+                <div key={p} style={{display:"flex",alignItems:"center",background:"var(--bg)",borderRadius:8,padding:"8px 12px",border:"1px solid var(--border)"}}>
+                  <span style={{flex:1,fontSize:13}}>{p}</span>
+                  {gespeicherteProjekte.includes(p) ? (
+                    <button onClick={() => projektLoeschen(p)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,padding:"0 4px"}}>✕</button>
+                  ) : (
+                    <span style={{fontSize:10,color:"var(--text3)"}}>aus Einträgen</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,17 +1,3 @@
-import { useState, useCallback } from "react";
-
-function uid() { return Math.random().toString(36).slice(2, 9); }
-
-export function useToasts() {
-  const [toasts, setToasts] = useState([]);
-  const addToast = useCallback((msg, type = "success") => {
-    const id = uid();
-    setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
-  }, []);
-  return { toasts, addToast };
-}
-
 export default function Toast({ toasts }) {
   return (
     <div style={{
