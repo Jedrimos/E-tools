@@ -6,6 +6,18 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.3.5] – 2026-03-09
+
+### 🐛 Bugfix — Verteilerplaner Header & Light-Mode
+
+- **Doppelter Header entfernt**: TopBar wird im Verteilerplaner nicht mehr aus Dashboard gerendert — der Verteilerplaner hat seinen eigenen vollständigen Header
+- **← Zurück-Button** wieder im Verteilerplaner-Header (links, vor dem Logo)
+- **☀️/🌙 Theme-Toggle** direkt im Verteilerplaner-Header (rechts, neben 🐛) — kein Wechsel ins Dashboard nötig
+- **Light-Mode schwarze Flächen behoben**: Alle Modal-Overlays (`rgba(10,12,14,...)`) durch theme-neutrale `rgba(0,0,0,0.55/0.65)` ersetzt
+- **Start-Screen Light-Mode**: Innerer Container bekommt `var(--bg2)` Hintergrund statt transparentem Overlay
+
+---
+
 ## [2026.3.4] – 2026-03-09
 
 ### ✨ Neu — KNX-Planer (neue App)

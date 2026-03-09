@@ -368,7 +368,7 @@ function ApiSettingsModal({ onClose }) {
     {label:"LM Studio",url:"http://localhost:1234/v1/chat/completions",model:"llava",format:"openai"},
   ];
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:480,padding:24}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <div style={{fontSize:16,fontWeight:800}}>⚙️ KI-API Einstellungen</div>
@@ -450,7 +450,7 @@ NUR JSON, keine Backticks, kein Text davor/danach.`;
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:600,maxHeight:"92vh",overflow:"auto",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
         <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
           <div>
@@ -533,7 +533,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   };
 
   if (phase === "neu") return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:18,width:"100%",maxWidth:480,padding:32}}>
         <button onClick={()=>setPhase("start")} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20,marginBottom:16,padding:0,display:"flex",alignItems:"center",gap:6}}>
           ← <span style={{fontSize:13}}>Zurück</span>
@@ -580,7 +580,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   );
 
   if (phase === "laden") return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:18,width:"100%",maxWidth:520,maxHeight:"80vh",overflow:"auto",padding:28}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <div>
@@ -621,8 +621,8 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
 
   // Start-Phase
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{textAlign:"center",maxWidth:440,width:"100%"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{textAlign:"center",maxWidth:440,width:"100%",background:"var(--bg2)",borderRadius:18,padding:32,border:"1px solid var(--border)"}}>
         {/* Logo */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginBottom:32}}>
           <div style={{width:56,height:56,borderRadius:14,background:"rgba(33,150,201,0.12)",border:"1px solid rgba(33,150,201,0.3)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -690,7 +690,7 @@ function SettingsModal({ settings, onSave, onClose }) {
   ];
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
       <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:520,maxHeight:"90vh",overflow:"auto",padding:28}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
           <div style={{fontSize:17,fontWeight:800,color:"var(--text)"}}>⚙️ Einstellungen</div>
@@ -816,7 +816,7 @@ function LeitungsRechner({ qs, laenge, onSelectQs }) {
 // ══════════════════════════════════════════
 // ── Hauptkomponente ──
 // ══════════════════════════════════════════
-export default function Verteilerplaner({ onBack } = {}) {
+export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
   const [step, setStep] = useState(1);
   const [projekt, setProjekt]     = useState({ name:"", adresse:"", ersteller:"", standort:"" });
   const [kabel, setKabel]         = useState([]);          // Step 2: Kabel
@@ -1660,10 +1660,14 @@ const stueckliste = (() => {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div className="no-print header-outer" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:52,zIndex:100,backdropFilter:"blur(12px)"}}>
+      <div className="no-print header-outer" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
 
-        {/* LEFT: Logo */}
+        {/* LEFT: Back + Logo */}
         <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+          {onBack&&<button onClick={onBack} title="Zurück zum Dashboard"
+            style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0}}
+            onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
+            onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>←</button>}
           <div onClick={()=>setShowStartScreen(true)} title="Zur Projektauswahl" style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",borderRadius:8,padding:"4px 6px",transition:"background 0.15s"}}
             onMouseEnter={e=>e.currentTarget.style.background="var(--bg3)"}
             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
@@ -1747,6 +1751,12 @@ const stueckliste = (() => {
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",textDecoration:"none"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>🐛</a>
+          {onToggleTheme&&<button onClick={onToggleTheme} title={theme==="dark"?"Hell-Modus aktivieren":"Dunkel-Modus aktivieren"}
+            style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
+            onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
+            onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>
+            {theme==="dark"?"☀️":"🌙"}
+          </button>}
         </div>
       </div>
 
@@ -3184,7 +3194,7 @@ const stueckliste = (() => {
           if(!fi)return null;
           const qNr=plan.gruppen.indexOf(fi)+1;
           return(
-            <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
               <div style={{background:"var(--bg2)",border:"1px solid rgba(33,150,201,0.2)",borderRadius:16,padding:24,width:"100%",maxWidth:420}} onClick={e=>e.stopPropagation()}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -3254,7 +3264,7 @@ const stueckliste = (() => {
           const qNr=plan.gruppen.indexOf(fi)+1;
           const fNr=fi.stromkreise.indexOf(si)+1;
           return(
-            <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={closePlanEdit}>
               <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:24,width:"100%",maxWidth:460}} onClick={e=>e.stopPropagation()}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -3321,7 +3331,7 @@ const stueckliste = (() => {
 
       {/* ── INFO MODAL ── */}
       {showInfo&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.94)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowInfo(false)}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowInfo(false)}>
           <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:20,width:"100%",maxWidth:560,padding:32,position:"relative"}} onClick={e=>e.stopPropagation()}>
             <button onClick={()=>setShowInfo(false)} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"var(--text3)",fontSize:22,cursor:"pointer",lineHeight:1}}>✕</button>
 
@@ -3375,7 +3385,7 @@ const stueckliste = (() => {
       )}
 
       {showSave&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,padding:24,width:"100%",maxWidth:400}}>
             <div style={{fontSize:16,fontWeight:700,marginBottom:16,color:"var(--text)"}}>💾 Projekt speichern</div>
             <input value={saveName} onChange={e=>setSaveName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&speichere()} placeholder="Projektname..." autoFocus
@@ -3389,7 +3399,7 @@ const stueckliste = (() => {
       )}
 
       {showLoad&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:14,padding:24,width:"100%",maxWidth:480,maxHeight:"80vh",overflow:"auto"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
               <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>📂 Projekt laden</div>
