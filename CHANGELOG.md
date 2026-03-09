@@ -6,71 +6,49 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
-## [2026.3.7] – 2026-03-08
+## [2026.3.4] – 2026-03-09
 
-### 🐛 Bugfixes KNX-Planer
-- Kyrillisches `м` in `aktRaумId` → korrektes ASCII `aktRaumId`
-- `csvExport()` mutierte React-State direkt via `.sort()` → `[...gaListe].sort()`
-- `URL.revokeObjectURL()` nach CSV-Download ergänzt (Memory-Leak geschlossen)
-- `GAForm`: `useEffect` synct form-State wenn anderer editGA gewählt wird (stale prop)
-- Sequentielle `await`-Schleifen in `addVorlage` und `raumLoeschen` → `Promise.all`
-- Etagen-Tab-Filter: widersprüchliche Bedingung bereinigt
-- Neuer Raum wechselt jetzt automatisch auf dessen Etagen-Tab
-- Doppeltes `raeume.find()` in TabCheckliste konsolidiert
-- `byFunk`: O(n×m) doppelter Filter → O(n) Single-Pass
-- `useMemo` für `gefiltert`, `grouped`, `hgListe`, `raumMap`
-- Leer-Zustand "Keine Ergebnisse" bei aktivem Filter ergänzt
-- `uid()` in `db_knx.js` auf zentrales `src/lib/utils.js` umgestellt
+### ✨ Neu — KNX-Planer (neue App)
+
+- **GA-Planer**: Gruppenadresse anlegen (HG 0–31 / MG 0–7 / UG 0–255), Funktion, DPT, Raum-Zuweisung, Notiz — sortierte Liste nach Adresse, Filter nach Funktion / HG / Suche, CSV-Export (ETS-kompatibel)
+- **Raumplan**: Räume nach Etage anlegen (Name, Etage, Typ), GA-Chips per Raum, direkte Zuweisung/Entfernung, nach Neuerstellung direkt auf richtigen Etagen-Tab springen
+- **Inbetriebnahme-Checkliste**: Vorlagen-Templates (Licht, Dimmen, Jalousie, Heizung, Szene, Allgemein), eigene Prüfpunkte, Gesamt- und Raum-Fortschrittsbalken
+- **KNX-Rechner**: Physikalische Adresse (Bereich.Linie.Gerät → Dez/Hex/Binär), GA↔Dezimal-Umrechnung, Projekt-Statistik, DPT-Kurzreferenz
+- localStorage-Datenspeicherung mit Supabase-Fallback (`knx_gruppen`, `knx_raeume`, `knx_checkliste`)
+- App-Farbe: `#e11d48` (rose-red, KNX-Branding), KNX-Daten in globalem Backup integriert
 
 ### ✨ Neu — Roadmap-Features
 
 **🌙 Dark-/Light-Mode Umschalter**
-- Toggle-Button in Dashboard-Header (oben rechts, dauerhaft sichtbar) und in TopBar jeder App
-- Einstellung wird in `localStorage` gespeichert und beim Start wiederhergestellt
-- Light Mode: vollständig neue CSS-Variablen in `index.css` (`[data-theme="light"]`)
+- Toggle-Button oben rechts im Dashboard und in der TopBar jeder App
+- Einstellung persistent in `localStorage`, beim Start sofort angewendet
+- Vollständiges Light-Mode-Farbschema via `[data-theme="light"]` in `index.css`
+
+**🐛 Fehler melden / Verbesserung vorschlagen**
+- Link-Button im Dashboard-Footer und 🐛-Icon in jeder App-TopBar
+- Öffnet direkt `https://github.com/Jedrimos/E-tools/issues/new` in neuem Tab
 
 **📧 Tagesbericht per E-Mail (Stundenbuch)**
-- Neuer Button „📧 E-Mail" im Tagesbericht-Modal
-- Öffnet `mailto:` mit vorausgefülltem Betreff (Datum, Mitarbeiter) und tabellarischem Inhalt aller Einträge
+- Button „📧 E-Mail" im Tagesbericht-Modal
+- `mailto:` mit vorausgefülltem Betreff (Datum, Mitarbeiter) und allen Einträgen als Tabelle
 
 **📋 Projektliste verwalten (Stundenbuch)**
-- Neuer Button „📋 Projekte" in der Stundenbuch-Toolbar
-- Modal zum Anlegen und Löschen fester Projekte (gespeichert in `stundenbuch_projekte`)
-- Vordefinierte Projekte erscheinen als Vorschläge im Eintrag-Formular
-- Aus bestehenden Einträgen auto-extrahierte Projekte werden weiterhin angezeigt
+- Button „📋 Projekte" in der Toolbar öffnet Mini-Modal
+- Feste Projekte anlegen/löschen (`stundenbuch_projekte`), erscheinen als Vorschläge im Eintrag-Formular
 
----
+### 🐛 Bugfixes KNX-Planer
 
-## [2026.3.6] – 2026-03-07
-
-### ✨ Neu — KNX-Planer (neue App)
-
-- **GA-Planer**: Gruppenadresse anlegen (HG/MG/UG), Funktionstyp, DPT, Raum-Zuweisung, Notiz — sortierte Liste nach Adresse, Filter nach Funktion/HG/Suche, CSV-Export
-- **Raumplan**: Räume nach Etage anlegen (Name, Etage, Typ), GA-Chips per Raum, direkte Zuweisung/Entfernung
-- **Inbetriebnahme-Checkliste**: Vorgaben-Templates (Licht, Dimmen, Jalousie, Heizung, Szene, Allgemein), eigene Prüfpunkte, Gesamt-Fortschrittsbalken, Raum-Fortschritt
-- **KNX-Rechner**: Physikalische Adresse (Bereich.Linie.Gerät → Dez/Hex/Binär), GA↔Dezimal-Umrechnung, Projekt-Statistik, DPT-Kurzreferenz
-- localStorage-Datenspeicherung mit Supabase-Fallback (Tabellen: `knx_gruppen`, `knx_raeume`, `knx_checkliste`)
-- App-Farbe: `#e11d48` (rose-red, KNX-Branding)
-- KNX-Daten in Backup/Restore integriert
-
-### Geändert
-- Abstandsrechner: Modus-Dropdown → visuelle 3-Karten-Auswahl (intuitiver)
-- Abstandsrechner: Objekt-Typ als Chip-Reihe statt Dropdown
-- Abstandsrechner: Formel wird direkt im Ergebnis-Block angezeigt
-
----
-
-## [2026.3.6] – 2026-03-07 (vorher)
-
-### ✨ Neu
-
-**Elektrorechner — neuer Tab Abstandsrechner**
-- Gleichmäßige Verteilung von Objekten (Lampen, Rohrschellen, Steckdosen …) auf einer Strecke
-- 3 Modi: Gleichmäßig inkl. Randabstand · Wand-zu-Wand · Frei (Wandabstand vorgeben)
-- SVG-Visualisierung mit Positions-Nummern, Abstands-Labels und Wandabstand-Markierung
-- Positionsliste aller Objekte als „Abstand ab linker Wand"
-- Referenztabelle Max. Befestigungsabstände nach VDE / DIN (NYM, NYY, H07V-K, Rohre, Kabelkanal, Datenkabel)
-- Einheit wählbar: Meter oder Zentimeter
+- Kyrillisches `м` in `aktRaумId` → korrektes ASCII `aktRaumId`
+- `csvExport()` mutierte React-State via `.sort()` → `[...gaListe].sort()`
+- `URL.revokeObjectURL()` nach CSV-Download ergänzt (Memory-Leak)
+- `GAForm`: `useEffect` synct Formular-State beim GA-Wechsel (stale prop)
+- Sequentielle `await`-Schleifen → `Promise.all` (Vorlagen, Raum löschen)
+- Etagen-Tab-Filter: widersprüchliche `|| raeume.length===0`-Bedingung entfernt
+- `byFunk`: O(n×m) → O(n) Single-Pass `reduce`
+- `useMemo` für `gefiltert`, `grouped`, `hgListe`, `raumMap`
+- Leer-Zustand "Keine Ergebnisse" bei aktivem Filter
+- Doppelter Filter für unassigned GAs auf Variable extrahiert
+- `uid()` in `db_knx.js` und `KNXPlaner.jsx` → zentrales `src/lib/utils.js`
 
 ---
 
