@@ -254,6 +254,8 @@ export default function Dashboard() {
   if (aktiveApp === "verteilerplaner") {
     return (
       <div>
+        <TopBar label="Verteilerplaner" icon="⚡" farbe="#4bc8e8" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <Verteilerplaner onBack={zurueck} />
       </div>
     );
@@ -331,8 +333,18 @@ export default function Dashboard() {
         <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />
       )}
 
-      {/* Theme-Toggle oben rechts */}
-      <div style={{ position: "fixed", top: 14, right: 14, zIndex: 100 }}>
+      {/* Feedback + Theme-Toggle oben rechts */}
+      <div style={{ position: "fixed", top: 14, right: 14, zIndex: 100, display: "flex", gap: 8 }}>
+        <a href={GITHUB_ISSUES_URL} target="_blank" rel="noopener noreferrer"
+          title="Fehler melden oder Verbesserung vorschlagen"
+          style={{
+            background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 20,
+            padding: "6px 12px", cursor: "pointer", fontSize: 14, color: "var(--text2)",
+            display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            textDecoration: "none",
+          }}>
+          🐛 <span style={{ fontSize: 11, fontWeight: 600 }}>Feedback</span>
+        </a>
         <button onClick={toggleTheme} title={theme === "dark" ? "Light Mode" : "Dark Mode"} style={{
           background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 20,
           padding: "6px 12px", cursor: "pointer", fontSize: 16, color: "var(--text2)",
@@ -519,7 +531,8 @@ function TopBar({ label, icon, farbe, onBack, config, onConfig, theme, onToggleT
   return (
     <div style={{
       background: "var(--bg)", borderBottom: "1px solid var(--border)",
-      padding: "10px 20px", display: "flex", alignItems: "center", gap: 12
+      padding: "10px 20px", display: "flex", alignItems: "center", gap: 12,
+      position: "sticky", top: 0, zIndex: 150,
     }}>
       <button
         onClick={onBack}

@@ -622,13 +622,6 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   // Start-Phase
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(10,12,14,0.97)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      {onBack && (
-        <button onClick={onBack} style={{position:"absolute",top:16,left:16,background:"none",border:"1px solid var(--border2)",color:"var(--text3)",cursor:"pointer",fontSize:13,borderRadius:8,padding:"7px 12px",display:"flex",alignItems:"center",gap:6,transition:"all 0.15s"}}
-          onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border)";}}
-          onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border2)";}}>
-          ← <span>Dashboard</span>
-        </button>
-      )}
       <div style={{textAlign:"center",maxWidth:440,width:"100%"}}>
         {/* Logo */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginBottom:32}}>
@@ -1667,18 +1660,10 @@ const stueckliste = (() => {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div className="no-print header-outer" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
+      <div className="no-print header-outer" style={{background:"var(--bg2)",borderBottom:"1px solid var(--border)",padding:"0 12px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,position:"sticky",top:52,zIndex:100,backdropFilter:"blur(12px)"}}>
 
-        {/* LEFT: Dashboard-Back + Logo */}
+        {/* LEFT: Logo */}
         <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-          {onBack && (
-            <button onClick={onBack} title="Zurück zum Dashboard"
-              style={{height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:12,fontWeight:600,padding:"0 10px",display:"flex",alignItems:"center",gap:5,transition:"all 0.15s",marginRight:4}}
-              onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
-              onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>
-              ← <span className="nav-label-long">Dashboard</span>
-            </button>
-          )}
           <div onClick={()=>setShowStartScreen(true)} title="Zur Projektauswahl" style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",borderRadius:8,padding:"4px 6px",transition:"background 0.15s"}}
             onMouseEnter={e=>e.currentTarget.style.background="var(--bg3)"}
             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
@@ -1757,6 +1742,11 @@ const stueckliste = (() => {
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>ℹ️</button>
+          <a href="https://github.com/Jedrimos/E-tools/issues/new" target="_blank" rel="noopener noreferrer"
+            title="Fehler melden oder Verbesserung vorschlagen"
+            style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",textDecoration:"none"}}
+            onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
+            onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>🐛</a>
         </div>
       </div>
 
