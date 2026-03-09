@@ -174,6 +174,8 @@ const APPS = [
 ];
 
 // ── Konfigurations-Felder ──
+const GITHUB_ISSUES_URL = "https://github.com/Jedrimos/E-tools/issues/new";
+
 const CONFIG_FELDER = [
   { key: "firma",       label: "Firmenname",        placeholder: "z.B. Elektro Mustermann GmbH", icon: "🏢" },
   { key: "mitarbeiter", label: "Mitarbeiter / Name", placeholder: "z.B. Max Mustermann",          icon: "👤" },
@@ -487,11 +489,27 @@ export default function Dashboard() {
         style={{
           background: "transparent", border: "1px solid var(--border)",
           color: "var(--text3)", borderRadius: 10, padding: "10px 20px",
-          cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8
+          cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8,
+          marginBottom: 12,
         }}
       >
         ⚙ Einstellungen & Konfiguration
       </button>
+
+      {/* Feedback / Issues */}
+      <a
+        href={GITHUB_ISSUES_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "flex", alignItems: "center", gap: 8,
+          background: "transparent", border: "1px solid var(--border)",
+          color: "var(--text3)", borderRadius: 10, padding: "9px 20px",
+          fontSize: 13, textDecoration: "none", cursor: "pointer",
+        }}
+      >
+        🐛 Fehler melden oder Verbesserung vorschlagen
+      </a>
     </div>
   );
 }
@@ -521,6 +539,15 @@ function TopBar({ label, icon, farbe, onBack, config, onConfig, theme, onToggleT
           {theme === "dark" ? "☀" : "🌙"}
         </button>
       )}
+      <a
+        href={GITHUB_ISSUES_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Fehler melden oder Verbesserung vorschlagen (GitHub)"
+        style={{ background: "transparent", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 16, padding: "0 4px", textDecoration: "none", lineHeight: 1, display: "flex", alignItems: "center" }}
+      >
+        🐛
+      </a>
       <button
         onClick={onConfig}
         style={{ background: "transparent", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 16 }}
