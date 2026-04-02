@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.3.5-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.4.0-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -146,6 +146,24 @@ Rechner und Formelsammlung für Elektrofachkräfte — 5 Tabs, kein Datenbankzug
 
 ---
 
+### 🔌 Materialzähler
+
+Installationsmaterial pro Projekt zählen und Bestellmengen verwalten.
+
+**Features:**
+- Projekte anlegen mit Name, Ort und Notiz
+- Positionen erfassen in Kategorien: Steckdosen, Schalter, Dimmer, Rahmen, Dosen & Gehäuse, Sonstiges
+- Schnellauswahl für gängige Artikel (Schuko, Wechselschalter, Rahmen 1–5-fach, CEE, USB, etc.)
+- Benötigte Menge und bestellte Menge direkt in der Liste editierbar
+- Status je Position: Offen / Teils bestellt / Bestellt ✓
+- Fortschrittsbalken und Statistik pro Projekt (Stückzahl gesamt, offen, bestellt)
+- Filter nach Kategorie + Freitextsuche
+- Druckansicht: saubere Materialliste gruppiert nach Kategorie
+- localStorage-Datenspeicherung mit Supabase-Fallback (`materialzaehler_projekte`)
+- Im globalen Backup-Export enthalten
+
+---
+
 ## Dashboard & Konfiguration
 
 Beim Start erscheint das Dashboard zur Tool-Auswahl. Über **⚙ Einstellungen** lassen sich folgende Daten hinterlegen (werden lokal gespeichert und in allen Tools verwendet):
@@ -267,6 +285,19 @@ CREATE TABLE wartungsaufgaben (
 );
 ALTER TABLE wartungsaufgaben ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON wartungsaufgaben FOR ALL USING (true) WITH CHECK (true);
+
+-- Materialzähler
+CREATE TABLE materialzaehler_projekte (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name         text NOT NULL DEFAULT '',
+  ort          text DEFAULT '',
+  notiz        text DEFAULT '',
+  positionen   jsonb DEFAULT '[]',
+  created_at   timestamptz DEFAULT now(),
+  updated_at   timestamptz DEFAULT now()
+);
+ALTER TABLE materialzaehler_projekte ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON materialzaehler_projekte FOR ALL USING (true) WITH CHECK (true);
 ```
 
 4. Environment Variables setzen:

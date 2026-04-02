@@ -6,6 +6,26 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.4.0] – 2026-04-02
+
+### ✨ Neu — Materialzähler (neue App)
+
+- **Projektbasiert**: Mehrere Projekte anlegen mit Name, Ort und Notiz
+- **Positionen erfassen**: Steckdosen, Schalter, Dimmer, Rahmen, Dosen & Gehäuse, Sonstiges — mit Schnellauswahl für gängige Artikel
+- **Mengen verwalten**: Benötigte Menge und bestellte Menge direkt in der Liste editierbar
+- **Status-Anzeige**: Offen / Teils bestellt / Bestellt ✓ je Position, Fortschrittsbalken pro Projekt
+- **Filter & Suche**: Nach Kategorie filtern oder Freitextsuche über Bezeichnung/Notiz
+- **Drucken**: Druckansicht mit Materialliste gruppiert nach Kategorie
+- **Supabase-Sync**: `materialzaehler_projekte`-Tabelle mit localStorage-Fallback, Positionen als JSONB
+- **Backup integriert**: Key `elektronikertools_materialzaehler` in globalem Backup
+- App-Farbe: `#84cc16` (lime)
+
+### 🐛 Bugfixes
+
+- **vde.js**: Null-Guard in `evalStromkreis()` und `risoMin()` — kein Crash mehr wenn `sk` undefined ist
+
+---
+
 ## [2026.3.5] – 2026-03-09
 
 ### 🐛 Bugfix — Verteilerplaner Header & Light-Mode

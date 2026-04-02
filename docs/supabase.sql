@@ -155,3 +155,17 @@ CREATE TABLE IF NOT EXISTS knx_checkliste (
 );
 ALTER TABLE knx_checkliste ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON knx_checkliste FOR ALL USING (true) WITH CHECK (true);
+
+
+-- ── Materialzähler ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS materialzaehler_projekte (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name         text NOT NULL DEFAULT '',
+  ort          text DEFAULT '',
+  notiz        text DEFAULT '',
+  positionen   jsonb DEFAULT '[]',
+  created_at   timestamptz DEFAULT now(),
+  updated_at   timestamptz DEFAULT now()
+);
+ALTER TABLE materialzaehler_projekte ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON materialzaehler_projekte FOR ALL USING (true) WITH CHECK (true);
