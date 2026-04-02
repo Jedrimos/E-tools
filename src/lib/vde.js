@@ -21,6 +21,7 @@ export function evalNum(val, pass) {
 
 /** Bewertet einen Stromkreis vollständig. Gibt "offen", "ok" oder "fail" zurück. */
 export function evalStromkreis(sk) {
+  if (!sk) return "offen";
   const results = [
     evalNum(sk.pe_widerstand, () => true),           // PE: kein fixer Grenzwert
     evalNum(sk.riso_l1_pe,  v => v >= GW.riso_min),
@@ -47,6 +48,7 @@ export function evalStromkreis(sk) {
 
 /** Gibt den kleinsten gemessenen Riso-Wert zurück (als formatierter String). */
 export function risoMin(sk) {
+  if (!sk) return "";
   const vals = [sk.riso_l1_pe, sk.riso_l2_pe, sk.riso_l3_pe, sk.riso_n_pe]
     .filter(v => v !== "")
     .map(v => parseFloat(String(v).replace(",", ".")))

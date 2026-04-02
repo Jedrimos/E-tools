@@ -66,6 +66,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ### Neue Tools
 - ✅ ~~**🔧 Wartungsprotokoll**~~ — Umgesetzt: Kategorien, Intervalle, Fälligkeits-Automatik, Erledigt-Button, Supabase-Sync.
 - ✅ ~~**📐 Leitungsberechnung**~~ — Umgesetzt: Strom + Länge + Verlegeart (B1/B2/C/E) + Material + cos φ → Querschnitt + Spannungsfall-Tabelle (VDE 0100-520).
+- ✅ ~~**🔌 Materialzähler**~~ — Umgesetzt: Steckdosen, Schalter, Dimmer, Rahmen & Co. pro Projekt zählen, Bestellmengen, Schnellauswahl, Drucken.
 - 🏗 **📦 Materialverwaltung** — Fahrzeug-/Lagerbestand, Verbrauch pro Baustelle, Mindestbestand-Warnung.
 - 🔨 **🔌 Betriebsmittelkennzeichnung** — QR-Code-Generator für Betriebsmittel, QR-Code öffnet das Prüfprotokoll.
 

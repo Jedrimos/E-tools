@@ -6,6 +6,7 @@ import Wissensdatenbank from "./Wissensdatenbank.jsx";
 import Wartungsprotokoll from "./Wartungsprotokoll.jsx";
 import Leitungsberechnung from "./Leitungsberechnung.jsx";
 import KNXPlaner from "./KNXPlaner.jsx";
+import Materialzaehler from "./Materialzaehler.jsx";
 import { isSupabaseConfigured, supabase } from "./lib/supabase.js";
 
 // ── Lokaler Speicher für Konfiguration ──
@@ -64,6 +65,7 @@ const BACKUP_KEYS = [
   "knx_gruppen",
   "knx_raeume",
   "knx_checkliste",
+  "elektronikertools_materialzaehler",
 ];
 
 function exportBackup() {
@@ -170,6 +172,14 @@ const APPS = [
     beschreibung: "KNX-Gruppenadress-Planer, Raumplan mit GA-Zuordnung, Inbetriebnahme-Checkliste und Adress-/DPT-Rechner.",
     farbe: "#e11d48",
     bg: "#1a0008",
+  },
+  {
+    id: "materialzaehler",
+    name: "Materialzähler",
+    icon: "🔌",
+    beschreibung: "Steckdosen, Schalter, Dimmer, Rahmen & Co. pro Projekt zählen und Bestellmengen festhalten.",
+    farbe: "#84cc16",
+    bg: "#0d1a00",
   },
 ];
 
@@ -316,6 +326,16 @@ export default function Dashboard() {
         <TopBar label="KNX-Planer" icon="🏡" farbe="#e11d48" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
         <KNXPlaner />
+      </div>
+    );
+  }
+
+  if (aktiveApp === "materialzaehler") {
+    return (
+      <div>
+        <TopBar label="Materialzähler" icon="🔌" farbe="#84cc16" onBack={zurueck} config={config} onConfig={openConfig} theme={theme} onToggleTheme={toggleTheme} />
+        {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
+        <Materialzaehler config={config} />
       </div>
     );
   }
