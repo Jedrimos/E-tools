@@ -53,6 +53,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 
 ### 🔗 App-übergreifend
 - ✅ ~~**PWA / Offline-Modus**~~ — Umgesetzt: manifest.json, Service Worker (Cache-Strategie), iOS-Meta-Tags, App installierbar
+- ✅ ~~**WordPress-Plugin**~~ — Umgesetzt: `[elektronikertools]`-Shortcode, WP-Admin-Einstellungsseite, ESM-Build, scoped CSS, fertige Assets im Repo.
 - 🏗 **Multi-Techniker / Betrieb** — Supabase Row Level Security: Techniker sehen eigene Daten, Chef-Login sieht alles.
 - 🏗 **Betriebsstammdaten / Briefkopf** — Firmenlogo + Adressdaten hinterlegen, automatisch auf Protokollen und Exporten.
 

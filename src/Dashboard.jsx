@@ -209,9 +209,10 @@ export default function Dashboard() {
   const [zuletzt, setZuletzt] = useState(ladeZuletzt);
   const [theme, setTheme] = useState(() => localStorage.getItem("ui_theme") || "dark");
 
-  // Theme auf <html> anwenden
+  // Theme anwenden — im WordPress-Modus auf den App-Root, sonst auf <html>
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    const el = document.getElementById("elektronikertools-root") || document.documentElement;
+    el.setAttribute("data-theme", theme);
     localStorage.setItem("ui_theme", theme);
   }, [theme]);
 
