@@ -6,7 +6,33 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
-## [2026.4.0] – 2026-04-02
+## [2026.4.1] – 2026-07-02
+
+### ✨ Neu — WordPress Plugin
+
+- **`wordpress-plugin/`**: Vollständiges WordPress-Plugin (`elektronikertools.php` + Admin-Einstellungsseite)
+- **Shortcode** `[elektronikertools]` bettet die komplette React-App in jede WP-Seite ein
+- **WP-Einstellungsseite** (Einstellungen → Elektronikertools) für Supabase URL + Key — werden zur Laufzeit per `wp_localize_script` an die App übergeben, kein Rebuild nötig
+- **Scoped CSS** (`wp-src/wp-index.css`): CSS-Variablen auf `#elektronikertools-root` statt auf `:root` — WP-Theme bleibt unberührt
+- **ESM-Support**: `type="module"` wird via `script_loader_tag`-Filter automatisch gesetzt
+- **Einzel-Bundle** (kein Code-Splitting): `inlineDynamicImports: true` — jsPDF und andere dynamische Imports werden eingebettet, keine Chunk-URL-Probleme in WP
+- **Build-Skript**: `npm run build:wp` im Plugin-Verzeichnis erzeugt `assets/elektronikertools.js` (1.6 MB / 449 KB gzip) und `assets/elektronikertools.css`
+- **Fertige Assets** direkt im Repo enthalten — kein Node.js für die Installation nötig
+- **Rückwärtskompatibel**: Standalone-App (`dist/`) und WP-Plugin können aus demselben Quellcode gebaut werden
+
+### 🐛 Bugfixes
+
+- **`src/Materialzaehler.jsx`**: Doppeltes `color`-Property im `<input>`-Inline-Style entfernt (ESBuild-Fehler)
+
+### 🔧 Refactoring (Quelle, abwärtskompatibel)
+
+- **`src/main.jsx`**: Unterstützt jetzt beide Root-IDs (`#elektronikertools-root` und `#root`); Service Worker im WP-Modus deaktiviert
+- **`src/lib/supabase.js`**: Liest Supabase-Credentials auch aus `window.elektrotools_config` (WP-Laufzeitkonfig)
+- **`src/Dashboard.jsx`**: Theme-Attribut wird auf `#elektronikertools-root` gesetzt (WP) oder `<html>` (Standalone)
+
+---
+
+## [2026.4.0] – 2026-07-02
 
 ### ✨ Neu — Materialzähler (neue App)
 

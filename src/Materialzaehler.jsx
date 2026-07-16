@@ -655,7 +655,7 @@ export default function Materialzaehler({ config = {} }) {
                         <input
                           type="number" min="0" value={pos.bestellt || 0}
                           onChange={e => handleMengeChange(pos.id, "bestellt", e.target.value)}
-                          style={{ width: 56, textAlign: "center", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 6px", fontSize: 14, fontWeight: 700, color: pos.bestellt >= pos.menge && pos.menge > 0 ? "#4ade80" : "var(--text)" }}
+                          style={{ width: 56, textAlign: "center", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 6px", fontSize: 14, fontWeight: 700, color: pos.bestellt >= pos.menge && pos.menge > 0 ? "#4ade80" : "var(--text)" }}
                         />
                       </div>
 

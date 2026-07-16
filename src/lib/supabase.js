@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL     || "";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+// Supabase-Credentials: Zuerst Build-Zeit-Env, dann WordPress-Laufzeitkonfig
+const wpCfg = (typeof window !== "undefined" && window.elektrotools_config) || {};
+
+const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL     || wpCfg.supabase_url || "";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || wpCfg.supabase_key || "";
 
 export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey)

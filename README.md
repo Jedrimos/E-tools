@@ -2,7 +2,7 @@
 
 **Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
 
-[![Version](https://img.shields.io/badge/version-2026.4.0-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.4.1-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -161,6 +161,40 @@ Installationsmaterial pro Projekt zählen und Bestellmengen verwalten.
 - Druckansicht: saubere Materialliste gruppiert nach Kategorie
 - localStorage-Datenspeicherung mit Supabase-Fallback (`materialzaehler_projekte`)
 - Im globalen Backup-Export enthalten
+
+---
+
+## WordPress Plugin
+
+Das fertige Plugin liegt unter `wordpress-plugin/`. Es enthält bereits die gebauten Assets — kein Node.js für die Installation nötig.
+
+### Schnellinstallation
+
+1. Ordner `wordpress-plugin/` als ZIP packen
+2. WordPress → Plugins → Neu hinzufügen → Plugin hochladen
+3. Plugin aktivieren
+4. Shortcode in eine Seite einfügen: **`[elektronikertools]`**
+
+### Optionale Parameter
+
+```
+[elektronikertools hoehe="100vh"]        Mindesthöhe
+[elektronikertools klasse="meine-css"]   Zusätzliche CSS-Klasse
+```
+
+### Supabase in WordPress konfigurieren
+
+Einstellungen → Elektronikertools → Supabase URL + Anon Key eintragen. Kein Rebuild nötig — Credentials werden zur Laufzeit per `wp_localize_script` übergeben.
+
+### Plugin neu bauen
+
+```bash
+cd wordpress-plugin
+npm install
+npm run build:wp
+```
+
+Ausgabe: `assets/elektronikertools.js` (~1.6 MB / 449 KB gzip) + `assets/elektronikertools.css`
 
 ---
 
