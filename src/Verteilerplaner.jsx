@@ -465,114 +465,7 @@ function ApiSettingsModal({ onClose }) {
   );
 }
 
-// ── Foto Import Modal ──
-function FotoImportModal({ onClose, onImport }) {
-  const [preview, setPreview] = useState(null);
-  const [base64, setBase64] = useState(null);
-  const [phase, setPhase] = useState("idle");
-  const [ergebnis, setErgebnis] = useState(null);
-  const [fehler, setFehler] = useState("");
-  const inputRef = useRef(null);
 
-  const handleFile = (file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setPreview(e.target.result);
-      setBase64(e.target.result.split(",")[1]);
-      setPhase("idle");
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const analysiere = async () => {
-    if (!base64) return;
-    setPhase("loading"); setFehler("");
-    try {
-      const text = await callVisionAPI(base64, KABEL_PROMPT);
-      const clean = text.replace(/```json|```/g,"").trim();
-      const parsed = JSON.parse(clean);
-      setErgebnis(parsed.map(item=>({...item,_sel:true})));
-      setPhase("result");
-    } catch(e) {
-      setFehler("Analyse fehlgeschlagen: " + e.message);
-      setPhase("error");
-    }
-  };
-
-  const toggle = (idx) => setErgebnis(e=>e.map((x,i)=>i===idx?{...x,_sel:!x._sel}:x));
-  const anzahl = ergebnis?.filter(x=>x._sel).length||0;
-
-  const importieren = (ersetzen) => {
-    const sel = ergebnis.filter(x=>x._sel);
-    onImport(sel, ersetzen);
-  };
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:600,maxHeight:"92vh",overflow:"auto",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-        <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-          <div>
-            <div style={{fontSize:16,fontWeight:800}}>📷 Kabelliste aus Foto importieren</div>
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Handgeschriebenes Blockblatt fotografieren und einlesen</div>
-          </div>
-          <button onClick={onClose} style={{background:"transparent",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:22}}>×</button>
-        </div>
-        <div style={{padding:20,flex:1,overflow:"auto"}}>
-          <div onClick={()=>inputRef.current?.click()} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFile(e.dataTransfer.files[0]);}}
-            style={{border:`2px dashed ${preview?"rgba(33,150,201,0.2)":"var(--border2)"}`,borderRadius:12,padding:preview?"10px":"28px",textAlign:"center",cursor:"pointer",marginBottom:14,background:"var(--bg2)"}}>
-            {preview
-              ? <><img src={preview} style={{maxWidth:"100%",maxHeight:180,borderRadius:8,objectFit:"contain"}} alt=""/><div style={{fontSize:11,color:"var(--blue)",marginTop:6}}>Anderes Foto wählen</div></>
-              : <><div style={{fontSize:36,marginBottom:8}}>📋</div><div style={{fontSize:14,color:"var(--text3)",fontWeight:600}}>Foto antippen oder reinziehen</div><div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>JPG oder PNG · Blockblatt mit Kabelliste</div></>
-            }
-            <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={e=>handleFile(e.target.files[0])} style={{display:"none"}}/>
-          </div>
-          {preview&&phase!=="result"&&(
-            <button onClick={analysiere} disabled={phase==="loading"}
-              style={{...bPrimary,width:"100%",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:phase==="loading"?0.6:1}}>
-              {phase==="loading"?<><span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⏳</span> Analysiere...</>:"🔍 Kabelliste analysieren"}
-            </button>
-          )}
-          {phase==="error"&&<div style={{background:"#200000",border:"1px solid #e05252",borderRadius:8,padding:"10px 14px",marginBottom:12,color:"var(--red)",fontSize:12}}>⚠ {fehler}</div>}
-          {phase==="result"&&ergebnis&&(
-            <>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                <div style={{fontSize:13,color:"var(--green)",fontWeight:700}}>✓ {ergebnis.length} Kabel erkannt</div>
-                <div style={{display:"flex",gap:6}}>
-                  <button onClick={()=>setErgebnis(e=>e.map(x=>({...x,_sel:true})))} style={{...bSec2,color:"var(--green)"}}>Alle</button>
-                  <button onClick={()=>setErgebnis(e=>e.map(x=>({...x,_sel:false})))} style={bSec2}>Keine</button>
-                </div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:280,overflowY:"auto",marginBottom:14}}>
-                {ergebnis.map((item,idx)=>(
-                  <div key={idx} onClick={()=>toggle(idx)}
-                    style={{display:"flex",gap:10,alignItems:"center",background:item._sel?"var(--bg3)":"#0f0f0f",border:`1px solid ${item._sel?"rgba(33,150,201,0.15)":"var(--bg3)"}`,borderRadius:8,padding:"8px 12px",cursor:"pointer",opacity:item._sel?1:0.45}}>
-                    <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${item._sel?"var(--blue)":"var(--text3)"}`,background:item._sel?"var(--blue)":"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {item._sel&&<span style={{color:"#fff",fontSize:10,fontWeight:800}}>✓</span>}
-                    </div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{item.bezeichnung||item.kabel}</div>
-                      <div style={{fontSize:10,color:"var(--text3)",marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
-                        {item.raum&&<span style={{color:"rgba(33,150,201,0.6)"}}>{item.raum}</span>}
-                        <span>{item.stockwerk}</span>
-                        <span style={{color:"rgba(33,150,201,0.5)",fontFamily:"monospace"}}>{item.kabelTyp||"NYM-J"} {item.kabelAdern}×{item.kabelQs}mm²</span>
-                        {item.dreipolig&&<span style={{color:"var(--purple)",fontWeight:600}}>3-phasig</span>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>importieren(false)} style={{...bPrimary,flex:2,opacity:anzahl===0?0.4:1}}>+ Hinzufügen ({anzahl})</button>
-                <button onClick={()=>importieren(true)} style={{flex:1,background:"transparent",border:"1px solid #e0525244",color:"var(--red)",borderRadius:9,padding:"11px",cursor:"pointer",fontSize:12,fontWeight:600,opacity:anzahl===0?0.4:1}}>⚠ Ersetzen</button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Datei Import Modal (PDF / Excel / Word / Bild) ──
 function DateiImportModal({ onClose, onImport }) {
@@ -1168,7 +1061,6 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
   const [editKabelId, setEditKabelId] = useState(null);
   const [showBeschriftung, setShowBeschriftung] = useState(false);
   const [showStueckliste, setShowStueckliste] = useState(false);
-  const [showFoto, setShowFoto]   = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [projekte, setProjekte]   = useState(loadProjekte);
   const [showSave, setShowSave]   = useState(false);
@@ -1552,7 +1444,6 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
     neueKabel.forEach(k=>{ if(k.raum)ensureRaum(k.raum); });
     if(ersetzen) { setKabel(neueKabel); setSicherungen([]); }
     else setKabel(ks=>[...ks.filter(x=>x.bezeichnung||x.raum),...neueKabel]);
-    setShowFoto(false);
     setShowImport(false);
   };
 
@@ -1934,7 +1825,6 @@ const stueckliste = (() => {
           .header-center-nav button{padding:6px 10px!important;font-size:11px!important;white-space:nowrap!important;}
           .header-logo-text{display:none!important;}
           .header-version{display:none!important;}
-          .header-photo-btn{display:none!important;}
           .header-settings-btn{display:none!important;}
           .header-info-btn{display:none!important;}
           .nav-label-long{display:none;}
@@ -2021,12 +1911,7 @@ const stueckliste = (() => {
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>💾</button>
           <div style={{width:1,height:18,background:"var(--border)",margin:"0 3px"}}/>
-          <button onClick={()=>setShowFoto(true)} title="Kabelliste aus Foto importieren"
-            className="header-photo-btn"
-            style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
-            onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
-            onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>📷</button>
-          <button onClick={()=>setShowImport(true)} title="Kabelliste aus PDF/Excel/Word importieren"
+          <button onClick={()=>setShowImport(true)} title="Kabelliste importieren (Foto · PDF · Excel · Word)"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>📂</button>
@@ -2167,15 +2052,11 @@ const stueckliste = (() => {
           </Card>
 
           <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
-            <button onClick={()=>setShowFoto(true)} style={{display:"flex",alignItems:"center",gap:8,background:"var(--bg2)",border:"1px solid rgba(33,150,201,0.25)",borderRadius:10,padding:"12px 20px",color:"var(--blue)",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(33,150,201,0.07)";e.currentTarget.style.borderColor="rgba(33,150,201,0.4)";}}
-              onMouseLeave={e=>{e.currentTarget.style.background="var(--bg2)";e.currentTarget.style.borderColor="rgba(33,150,201,0.25)";}}>
-              📷 Kabelliste aus Foto / Scan importieren
-            </button>
             <button onClick={()=>setShowImport(true)} style={{display:"flex",alignItems:"center",gap:8,background:"var(--bg2)",border:"1px solid rgba(33,150,201,0.25)",borderRadius:10,padding:"12px 20px",color:"var(--blue)",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all 0.15s"}}
               onMouseEnter={e=>{e.currentTarget.style.background="rgba(33,150,201,0.07)";e.currentTarget.style.borderColor="rgba(33,150,201,0.4)";}}
               onMouseLeave={e=>{e.currentTarget.style.background="var(--bg2)";e.currentTarget.style.borderColor="rgba(33,150,201,0.25)";}}>
-              📂 PDF / Excel / Word importieren
+              📂 Kabelliste importieren
+              <span style={{fontSize:11,fontWeight:400,color:"var(--text3)"}}>Foto · PDF · Excel · Word</span>
             </button>
           </div>
           {/* Warnungen / Completion hint */}
@@ -2219,7 +2100,7 @@ const stueckliste = (() => {
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button onClick={()=>setStep(1)} style={bSec}>← Zurück</button>
-              <button onClick={()=>setShowFoto(true)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}}>📷 <span className="nav-label-long">Foto</span></button>
+              <button onClick={()=>setShowImport(true)} style={{...bSec,color:"var(--blue)",borderColor:"rgba(33,150,201,0.15)"}} title="Kabelliste importieren (Foto · PDF · Excel · Word)">📂 <span className="nav-label-long">Import</span></button>
               <button onClick={()=>setStep(3)} style={{...bPrimary,flex:"1 1 auto",whiteSpace:"nowrap"}}>Weiter →<span className="nav-label-long"> Sicherungen planen</span></button>
             </div>
           </div>
@@ -3625,7 +3506,6 @@ const stueckliste = (() => {
       })()}
 
       {/* ── MODALS ── */}
-      {showFoto&&<FotoImportModal onClose={()=>setShowFoto(false)} onImport={handleFotoImport}/>}
       {showImport&&<DateiImportModal onClose={()=>setShowImport(false)} onImport={handleFotoImport}/>}
       {showSettings&&<SettingsModal settings={settings} onSave={s=>{setSettings(s);saveSettings(s);setShowSettings(false);showToast("Einstellungen gespeichert ✓");}} onClose={()=>setShowSettings(false)}/>}
 
