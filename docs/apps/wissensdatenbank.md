@@ -72,44 +72,17 @@ Der Artikelinhalt unterstützt einfaches Markdown:
 - **Kategoriefilter** mit Artikelanzahl je Kategorie
 - Suchergebnisse in Echtzeit (kein Submit nötig)
 
-## Team-Sharing via Supabase
-
-Die Wissensdatenbank ist speziell für die Team-Nutzung ausgelegt:
-
-- **Ohne Supabase:** Artikel nur lokal im Browser — kein Sharing
-- **Mit Supabase:** Alle Techniker mit derselben Supabase-URL sehen dieselben Artikel
-- Indikator **"☁ Geteilt im Team"** erscheint wenn Supabase aktiv
-- Ohne Supabase: Warnung **"Supabase nicht konfiguriert – nur lokal"**
-
-> **Für echtes Team-Sharing** muss Supabase konfiguriert sein. → [Setup-Guide](../setup.md)
-
 ## Datenspeicherung
 
-- **Lokal:** `localStorage` unter Key `elektronikertools_wissen` (Fallback / Offline-Cache)
-- **Supabase:** Tabelle `wissensdatenbank`
-
-## Supabase-Tabelle
-
-```sql
-CREATE TABLE wissensdatenbank (
-  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  titel       text NOT NULL DEFAULT '',
-  kategorie   text DEFAULT 'Allgemein',
-  inhalt      text DEFAULT '',
-  tags        text[] DEFAULT '{}',
-  autor       text DEFAULT '',
-  erstellt    date DEFAULT CURRENT_DATE,
-  created_at  timestamptz DEFAULT now(),
-  updated_at  timestamptz DEFAULT now()
-);
-```
+- `localStorage` unter Key `elektronikertools_wissen`
+- Im globalen Backup-Export enthalten
 
 ---
 
 ## Roadmap
 
 ### Kurzfristig
-- **Anhänge / Bilder in Artikeln** — Fotos oder PDFs an Artikel anhängen (Supabase Storage).
+- **Anhänge / Bilder in Artikeln** — Fotos oder PDFs an Artikel anhängen.
 - **Export als PDF** — Artikel als druckbares PDF exportieren.
 
 ### Mittelfristig

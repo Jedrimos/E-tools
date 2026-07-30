@@ -270,31 +270,38 @@ function PositionModal({ initial, onSave, onClose }) {
 }
 
 // ── Druckansicht ──
-function drucken(projekt) {
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function drucken(projekt, config = {}) {
   const gruppen = KATEGORIEN.map(k => ({
     kategorie: k,
     positionen: (projekt.positionen || []).filter(p => p.kategorie === k),
   })).filter(g => g.positionen.length > 0);
 
   const zeilen = gruppen.map(g => `
-    <tr><td colspan="4" style="background:#f0f4e8;font-weight:700;padding:6px 8px;border-top:2px solid #84cc16">${g.kategorie}</td></tr>
+    <tr><td colspan="4" style="background:#f0f4e8;font-weight:700;padding:6px 8px;border-top:2px solid #84cc16">${escapeHtml(g.kategorie)}</td></tr>
     ${g.positionen.map((p, i) => `
       <tr style="background:${i % 2 === 0 ? "#fff" : "#f9fafb"}">
-        <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb">${p.bezeichnung}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb">${escapeHtml(p.bezeichnung)}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700">${p.menge || 0}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${p.bestellt || 0}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:12px">${p.notiz || ""}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:12px">${escapeHtml(p.notiz)}</td>
       </tr>
     `).join("")}
   `).join("");
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>Materialliste – ${projekt.name}</title>
+    <title>Materialliste – ${escapeHtml(projekt.name)}</title>
     <style>body{font-family:Arial,sans-serif;font-size:13px;color:#111}table{width:100%;border-collapse:collapse}h1{font-size:18px;margin-bottom:4px}p{margin:2px 0;color:#555;font-size:12px}th{background:#84cc16;color:#0d1a00;padding:8px;text-align:left}@media print{body{margin:0}}</style>
   </head><body>
-    <h1>Materialliste: ${projekt.name}</h1>
-    ${projekt.ort ? `<p>Ort: ${projekt.ort}</p>` : ""}
-    ${projekt.notiz ? `<p>Notiz: ${projekt.notiz}</p>` : ""}
+    <h1>Materialliste: ${escapeHtml(projekt.name)}</h1>
+    ${config.firma ? `<p>${escapeHtml(config.firma)}${config.mitarbeiter ? ` · ${escapeHtml(config.mitarbeiter)}` : ""}</p>` : ""}
+    ${projekt.ort ? `<p>Ort: ${escapeHtml(projekt.ort)}</p>` : ""}
+    ${projekt.notiz ? `<p>Notiz: ${escapeHtml(projekt.notiz)}</p>` : ""}
     <p>Erstellt: ${new Date().toLocaleDateString("de-DE")}</p>
     <br>
     <table>
@@ -382,7 +389,7 @@ export default function Materialzaehler({ config = {} }) {
     let updated;
     if (editPos) {
       const pos = { ...editPos, ...data };
-      updated = { ...aktivProjekt, positionen: aktivProjekt.positionen.map(p => p.id === editPos.id ? pos : p) };
+      updated = { ...aktivProjekt, positionen: (aktivProjekt.positionen || []).map(p => p.id === editPos.id ? pos : p) };
     } else {
       const pos = { id: uid(), ...data };
       updated = { ...aktivProjekt, positionen: [...(aktivProjekt.positionen || []), pos] };
@@ -398,7 +405,7 @@ export default function Materialzaehler({ config = {} }) {
 
   function handlePosDelete(posId) {
     if (!aktivProjekt) return;
-    const updated = { ...aktivProjekt, positionen: aktivProjekt.positionen.filter(p => p.id !== posId) };
+    const updated = { ...aktivProjekt, positionen: (aktivProjekt.positionen || []).filter(p => p.id !== posId) };
     setProjekte(prev => prev.map(p => p.id === aktivProjekt.id ? updated : p));
     addToast("Position entfernt");
     saveProjektDB(updated).catch(e => addToast(e.message, "error"));
@@ -408,7 +415,7 @@ export default function Materialzaehler({ config = {} }) {
     if (!aktivProjekt) return;
     const updated = {
       ...aktivProjekt,
-      positionen: aktivProjekt.positionen.map(p =>
+      positionen: (aktivProjekt.positionen || []).map(p =>
         p.id === posId ? { ...p, [field]: Math.max(0, parseInt(value) || 0) } : p
       ),
     };
@@ -541,7 +548,7 @@ export default function Materialzaehler({ config = {} }) {
             {aktivProjekt.ort && <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>📍 {aktivProjekt.ort}</div>}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={BTN.secondary} onClick={() => drucken(aktivProjekt)}>🖨 Drucken</button>
+            <button style={BTN.secondary} onClick={() => drucken(aktivProjekt, config)}>🖨 Drucken</button>
             <button style={BTN.primary} onClick={neuePosition}>+ Position</button>
           </div>
         </div>
@@ -581,7 +588,7 @@ export default function Materialzaehler({ config = {} }) {
       </div>
 
       {/* Positionsliste */}
-      {aktivProjekt.positionen.length === 0 ? (
+      {(aktivProjekt.positionen || []).length === 0 ? (
         <div style={{
           textAlign: "center", padding: "50px 20px", color: "var(--text3)",
           border: "2px dashed var(--border)", borderRadius: 16,

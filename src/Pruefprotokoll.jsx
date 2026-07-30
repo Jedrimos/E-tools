@@ -6,7 +6,7 @@ import {
   loadProjekteForImport,
 } from "./lib/db_pruefprotokoll.js";
 import { uid } from "./lib/utils.js";
-import { GW, evalStromkreis, risoMin } from "./lib/vde.js";
+import { GW, evalStromkreis, risoMin, gesamtStatus, zsGrenzwert } from "./lib/vde.js";
 // jsPDF wird lazy geladen (nur bei PDF-Export, ~250kB gespart beim ersten Laden)
 
 const LS_KEY = "elektronikertools_pruefprotokoll";
@@ -114,21 +114,29 @@ async function exportPDF(p, config = {}) {
   y += Math.ceil(meta.length / 2) * 6 + 6;
 
   // ── Gesamtergebnis ──
-  const bestanden = p.stromkreise.every(sk => evalStromkreis(sk) !== "fail");
-  const hatMessungen = p.stromkreise.some(sk => evalStromkreis(sk) !== "offen");
-  if (hatMessungen) {
-    doc.setFillColor(...(bestanden ? GRUEN : ROT));
+  const gesamt = gesamtStatus(p.stromkreise);
+  if (gesamt !== "offen") {
+    doc.setFillColor(...(gesamt === "ok" ? GRUEN : ROT));
     doc.rect(margin - 2, y - 4, 210 - 2 * margin + 4, 10, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(bestanden ? "PRÜFUNG BESTANDEN — Alle Grenzwerte eingehalten" : "PRÜFUNG NICHT BESTANDEN — Grenzwerte überschritten", 105, y + 2, { align: "center" });
+    doc.text(gesamt === "ok" ? "PRÜFUNG BESTANDEN — Alle Grenzwerte eingehalten" : "PRÜFUNG NICHT BESTANDEN — Grenzwerte überschritten", 105, y + 2, { align: "center" });
+    y += 14;
+    doc.setTextColor(0, 0, 0);
+  } else {
+    doc.setFillColor(...HELL);
+    doc.rect(margin - 2, y - 4, 210 - 2 * margin + 4, 10, "F");
+    doc.setTextColor(...GRAU);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("PRÜFUNG UNVOLLSTÄNDIG — nicht alle Stromkreise gemessen", 105, y + 2, { align: "center" });
     y += 14;
     doc.setTextColor(0, 0, 0);
   }
 
   // ── Stromkreis-Tabelle ──
-  const head = [["#", "Bezeichnung", "Sich.", "RPE (Ω)", "Riso min (MΩ)", "Zs (Ω)", "Ik (kA)", "FI-t (ms)", "FI-Ub (V)", "Ergebnis"]];
+  const head = [["#", "Bezeichnung", "Sich.", "RPE (Ω)", "Riso min (MΩ)", "Zs (Ω)", "Ik (A)", "FI-t (ms)", "FI-Ub (V)", "Ergebnis"]];
   const body = p.stromkreise.map((sk, i) => {
     const status = evalStromkreis(sk);
     return [
@@ -377,7 +385,7 @@ function StromkreisForm({ sk, onChange, onDelete }) {
         <div className="sk-3pol">
           <FL label="3-polig">
             <label style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 6, cursor: "pointer" }}>
-              <input type="checkbox" checked={sk.dreipolig} onChange={e => set("dreipolig", e.target.checked)} />
+              <input type="checkbox" checked={sk.dreipolig} onChange={e => onChange({ ...sk, dreipolig: e.target.checked, ...(e.target.checked ? {} : { riso_l2_pe: "", riso_l3_pe: "" }) })} />
               <span style={{ fontSize: 12, color: "var(--text2)" }}>Ja</span>
             </label>
           </FL>
@@ -415,7 +423,7 @@ function StromkreisForm({ sk, onChange, onDelete }) {
       </div>
 
       {/* Schleifenimpedanz */}
-      <SectionHead>Schleifenimpedanz <NormInfo norm="§61.3.6 DIN VDE 0100-600" grenzwert="Zs ≤ U₀ / (5 × Ia)" begruendung={"Ia = Auslösestrom des Überstromschutzorgans. Beispiele: 16A/Typ B → Ia=80A → Zs ≤ 0,575 Ω · 16A/Typ C → Ia=160A → Zs ≤ 0,288 Ω · 20A/Typ B → Ia=100A → Zs ≤ 0,46 Ω"} /></SectionHead>
+      <SectionHead>Schleifenimpedanz <NormInfo norm="§61.3.6 DIN VDE 0100-600" grenzwert="Zs ≤ U₀ / Ia" begruendung={"Ia = Auslösestrom des Überstromschutzorgans (B: 5×In, C: 10×In, D: 20×In). Beispiele: 16A/Typ B → Ia=80A → Zs ≤ 2,875 Ω · 16A/Typ C → Ia=160A → Zs ≤ 1,4375 Ω · 20A/Typ B → Ia=100A → Zs ≤ 2,3 Ω"} /></SectionHead>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: 8, marginBottom: 12 }}>
         <FL label="Zs (Ω)">
           <input style={inp()} value={sk.zs} onChange={e => set("zs", e.target.value)} placeholder="0,42" />
@@ -542,7 +550,7 @@ function FortschrittsRing({ gemessen, gesamt, size = 48 }) {
   );
 }
 
-function ProtokollEditor({ protokoll, onSave, onBack, config }) {
+function ProtokollEditor({ protokoll, onSave, onBack, config, addToast }) {
   const [p, setP] = useState(protokoll);
   const [expanded, setExpanded] = useState(new Set());
 
@@ -579,8 +587,7 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onSave, p]);
 
-  const bestanden = p.stromkreise.every(s => evalStromkreis(s) !== "fail");
-  const hatMessungen = p.stromkreise.some(s => evalStromkreis(s) !== "offen");
+  const gesamt = gesamtStatus(p.stromkreise);
   const gemessen = p.stromkreise.filter(s => evalStromkreis(s) !== "offen").length;
 
   return (
@@ -613,8 +620,8 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
           </div>
         </div>
         <div className="pp-kopfzeile-actions">
-          {hatMessungen && <Badge status={bestanden ? "ok" : "fail"} />}
-          <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => exportPDF(p, config)} title="Als PDF herunterladen">⬇ PDF</button>
+          <Badge status={gesamt} />
+          <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => exportPDF(p, config).catch(e => addToast("PDF-Export fehlgeschlagen: " + e.message, "error"))} title="Als PDF herunterladen">⬇ PDF</button>
           <button style={{ ...bSec, padding: "8px 12px" }} onClick={() => window.print()} title="Protokoll drucken (Strg+P)">🖨</button>
           <button style={bPrim} onClick={() => onSave(p)} title="Speichern (Strg+S)">Speichern</button>
         </div>
@@ -644,7 +651,7 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
             </select>
           </FL>
           <FL label="Prüfer">
-            <input style={inp()} value={p.pruefer || config?.mitarbeiter || ""} onChange={e => setField("pruefer", e.target.value)} placeholder={config?.mitarbeiter || "Name des Prüfers"} />
+            <input style={inp()} value={p.pruefer || ""} onChange={e => setField("pruefer", e.target.value)} placeholder={config?.mitarbeiter || "Name des Prüfers"} />
           </FL>
           <FL label="Prüfdatum">
             <input type="date" style={inp()} value={p.datum} onChange={e => setField("datum", e.target.value)} />
@@ -729,7 +736,11 @@ function ProtokollEditor({ protokoll, onSave, onBack, config }) {
                     : <span style={{ color: "var(--text3)" }}>—</span>}
                 </span>
                 <span style={{ fontSize: 12 }}>
-                  {sk.zs ? <span style={{ color: "var(--text2)" }}>{sk.zs}</span> : <span style={{ color: "var(--text3)" }}>—</span>}
+                  {sk.zs
+                    ? (zsGrenzwert(sk) != null
+                        ? <Val val={sk.zs} pass={v => v <= zsGrenzwert(sk)} unit=" Ω" />
+                        : <span style={{ color: "var(--text2)" }}>{sk.zs} Ω</span>)
+                    : <span style={{ color: "var(--text3)" }}>—</span>}
                 </span>
                 <span style={{ fontSize: 12 }}>
                   {sk.fi_vorhanden && sk.fi_t_nenn
@@ -771,7 +782,7 @@ const DATUM_HEUTE = new Date().toISOString().slice(0, 10);
 const DATUM_IN30  = new Date(+new Date() + 30 * 864e5).toISOString().slice(0, 10);
 
 // ── Protokoll-Liste ───────────────────────────────────────────────────────────
-function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync, config }) {
+function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync, config, addToast }) {
   const [showInfo, setShowInfo] = useState(false);
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px" }}>
@@ -843,8 +854,7 @@ function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync,
           {protokolle.map(p => {
             const statuses = p.stromkreise.map(evalStromkreis);
             const hatFehler = statuses.includes("fail");
-            const alleOk = statuses.length > 0 && statuses.every(s => s === "ok");
-            const gesamt = hatFehler ? "fail" : alleOk ? "ok" : "offen";
+            const gesamt = gesamtStatus(p.stromkreise);
             const istAbgelaufen = p.naechste_pruefung && p.naechste_pruefung < DATUM_HEUTE;
             const istBaldFaellig = p.naechste_pruefung && !istAbgelaufen && p.naechste_pruefung <= DATUM_IN30;
 
@@ -892,7 +902,7 @@ function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync,
                   </div>
                   <button
                     style={{ ...bSec, padding: "5px 10px", fontSize: 11 }}
-                    onClick={e => { e.stopPropagation(); exportPDF(p, config); }}
+                    onClick={e => { e.stopPropagation(); exportPDF(p, config).catch(err => addToast("PDF-Export fehlgeschlagen: " + err.message, "error")); }}
                     title="Als PDF herunterladen"
                   >⬇ PDF</button>
                   <button
@@ -962,7 +972,7 @@ export default function Pruefprotokoll({ config = {} }) {
   async function handleDelete(id) {
     const proto = protokolle.find(x => x.id === id);
     setProtokolle(prev => prev.filter(x => x.id !== id));
-    addToast("Protokoll gelöscht", "error");
+    addToast("Protokoll gelöscht");
     if (proto?.db_id) {
       try { await deleteProtokollDB(proto.db_id); } catch { /* fire-and-forget */ }
     }
@@ -982,6 +992,7 @@ export default function Pruefprotokoll({ config = {} }) {
           onSave={handleSave}
           onBack={() => setAktiv(null)}
           config={config}
+          addToast={addToast}
         />
       ) : (
         <ProtokollListe
@@ -992,6 +1003,7 @@ export default function Pruefprotokoll({ config = {} }) {
           onDelete={handleDelete}
           dbSync={dbSync}
           config={config}
+          addToast={addToast}
         />
       )}
       <Toast toasts={toasts} />

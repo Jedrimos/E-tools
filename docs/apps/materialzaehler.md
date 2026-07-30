@@ -77,28 +77,11 @@ In der Positionsliste können **Benötigt** und **Bestellt** direkt inline über
 
 ## Drucken
 
-Der Button **🖨 Drucken** öffnet eine Druckansicht mit der Materialliste, gruppiert nach Kategorie. Enthält Projektname, Ort, Datum und Spalten: Bezeichnung / Benötigt / Bestellt / Notiz.
+Der Button **🖨 Drucken** öffnet eine Druckansicht mit der Materialliste, gruppiert nach Kategorie. Enthält Projektname, Firmenname/Mitarbeiter (aus den Dashboard-Einstellungen), Ort, Datum und Spalten: Bezeichnung / Benötigt / Bestellt / Notiz.
 
 ---
 
 ## Datenspeicherung
 
-- **localStorage**: Key `elektronikertools_materialzaehler` — immer aktiv, auch ohne Netzwerk
-- **Supabase**: Tabelle `materialzaehler_projekte`, Positionen als JSONB-Array im Projekt-Datensatz
+- **localStorage**: Key `elektronikertools_materialzaehler`
 - Im globalen **Backup/Restore** des Dashboards enthalten
-
-### Supabase-Tabelle
-
-```sql
-CREATE TABLE materialzaehler_projekte (
-  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name         text NOT NULL DEFAULT '',
-  ort          text DEFAULT '',
-  notiz        text DEFAULT '',
-  positionen   jsonb DEFAULT '[]',
-  created_at   timestamptz DEFAULT now(),
-  updated_at   timestamptz DEFAULT now()
-);
-ALTER TABLE materialzaehler_projekte ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON materialzaehler_projekte FOR ALL USING (true) WITH CHECK (true);
-```

@@ -28,9 +28,10 @@ export default defineConfig({
       'react':                 path.resolve(__dirname, 'node_modules/react'),
       'react-dom':             path.resolve(__dirname, 'node_modules/react-dom'),
       'react/jsx-runtime':     path.resolve(__dirname, 'node_modules/react/jsx-runtime'),
-      '@supabase/supabase-js': path.resolve(__dirname, 'node_modules/@supabase/supabase-js'),
       'jspdf':                 path.resolve(__dirname, 'node_modules/jspdf'),
       'jspdf-autotable':       path.resolve(__dirname, 'node_modules/jspdf-autotable'),
+      'xlsx':                  path.resolve(__dirname, 'node_modules/xlsx'),
+      'mammoth':               path.resolve(__dirname, 'node_modules/mammoth'),
     },
   },
 

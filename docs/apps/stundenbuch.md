@@ -37,28 +37,8 @@ Button **↓ CSV Export** — exportiert alle gefilterten Einträge als CSV:
 
 ## Datenspeicherung
 
-- **Lokal:** `localStorage` unter Key `elektronikertools_stundenbuch`
-- **Supabase:** Tabelle `stunden` (wenn konfiguriert)
-  - Jeder Eintrag ist eine eigene Zeile
-  - `db_id` wird nach erstem Speichern in Supabase gesetzt
-  - Sync: beim Start laden, nach jedem Speichern/Löschen synchronisieren
-
-## Supabase-Tabelle
-
-```sql
-CREATE TABLE stunden (
-  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  datum       date NOT NULL,
-  von         text DEFAULT '',
-  bis         text DEFAULT '',
-  pause       integer DEFAULT 0,
-  projekt     text DEFAULT '',
-  taetigkeit  text DEFAULT '',
-  notiz       text DEFAULT '',
-  created_at  timestamptz DEFAULT now(),
-  updated_at  timestamptz DEFAULT now()
-);
-```
+- `localStorage` unter Key `elektronikertools_stundenbuch`
+- Im globalen Backup-Export enthalten
 
 ---
 

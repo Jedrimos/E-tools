@@ -22,11 +22,18 @@ function timeToMinutes(timeStr) {
   return h * 60 + m;
 }
 
+// Lokales Kalenderdatum (YYYY-MM-DD) statt UTC — new Date().toISOString() liefert
+// in den ersten Stunden nach Mitternacht (Zeitzone UTC+1/+2) noch den Vortag.
+function toLocalISODate(d = new Date()) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const PAUSE_OPTIONS = [0, 15, 30, 45, 60];
 
 const mkEintrag = () => ({
   id: uid(),
-  datum: new Date().toISOString().slice(0, 10),
+  datum: toLocalISODate(),
   von: "07:00",
   bis: "16:00",
   pause: 30,
@@ -37,9 +44,9 @@ const mkEintrag = () => ({
 
 function calcNetto(eintrag) {
   const von = timeToMinutes(eintrag.von);
-  const bis = timeToMinutes(eintrag.bis);
-  if (bis <= von) return 0;
-  return Math.max(0, bis - von - eintrag.pause);
+  let bis = timeToMinutes(eintrag.bis);
+  if (bis < von) bis += 24 * 60; // Schicht über Mitternacht (z.B. Notdienst 22:00–02:00)
+  return Math.max(0, bis - von - (eintrag.pause || 0));
 }
 
 // ── Lokaler Speicher ──
@@ -144,8 +151,8 @@ function aktuelleWocheMinuten(eintraege) {
   // Montag dieser Woche
   const montag = new Date(heute);
   montag.setDate(heute.getDate() - (tag === 0 ? 6 : tag - 1));
-  const montagStr = montag.toISOString().slice(0, 10);
-  const sonntagStr = new Date(montag.getTime() + 6 * 864e5).toISOString().slice(0, 10);
+  const montagStr = toLocalISODate(montag);
+  const sonntagStr = toLocalISODate(new Date(montag.getTime() + 6 * 864e5));
   return eintraege
     .filter(e => e.datum >= montagStr && e.datum <= sonntagStr)
     .reduce((sum, e) => sum + calcNetto(e), 0);
@@ -155,7 +162,7 @@ function aktuelleWocheMinuten(eintraege) {
 function MonatsChart({ eintraege, monat }) {
   const [jahr, mon] = monat.split("-").map(Number);
   const tageImMonat = new Date(jahr, mon, 0).getDate();
-  const heute = new Date().toISOString().slice(0, 10);
+  const heute = toLocalISODate();
 
   // Minuten pro Tag
   const perTag = {};
@@ -238,13 +245,13 @@ export default function Stundenbuch({ config = {} }) {
   const [eintraege, setEintraegeLive] = useState(loadData);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [filter, setFilter] = useState({ monat: new Date().toISOString().slice(0, 7), projekt: "" });
+  const [filter, setFilter] = useState({ monat: toLocalISODate().slice(0, 7), projekt: "" });
   const [timerStart, setTimerStart] = useState(null);
   const [timerNow, setTimerNow] = useState(null);
   const [timerVorbelegung, setTimerVorbelegung] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
   const [showTagesbericht, setShowTagesbericht] = useState(false);
-  const [tagesberichtDatum, setTagesberichtDatum] = useState(new Date().toISOString().slice(0,10));
+  const [tagesberichtDatum, setTagesberichtDatum] = useState(toLocalISODate());
   const [gespeicherteProjekte, setGespeicherteProjekte] = useState(() => {
     try { return JSON.parse(localStorage.getItem("stundenbuch_projekte") || "[]"); } catch { return []; }
   });
@@ -269,10 +276,10 @@ export default function Stundenbuch({ config = {} }) {
     const jetzt = new Date();
     const vonStr = `${timerStart.getHours().toString().padStart(2,"0")}:${timerStart.getMinutes().toString().padStart(2,"0")}`;
     const bisStr = `${jetzt.getHours().toString().padStart(2,"0")}:${jetzt.getMinutes().toString().padStart(2,"0")}`;
-    const datum = timerStart.toISOString().slice(0, 10);
+    const datum = toLocalISODate(timerStart);
     setTimerStart(null);
     setTimerNow(null);
-    setTimerVorbelegung({ datum, von: vonStr, bis: bisStr });
+    setTimerVorbelegung({ ...mkEintrag(), datum, von: vonStr, bis: bisStr });
     setEditId(null);
     setShowForm(true);
   }
@@ -360,11 +367,15 @@ export default function Stundenbuch({ config = {} }) {
   const gesamtMinuten = gefiltert.reduce((sum, e) => sum + calcNetto(e), 0);
 
   // Export CSV
+  function csvField(v) {
+    const s = String(v ?? "");
+    return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
   function exportCSV() {
     const firma = config.firma || "Firma";
     const header = "Datum;Von;Bis;Pause(min);Netto(h);Projekt;Tätigkeit;Notiz";
     const rows = gefiltert.map(e =>
-      [formatDate(e.datum), e.von, e.bis, e.pause, (calcNetto(e) / 60).toFixed(2), e.projekt, e.taetigkeit, e.notiz].join(";")
+      [formatDate(e.datum), e.von, e.bis, e.pause, (calcNetto(e) / 60).toFixed(2), e.projekt, e.taetigkeit, e.notiz].map(csvField).join(";")
     );
     const csv = [header, ...rows].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
@@ -420,7 +431,7 @@ export default function Stundenbuch({ config = {} }) {
               </div>
             </div>
             <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>
-              Digitale Zeiterfassung für Elektrofachkräfte. Einträge mit Datum, Von/Bis, Pause, Projekt und Tätigkeit — mit optionalem Supabase-Sync für das ganze Team.
+              Digitale Zeiterfassung für Elektrofachkräfte. Einträge mit Datum, Von/Bis, Pause, Projekt und Tätigkeit.
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:24}}>
               {[
@@ -428,7 +439,7 @@ export default function Stundenbuch({ config = {} }) {
                 ["📅","Monats-Filter","Filtern nach Monat und Projekt"],
                 ["📊","Chart","SVG-Balkendiagramm pro Tag"],
                 ["⬇","CSV-Export","Stundennachweis als CSV-Datei"],
-                ["💾","Auto-Save","Lokal + optional in Supabase"],
+                ["💾","Auto-Save","Automatisch lokal gespeichert"],
                 ["⌨","Shortcut","Ctrl+S speichert den Eintrag"],
               ].map(([icon,titel,sub])=>(
                 <div key={titel} style={{display:"flex",alignItems:"flex-start",gap:10,background:"var(--bg3)",borderRadius:10,padding:"10px 12px"}}>
@@ -482,6 +493,7 @@ export default function Stundenbuch({ config = {} }) {
       {/* Formular */}
       {showForm && (
         <EintragForm
+          key={editId || timerVorbelegung?.id || "neu"}
           initial={editEintrag || timerVorbelegung || undefined}
           projekte={projekte}
           onSave={e => { handleSave(e); setTimerVorbelegung(null); }}

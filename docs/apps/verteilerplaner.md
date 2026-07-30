@@ -42,8 +42,8 @@ Professionelle Planung und Dokumentation von Elektroverteiler-Belegungen im Brow
 
 ## Datenspeicherung
 
-- **Lokal:** `localStorage` unter Key `vp_projekte` (Migration von `svp_projekte` automatisch)
-- **Supabase:** Tabelle `projekte` (wenn konfiguriert) — automatischer Sync
+- `localStorage` unter Key `vp_projekte`
+- Im globalen Backup-Export enthalten
 
 ## Technische Besonderheiten
 

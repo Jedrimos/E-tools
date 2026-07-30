@@ -23,6 +23,13 @@ const KATEGORIEN = [
   "Sonstiges",
 ];
 
+// Lokales Kalenderdatum (YYYY-MM-DD) statt UTC — new Date().toISOString() liefert
+// in den ersten Stunden nach Mitternacht (Zeitzone UTC+1/+2) noch den Vortag.
+function toLocalISODate(d = new Date()) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const mkArtikel = (autor = "") => ({
   id:        uid(),
   db_id:     null,
@@ -31,13 +38,16 @@ const mkArtikel = (autor = "") => ({
   inhalt:    "",
   tags:      [],
   autor,
-  erstellt:  new Date().toISOString().slice(0, 10),
+  erstellt:  toLocalISODate(),
 });
 
 // ── Einfacher Markdown-Renderer ───────────────────────────────────────────────
 function InlineText({ text }) {
   const parts = [];
-  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  // Einzelnes *...* nur als Kursiv werten wenn kein Leerzeichen direkt nach dem
+  // öffnenden/vor dem schließenden Sternchen steht — sonst würde z.B. "2 * 3"
+  // (Multiplikation in einer Elektro-Formel) fälschlich als Kursiv-Markup gelesen.
+  const regex = /(\*\*(.+?)\*\*|\*(\S(?:.*?\S)?)\*|`(.+?)`)/g;
   let last = 0, key = 0, m;
   while ((m = regex.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
@@ -102,7 +112,7 @@ function KatBadge({ label }) {
 }
 
 // ── Artikel-Editor ────────────────────────────────────────────────────────────
-function ArtikelEditor({ artikel, onSave, onBack }) {
+function ArtikelEditor({ artikel, istNeu, onSave, onBack }) {
   const [a, setA] = useState(artikel);
   const [preview, setPreview] = useState(false);
   const [tagInput, setTagInput] = useState((artikel.tags || []).join(", "));
@@ -121,7 +131,7 @@ function ArtikelEditor({ artikel, onSave, onBack }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
         <button style={{ ...bSec, padding: "8px 12px" }} onClick={onBack}>← Zurück</button>
         <div style={{ flex: 1, fontWeight: 700, fontSize: 16, color: "var(--text3)" }}>
-          {artikel.db_id || artikel.id !== artikel.db_id ? "Artikel bearbeiten" : "Neuer Artikel"}
+          {istNeu ? "Neuer Artikel" : "Artikel bearbeiten"}
         </div>
         <button style={{ ...bSec }} onClick={() => setPreview(v => !v)}>
           {preview ? "✎ Bearbeiten" : "👁 Vorschau"}
@@ -225,7 +235,7 @@ function ArtikelView({ artikel, onBack, onEdit, onDelete }) {
 }
 
 // ── Artikel-Liste ─────────────────────────────────────────────────────────────
-function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
+function ArtikelListe({ artikel, onOpen, onNew, dbSync }) {
   const [suche, setSuche] = useState("");
   const [kat, setKat] = useState("Alle");
   const [showInfo, setShowInfo] = useState(false);
@@ -258,11 +268,6 @@ function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
         </div>
         <div style={{ flex: 1 }} />
         {dbSync && <span style={{ fontSize: 11, color: TEAL, background: `${TEAL}15`, border: `1px solid ${TEAL}30`, borderRadius: 6, padding: "3px 8px", alignSelf: "center" }}>☁ Geteilt im Team</span>}
-        {!dbSync && dbRequired && (
-          <span style={{ fontSize: 11, color: "var(--red)", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.2)", borderRadius: 6, padding: "3px 8px", alignSelf: "center" }}>
-            ⚠ Supabase nicht konfiguriert – nur lokal
-          </span>
-        )}
         <button style={bPrim} onClick={onNew}>+ Neuer Artikel</button>
         <button onClick={() => setShowInfo(true)} title="Info" style={{...bPrim,background:"transparent",border:"1px solid var(--border2)",color:"var(--text2)",padding:"6px 10px"}}>ℹ</button>
       </div>
@@ -279,14 +284,14 @@ function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
               </div>
             </div>
             <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>
-              Firmenwissen strukturiert erfassen und im Team teilen. Artikel mit Markdown-Inhalt, Kategorien und Tags — durchsuchbar und via Supabase teamweit verfügbar.
+              Firmenwissen strukturiert erfassen. Artikel mit Markdown-Inhalt, Kategorien und Tags — durchsuchbar und lokal gespeichert.
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:24}}>
               {[
                 ["📝","Markdown","Volle Markdown-Formatierung"],
                 ["🔍","Volltextsuche","In Titel, Inhalt, Tags, Autor"],
                 ["🏷","Kategorien","Thematisch strukturiert"],
-                ["👥","Team-Sharing","Sync via Supabase"],
+                ["💾","Speicherung","Automatisch lokal"],
                 ["👁","Vorschau","Live Markdown-Vorschau"],
                 ["📱","Responsive","Mobile-optimiert"],
               ].map(([icon,titel,sub])=>(
@@ -427,7 +432,7 @@ export default function Wissensdatenbank({ config = {} }) {
     const a = artikel.find(x => x.id === id);
     if (!confirm(`"${a?.titel || "Artikel"}" wirklich löschen?`)) return;
     setArtikel(prev => prev.filter(x => x.id !== id));
-    addToast("Artikel gelöscht", "error");
+    addToast("Artikel gelöscht");
     setAnsicht({ typ: "liste" });
     if (a?.db_id) {
       try { await deleteArtikelDB(a.db_id); } catch { /* fire-and-forget */ }
@@ -442,7 +447,6 @@ export default function Wissensdatenbank({ config = {} }) {
           onOpen={a => setAnsicht({ typ: "lesen", artikel: a })}
           onNew={handleNew}
           dbSync={dbSync}
-          dbRequired={false}
         />
       )}
       {ansicht.typ === "lesen" && (
@@ -456,6 +460,7 @@ export default function Wissensdatenbank({ config = {} }) {
       {ansicht.typ === "bearbeiten" && (
         <ArtikelEditor
           artikel={ansicht.artikel}
+          istNeu={!artikel.find(x => x.id === ansicht.artikel.id)}
           onSave={handleSave}
           onBack={() => setAnsicht(ansicht.artikel.db_id || artikel.find(x => x.id === ansicht.artikel.id)
             ? { typ: "lesen", artikel: ansicht.artikel }

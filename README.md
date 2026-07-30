@@ -1,8 +1,8 @@
 # 🔧 Elektronikertools
 
-**Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, optional mit eigener Datenbank.**
+**Browserbasierte Werkzeuge für Elektrofachkräfte — kein Download, keine Installation, keine Anmeldung.**
 
-[![Version](https://img.shields.io/badge/version-2026.4.1-2196C9?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2026.7.1-2196C9?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-52d98a?style=flat-square)](LICENSE)
 [![Built with](https://img.shields.io/badge/built%20with-React%20%2B%20Vite-a78bfa?style=flat-square)](https://vitejs.dev)
 
@@ -10,7 +10,7 @@
 
 ## Was sind die Elektronikertools?
 
-Eine Sammlung von Werkzeugen für den Arbeitsalltag von Elektrikern und Elektrotechnikern. Direkt im Browser, funktioniert auf Desktop, Tablet und Mobilgerät. Keine Anmeldung notwendig — Daten bleiben lokal im Browser oder optional in einer selbst gehosteten Datenbank.
+Eine Sammlung von Werkzeugen für den Arbeitsalltag von Elektrikern und Elektrotechnikern. Direkt im Browser, funktioniert auf Desktop, Tablet und Mobilgerät. Keine Anmeldung notwendig — alle Daten bleiben lokal im Browser (`localStorage`).
 
 ---
 
@@ -55,14 +55,13 @@ Einfache Zeiterfassung für Elektriker und Monteure.
 - Monats- und Projektfilter
 - CSV-Export als Stundennachweis (mit Firmenname)
 - Projekte/Baustellen per Autocomplete
-- Optionale Synchronisierung mit Supabase
 - **Mobiloptimiert:** Eintrags-Karten responsives 2-Spalten-Layout auf kleinen Bildschirmen
 
 ---
 
 ### 📚 Wissensdatenbank
 
-Firmeninternes Wissen strukturiert erfassen und im Team teilen.
+Firmeninternes Wissen strukturiert erfassen.
 
 **Features:**
 - Artikel mit Titel, Kategorie, Tags, Autor und Markdown-Inhalt
@@ -71,8 +70,6 @@ Firmeninternes Wissen strukturiert erfassen und im Team teilen.
 - Kategoriefilter mit Artikelanzahl
 - Markdown-Editor mit Live-Vorschau (Überschriften, Listen, Code, fett, kursiv, Blockquote)
 - Artikel-Karten-Ansicht + Detailansicht mit gerendertem Markdown
-- Team-Sharing via Supabase: alle Techniker mit gleicher Datenbank sehen denselben Wissensstand
-- `☁ Geteilt im Team`-Indikator wenn Supabase aktiv
 
 ---
 
@@ -98,7 +95,6 @@ VDE-konforme Messprotokollierung für Erst- und Wiederholungsprüfungen nach VDE
 - **Import aus Verteilerplaner:** Stromkreise direkt aus einem gespeicherten Verteiler-Projekt übernehmen (Bezeichnung, Nennstrom, Sicherungstyp, 3-phasig)
 - **PDF-Export:** Professionelles A4-Prüfprotokoll als PDF (DIN VDE 0100-600), lazy-geladen — direkt aus der Liste oder dem Editor
 - Drucken via `window.print()` + Print-CSS
-- Optionale Synchronisierung mit Supabase
 - **Mobiloptimiert:** Stromkreis-Tabelle horizontal scrollbar, Formulare 2-spaltig, Header-Buttons wrappend
 
 ---
@@ -114,7 +110,7 @@ Wiederkehrende Wartungsaufgaben verwalten und nachverfolgen.
 - Farbkodierter Status: rot = überfällig, gelb = in ≤ 30 Tagen fällig, grün = OK
 - „✓ Erledigt"-Button setzt Datum auf heute und berechnet Fälligkeit neu
 - Filter nach Kategorie und Suche; Sortierung nach Fälligkeit, Name oder Kategorie
-- Supabase-Sync + localStorage-Fallback; im Backup-Export enthalten
+- localStorage-Speicherung, im globalen Backup-Export enthalten
 
 ---
 
@@ -159,8 +155,20 @@ Installationsmaterial pro Projekt zählen und Bestellmengen verwalten.
 - Fortschrittsbalken und Statistik pro Projekt (Stückzahl gesamt, offen, bestellt)
 - Filter nach Kategorie + Freitextsuche
 - Druckansicht: saubere Materialliste gruppiert nach Kategorie
-- localStorage-Datenspeicherung mit Supabase-Fallback (`materialzaehler_projekte`)
+- localStorage-Datenspeicherung (`elektronikertools_materialzaehler`)
 - Im globalen Backup-Export enthalten
+
+---
+
+### 🏡 KNX-Planer
+
+Planungswerkzeug für KNX-Installationen.
+
+**Features:**
+- **GA-Planer:** Gruppenadressen mit 3-Ebenen-Hierarchie (Hauptgruppe/Mittelgruppe/Untergruppe), DPT-Zuordnung, Funktion und Raumzuweisung; CSV-Export
+- **Raumplan:** Räume nach Etage anlegen, Gruppenadressen zuweisen
+- **Inbetriebnahme-Checkliste:** Vorlagen je Funktion (Licht, Dimmen, Jalousie, Heizung, Szene, Allgemein), Fortschrittsanzeige pro Raum und gesamt
+- **KNX-Rechner:** Physikalische Adresse ↔ Dezimal/Hex/Binär, Gruppenadresse ↔ Dezimal, DPT-Kurzreferenz
 
 ---
 
@@ -182,10 +190,6 @@ Das fertige Plugin liegt unter `wordpress-plugin/`. Es enthält bereits die geba
 [elektronikertools klasse="meine-css"]   Zusätzliche CSS-Klasse
 ```
 
-### Supabase in WordPress konfigurieren
-
-Einstellungen → Elektronikertools → Supabase URL + Anon Key eintragen. Kein Rebuild nötig — Credentials werden zur Laufzeit per `wp_localize_script` übergeben.
-
 ### Plugin neu bauen
 
 ```bash
@@ -204,14 +208,10 @@ Beim Start erscheint das Dashboard zur Tool-Auswahl. Über **⚙ Einstellungen**
 
 | Feld | Verwendung |
 |---|---|
-| Firmenname | CSV-Export, Planansicht, Stückliste |
-| Mitarbeiter / Name | Stundennachweis, Prüfprotokoll |
+| Firmenname | CSV-Export, Planansicht, Stückliste, Ausdrucke |
+| Mitarbeiter / Name | Stundennachweis, Prüfprotokoll, Wartungsprotokoll |
 | Ort | Anzeige im Dashboard |
-| Datenbank-Name | Referenz für eigene DB |
-| Supabase URL | Datenbankverbindung für alle Tools |
-| Supabase Anon Key | Datenbankverbindung für alle Tools |
-
-> **Wichtig für die Wissensdatenbank:** Nur mit Supabase-Konfiguration ist das Team-Sharing aktiv. Ohne Supabase bleibt die Wissensdatenbank lokal im Browser.
+| Notizen | Freitext |
 
 ---
 
@@ -227,122 +227,6 @@ Beim Start erscheint das Dashboard zur Tool-Auswahl. Über **⚙ Einstellungen**
    - **Port:** `80`
 3. *Deploy* klicken — fertig.
 
-### Datenbank (optional) — Supabase self-hosted
-
-1. **Coolify** → *New Resource* → *Service* → **Supabase** → deployen
-2. Im Supabase-Dashboard: *Settings → API* → Project URL & anon key kopieren
-3. Im SQL-Editor die folgenden Tabellen anlegen:
-
-```sql
--- Verteilerplaner-Projekte
-CREATE TABLE projekte (
-  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name         text NOT NULL,
-  ersteller    text DEFAULT '',
-  adresse      text DEFAULT '',
-  standort     text DEFAULT '',
-  kabel        jsonb DEFAULT '[]',
-  sicherungen  jsonb DEFAULT '[]',
-  fi_konfigs   jsonb DEFAULT '[]',
-  stockwerke   jsonb DEFAULT '[]',
-  raeume       jsonb DEFAULT '[]',
-  sw_color_map jsonb DEFAULT '{}',
-  created_at   timestamptz DEFAULT now(),
-  updated_at   timestamptz DEFAULT now()
-);
-ALTER TABLE projekte ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON projekte FOR ALL USING (true) WITH CHECK (true);
-
--- Prüfprotokolle
-CREATE TABLE pruefprotokolle (
-  id                uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name              text NOT NULL DEFAULT 'Protokoll',
-  auftraggeber      text DEFAULT '',
-  auftragnummer     text DEFAULT '',
-  anlagenstandort   text DEFAULT '',
-  anlage_art        text DEFAULT 'Wohngebäude',
-  nennspannung      text DEFAULT '230/400',
-  pruefer           text DEFAULT '',
-  datum             date,
-  naechste_pruefung date,
-  stromkreise       jsonb DEFAULT '[]',
-  notiz             text DEFAULT '',
-  verteiler_id      uuid REFERENCES projekte(id) ON DELETE SET NULL,
-  created_at        timestamptz DEFAULT now(),
-  updated_at        timestamptz DEFAULT now()
-);
-ALTER TABLE pruefprotokolle ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON pruefprotokolle FOR ALL USING (true) WITH CHECK (true);
-
--- Wissensdatenbank
-CREATE TABLE wissensdatenbank (
-  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  titel       text NOT NULL DEFAULT '',
-  kategorie   text DEFAULT 'Allgemein',
-  inhalt      text DEFAULT '',
-  tags        text[] DEFAULT '{}',
-  autor       text DEFAULT '',
-  erstellt    date DEFAULT CURRENT_DATE,
-  created_at  timestamptz DEFAULT now(),
-  updated_at  timestamptz DEFAULT now()
-);
-ALTER TABLE wissensdatenbank ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON wissensdatenbank FOR ALL USING (true) WITH CHECK (true);
-
--- Stundenbuch
-CREATE TABLE stunden (
-  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  datum       date NOT NULL,
-  von         text DEFAULT '',
-  bis         text DEFAULT '',
-  pause       integer DEFAULT 0,
-  projekt     text DEFAULT '',
-  taetigkeit  text DEFAULT '',
-  notiz       text DEFAULT '',
-  created_at  timestamptz DEFAULT now(),
-  updated_at  timestamptz DEFAULT now()
-);
-ALTER TABLE stunden ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON stunden FOR ALL USING (true) WITH CHECK (true);
-
--- Wartungsprotokoll
-CREATE TABLE wartungsaufgaben (
-  id          text PRIMARY KEY,
-  bezeichnung text NOT NULL,
-  kategorie   text DEFAULT '',
-  intervall   text DEFAULT 'jaehrlich',
-  letzte      text DEFAULT '',
-  naechste    text DEFAULT '',
-  zustaendig  text DEFAULT '',
-  notiz       text DEFAULT '',
-  created_at  timestamptz DEFAULT now()
-);
-ALTER TABLE wartungsaufgaben ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON wartungsaufgaben FOR ALL USING (true) WITH CHECK (true);
-
--- Materialzähler
-CREATE TABLE materialzaehler_projekte (
-  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name         text NOT NULL DEFAULT '',
-  ort          text DEFAULT '',
-  notiz        text DEFAULT '',
-  positionen   jsonb DEFAULT '[]',
-  created_at   timestamptz DEFAULT now(),
-  updated_at   timestamptz DEFAULT now()
-);
-ALTER TABLE materialzaehler_projekte ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON materialzaehler_projekte FOR ALL USING (true) WITH CHECK (true);
-```
-
-4. Environment Variables setzen:
-   ```
-   VITE_SUPABASE_URL=https://supabase.deine-domain.de
-   VITE_SUPABASE_ANON_KEY=dein-anon-key
-   ```
-5. App neu deployen.
-
-Ohne Supabase-Konfiguration fällt die App automatisch auf `localStorage` zurück.
-
 ### PWA — Als App installieren
 
 Die App ist als **Progressive Web App (PWA)** eingerichtet und kann auf Mobilgeräten und Desktop als eigenständige App installiert werden:
@@ -351,7 +235,7 @@ Die App ist als **Progressive Web App (PWA)** eingerichtet und kann auf Mobilger
 - **iOS (Safari):** Teilen → "Zum Home-Bildschirm"
 - **Desktop (Chrome/Edge):** Adressleiste → Installations-Icon
 
-Offline-Fähigkeit: Assets werden gecacht, Supabase-Aufrufe laufen immer live.
+Offline-Fähigkeit: Assets werden per Service Worker gecacht, alle Daten liegen ohnehin lokal im Browser.
 
 ---
 
@@ -380,7 +264,7 @@ npm run build
 | Framework | React 19 |
 | Build Tool | Vite 7 |
 | Styling | Inline CSS + CSS Custom Properties |
-| Datenspeicherung | localStorage + Supabase (optional) |
+| Datenspeicherung | localStorage |
 | KI-Import | Anthropic Claude API (optional) |
 | Deployment | Static Build / Nixpacks (Coolify) |
 
@@ -394,22 +278,28 @@ src/
 ├── Verteilerplaner.jsx    # Tool: Verteilerplaner
 ├── Stundenbuch.jsx        # Tool: Stundenbuch
 ├── Pruefprotokoll.jsx     # Tool: Prüfprotokoll
+├── Wissensdatenbank.jsx   # Tool: Wissensdatenbank
+├── Wartungsprotokoll.jsx  # Tool: Wartungsprotokoll
+├── Leitungsberechnung.jsx # Tool: Elektrorechner
+├── Materialzaehler.jsx    # Tool: Materialzähler
+├── KNXPlaner.jsx          # Tool: KNX-Planer
 ├── components/
 │   └── Toast.jsx              # Gemeinsame Toast-Komponente
 ├── lib/
-│   ├── supabase.js            # Supabase-Client
 │   ├── utils.js               # Gemeinsame Hilfsfunktionen (uid, …)
-│   ├── db.js                  # DB-Layer: Verteilerplaner
-│   ├── db_pruefprotokoll.js   # DB-Layer: Prüfprotokoll
-│   ├── db_stundenbuch.js      # DB-Layer: Stundenbuch
-│   └── db_wissen.js           # DB-Layer: Wissensdatenbank
+│   ├── vde.js                 # VDE-Grenzwerte & Bewertungslogik (Prüfprotokoll)
+│   ├── db_pruefprotokoll.js    # localStorage-Layer: Prüfprotokoll
+│   ├── db_stundenbuch.js       # localStorage-Layer: Stundenbuch
+│   ├── db_wissen.js            # localStorage-Layer: Wissensdatenbank
+│   ├── db_wartung.js           # localStorage-Layer: Wartungsprotokoll
+│   ├── db_materialzaehler.js   # localStorage-Layer: Materialzähler
+│   └── db_knx.js               # localStorage-Layer: KNX-Planer
 ├── index.css                  # Globale CSS-Variablen & Reset
 └── main.jsx                   # Einstiegspunkt
 
 docs/
 ├── index.md                   # Dokumentations-Übersicht
 ├── setup.md                   # Installation & Deployment
-├── supabase.sql               # Vollständiges SQL-Schema
 ├── development.md             # Entwickler-Guide
 └── apps/                      # Per-App Dokumentation
 ```
@@ -422,8 +312,7 @@ Vollständige Docs im Ordner [`docs/`](docs/index.md):
 
 | | |
 |---|---|
-| [Setup & Deployment](docs/setup.md) | Installation, Coolify, Supabase |
-| [SQL-Schema](docs/supabase.sql) | Alle Tabellen zum Copy-Paste |
+| [Setup & Deployment](docs/setup.md) | Installation, Coolify |
 | [Entwickler-Guide](docs/development.md) | Neue App anlegen, Konventionen |
 | [Verteilerplaner](docs/apps/verteilerplaner.md) | Detaillierte App-Dokumentation |
 | [Stundenbuch](docs/apps/stundenbuch.md) | Detaillierte App-Dokumentation |
