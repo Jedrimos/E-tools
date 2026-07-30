@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { GW, evalNum, evalStromkreis, risoMin } from "../vde.js";
+import { GW, evalNum, evalStromkreis, risoMin, zsGrenzwert, gesamtStatus } from "../vde.js";
 
 // ── evalNum ───────────────────────────────────────────────────────────────────
 describe("evalNum", () => {
@@ -121,6 +121,82 @@ describe("evalStromkreis", () => {
     it("½×IΔN kein Auslösen (leer) → kein zusätzliches fail", () => {
       const sk = { ...skBase, fi_t_nenn: "200", fi_t_5fach: "30", fi_ub: "25", fi_t_halb: "" };
       expect(evalStromkreis(sk)).toBe("ok");
+    });
+  });
+
+  describe("Schleifenimpedanz (Zs/Ik)", () => {
+    it("zsGrenzwert für 16A/Typ B ist 2,875 Ω (U0=230V / Ia=5x16A)", () => {
+      expect(zsGrenzwert({ sicherungstyp: "B", nennstrom: "16" })).toBeCloseTo(2.875, 3);
+    });
+
+    it("zsGrenzwert für 16A/Typ C ist 1,4375 Ω (Ia=10x16A)", () => {
+      expect(zsGrenzwert({ sicherungstyp: "C", nennstrom: "16" })).toBeCloseTo(1.4375, 3);
+    });
+
+    it("zsGrenzwert ist null für Typ K/gG (kein fester Auslösefaktor)", () => {
+      expect(zsGrenzwert({ sicherungstyp: "K", nennstrom: "16" })).toBeNull();
+      expect(zsGrenzwert({ sicherungstyp: "gG", nennstrom: "16" })).toBeNull();
+    });
+
+    it("zsGrenzwert ist null ohne gültigen Nennstrom", () => {
+      expect(zsGrenzwert({ sicherungstyp: "B", nennstrom: "" })).toBeNull();
+      expect(zsGrenzwert({ sicherungstyp: "B", nennstrom: "abc" })).toBeNull();
+    });
+
+    it("Zs innerhalb Grenzwert → ok", () => {
+      const sk = { ...skLeer, sicherungstyp: "B", nennstrom: "16", zs: "2.0", riso_l1_pe: "5" };
+      expect(evalStromkreis(sk)).toBe("ok");
+    });
+
+    it("Zs über Grenzwert → fail (zu hohe Schleifenimpedanz, Abschaltbedingung nicht erfüllt)", () => {
+      const sk = { ...skLeer, sicherungstyp: "B", nennstrom: "16", zs: "3.5", riso_l1_pe: "5" };
+      expect(evalStromkreis(sk)).toBe("fail");
+    });
+
+    it("Ik unter Ia → fail (Kurzschlussstrom reicht nicht für sichere Abschaltung)", () => {
+      const sk = { ...skLeer, sicherungstyp: "B", nennstrom: "16", ik: "50", riso_l1_pe: "5" };
+      expect(evalStromkreis(sk)).toBe("fail");
+    });
+
+    it("Ik über Ia → ok", () => {
+      const sk = { ...skLeer, sicherungstyp: "B", nennstrom: "16", ik: "100", riso_l1_pe: "5" };
+      expect(evalStromkreis(sk)).toBe("ok");
+    });
+
+    it("ohne sicherungstyp/nennstrom bleibt Zs/Ik unbewertet (kein falscher ok/fail)", () => {
+      const sk = { ...skLeer, zs: "5.0", riso_l1_pe: "5" };
+      expect(evalStromkreis(sk)).toBe("ok");
+    });
+  });
+
+  describe("½×IΔN Leerraum-Behandlung", () => {
+    it("reines Leerzeichen in fi_t_halb löst KEIN fail aus (kein echter Messwert)", () => {
+      const sk = { ...skLeer, fi_vorhanden: true, fi_typ: "AC", fi_t_nenn: "200", fi_t_5fach: "30", fi_ub: "25", fi_t_halb: "  " };
+      expect(evalStromkreis(sk)).toBe("ok");
+    });
+  });
+
+  describe("gesamtStatus", () => {
+    it("gibt 'fail' zurück wenn mindestens ein Stromkreis fehlschlägt", () => {
+      const ok = { ...skLeer, riso_l1_pe: "5" };
+      const fail = { ...skLeer, riso_l1_pe: "0.5" };
+      expect(gesamtStatus([ok, fail])).toBe("fail");
+    });
+
+    it("gibt 'offen' zurück wenn nicht alle Stromkreise gemessen sind (kein fail)", () => {
+      const ok = { ...skLeer, riso_l1_pe: "5" };
+      const offen = { ...skLeer };
+      expect(gesamtStatus([ok, offen])).toBe("offen");
+    });
+
+    it("gibt 'ok' nur zurück wenn ALLE Stromkreise explizit ok sind", () => {
+      const ok1 = { ...skLeer, riso_l1_pe: "5" };
+      const ok2 = { ...skLeer, riso_l1_pe: "8" };
+      expect(gesamtStatus([ok1, ok2])).toBe("ok");
+    });
+
+    it("gibt 'offen' zurück für eine leere Liste", () => {
+      expect(gesamtStatus([])).toBe("offen");
     });
   });
 

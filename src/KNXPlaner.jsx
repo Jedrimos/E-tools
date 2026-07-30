@@ -71,6 +71,12 @@ const CHECK_TEMPLATES = {
 function gaStr(h, m, u) { return `${h}/${m}/${u}`; }
 function gaInt(h, m, u) { return ((h & 0x1F) << 11) | ((m & 0x07) << 8) | (u & 0xFF); }
 
+function csvField(v) {
+  let s = String(v ?? "");
+  if (/^[=+\-@]/.test(s)) s = "'" + s; // CSV-Formula-Injection verhindern (Excel/Sheets)
+  return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
 function csvExport(gaListe, raeume) {
   const raumMap = Object.fromEntries(raeume.map(r => [r.id, r.name]));
   const header = "Gruppenadresse;Name;DPT;Funktion;Raum;Dezimal;Notiz";
@@ -82,7 +88,7 @@ function csvExport(gaListe, raeume) {
       raumMap[ga.raum_id] || "",
       gaInt(ga.hauptgruppe, ga.mittelgruppe, ga.untergruppe),
       ga.notiz || "",
-    ].join(";"));
+    ].map(csvField).join(";"));
   const blob = new Blob([header + "\n" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -110,14 +116,12 @@ const GA_FORM_DEFAULT = { hauptgruppe: 1, mittelgruppe: 0, untergruppe: 1, name:
 function GAForm({ initial, raeume, onSave, onCancel }) {
   const [form, setForm] = useState(initial || GA_FORM_DEFAULT);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setInt = (k, v) => setForm(f => ({ ...f, [k]: Math.trunc(Number(v)) }));
 
-  // Sync form when switching between different GAs to edit
-  useEffect(() => {
-    setForm(initial || GA_FORM_DEFAULT);
-  }, [initial?.id]);
-  const valid = form.name.trim() && form.hauptgruppe >= 0 && form.hauptgruppe <= 31
-    && form.mittelgruppe >= 0 && form.mittelgruppe <= 7
-    && form.untergruppe >= 0 && form.untergruppe <= 255;
+  const valid = form.name.trim()
+    && Number.isInteger(form.hauptgruppe)   && form.hauptgruppe >= 0   && form.hauptgruppe <= 31
+    && Number.isInteger(form.mittelgruppe)  && form.mittelgruppe >= 0  && form.mittelgruppe <= 7
+    && Number.isInteger(form.untergruppe)   && form.untergruppe >= 0   && form.untergruppe <= 255;
 
   return (
     <div style={{ ...card(), border: `1px solid ${AKZENT}40`, marginBottom: 12 }}>
@@ -129,16 +133,16 @@ function GAForm({ initial, raeume, onSave, onCancel }) {
       <div style={{ marginBottom: 12 }}>
         <span style={lbl}>Gruppenadresse (HG / MG / UG)</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="number" min={0} max={31} value={form.hauptgruppe}
-            onChange={e => set("hauptgruppe", Number(e.target.value))}
+          <input type="number" min={0} max={31} step={1} value={form.hauptgruppe}
+            onChange={e => setInt("hauptgruppe", e.target.value)}
             style={inp({ width: 60, textAlign: "center" })} />
           <span style={{ color: "var(--text3)", fontWeight: 700 }}>/</span>
-          <input type="number" min={0} max={7} value={form.mittelgruppe}
-            onChange={e => set("mittelgruppe", Number(e.target.value))}
+          <input type="number" min={0} max={7} step={1} value={form.mittelgruppe}
+            onChange={e => setInt("mittelgruppe", e.target.value)}
             style={inp({ width: 60, textAlign: "center" })} />
           <span style={{ color: "var(--text3)", fontWeight: 700 }}>/</span>
-          <input type="number" min={0} max={255} value={form.untergruppe}
-            onChange={e => set("untergruppe", Number(e.target.value))}
+          <input type="number" min={0} max={255} step={1} value={form.untergruppe}
+            onChange={e => setInt("untergruppe", e.target.value)}
             style={inp({ width: 70, textAlign: "center" })} />
           <span style={{ fontSize: 12, color: "var(--text3)", marginLeft: 4, fontFamily: "var(--mono)" }}>
             = {gaInt(form.hauptgruppe, form.mittelgruppe, form.untergruppe)}
@@ -280,6 +284,7 @@ function TabGA({ gaListe, raeume, onReload, addToast }) {
       {/* Formular */}
       {(showForm || editGA) && (
         <GAForm
+          key={editGA?.id || "neu"}
           initial={editGA}
           raeume={raeume}
           onSave={handleSave}
@@ -341,7 +346,7 @@ function TabGA({ gaListe, raeume, onReload, addToast }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab 2: Raumplan
 // ══════════════════════════════════════════════════════════════════════════════
-function TabRaeume({ gaListe, raeume, onReload, addToast }) {
+function TabRaeume({ gaListe, raeume, checks, onReload, addToast }) {
   const [aktEtage, setAktEtage] = useState(null);
   const [showRaumForm, setShowRaumForm] = useState(false);
   const [raumForm, setRaumForm] = useState({ name: "", etage: "EG", typ: "Wohnzimmer" });
@@ -365,11 +370,15 @@ function TabRaeume({ gaListe, raeume, onReload, addToast }) {
   async function raumLoeschen(id) {
     if (!confirm("Raum löschen?")) return;
     const betroffene = gaListe.filter(g => g.raum_id === id);
+    const betroffeneChecks = checks.filter(c => c.raum_id === id);
+    const bleibtEtage = raeume.some(r => r.etage === akt && r.id !== id);
     try {
       await Promise.all([
         loescheRaum(id),
         ...betroffene.map(ga => speichereGA({ ...ga, raum_id: "" })),
+        ...betroffeneChecks.map(c => loescheCheckItem(c.id)),
       ]);
+      if (!bleibtEtage) setAktEtage(null);
       onReload();
     } catch(e) { addToast("Raum löschen fehlgeschlagen: " + e.message, "error"); }
   }
@@ -493,7 +502,7 @@ function TabRaeume({ gaListe, raeume, onReload, addToast }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab 3: Inbetriebnahme-Checkliste
 // ══════════════════════════════════════════════════════════════════════════════
-function TabCheckliste({ raeume, gaListe, checks, onReload, addToast }) {
+function TabCheckliste({ raeume, checks, onReload, addToast }) {
   const [aktRaum, setAktRaum] = useState(null);
   const [neuItem, setNeuItem] = useState("");
   const [neuKat, setNeuKat] = useState("Allgemein");
@@ -668,12 +677,17 @@ function TabRechner({ gaListe, raeume }) {
   const [gaH, setGaH] = useState("1"); const [gaM, setGaM] = useState("0"); const [gaU, setGaU] = useState("1");
   const [dezIn, setDezIn] = useState("");
 
-  const physInt = ((parseInt(pBereich) & 0xF) << 12) | ((parseInt(pLinie) & 0xF) << 8) | (parseInt(pGeraet) & 0xFF);
+  const pB = parseInt(pBereich, 10), pL = parseInt(pLinie, 10), pG = parseInt(pGeraet, 10);
+  const physValid = Number.isInteger(pB) && pB >= 1 && pB <= 15
+    && Number.isInteger(pL) && pL >= 1 && pL <= 15
+    && Number.isInteger(pG) && pG >= 1 && pG <= 255;
+  const physInt = physValid ? ((pB & 0xF) << 12) | ((pL & 0xF) << 8) | (pG & 0xFF) : null;
   const physStr = `${pBereich}.${pLinie}.${pGeraet}`;
 
   const gaIntVal = gaInt(parseInt(gaH) || 0, parseInt(gaM) || 0, parseInt(gaU) || 0);
-  const dezVal = parseInt(dezIn);
-  const vonDez = !isNaN(dezVal) ? {
+  const dezVal = parseInt(dezIn, 10);
+  const dezValid = !isNaN(dezVal) && dezVal >= 0 && dezVal <= 65535;
+  const vonDez = dezValid ? {
     h: (dezVal >> 11) & 0x1F, m: (dezVal >> 8) & 0x07, u: dezVal & 0xFF
   } : null;
 
@@ -703,19 +717,25 @@ function TabRechner({ gaListe, raeume }) {
               <input type="number" min={1} max={255} value={pGeraet} onChange={e => setPGeraet(e.target.value)} style={inp({ width: 75, textAlign: "center" })} />
             </div>
           </div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {[
-              { label: "Phys. Adresse", value: physStr, color: AKZENT },
-              { label: "Dezimal", value: physInt, color: "var(--text2)" },
-              { label: "Hex", value: "0x" + physInt.toString(16).toUpperCase().padStart(4, "0"), color: "var(--text3)" },
-              { label: "Binär", value: physInt.toString(2).padStart(16, "0"), color: "var(--text3)", mono: true, small: true },
-            ].map(({ label, value, color, mono, small }) => (
-              <div key={label} style={{ textAlign: "center", background: "var(--bg)", borderRadius: 8, padding: "8px 12px", flex: "1 1 80px" }}>
-                <div style={{ fontSize: 10, color: "var(--text3)", marginBottom: 3 }}>{label}</div>
-                <div style={{ fontSize: small ? 12 : 18, fontWeight: 700, color, fontFamily: (mono || small) ? "var(--mono)" : "inherit" }}>{value}</div>
-              </div>
-            ))}
-          </div>
+          {physValid ? (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {[
+                { label: "Phys. Adresse", value: physStr, color: AKZENT },
+                { label: "Dezimal", value: physInt, color: "var(--text2)" },
+                { label: "Hex", value: "0x" + physInt.toString(16).toUpperCase().padStart(4, "0"), color: "var(--text3)" },
+                { label: "Binär", value: physInt.toString(2).padStart(16, "0"), color: "var(--text3)", mono: true, small: true },
+              ].map(({ label, value, color, mono, small }) => (
+                <div key={label} style={{ textAlign: "center", background: "var(--bg)", borderRadius: 8, padding: "8px 12px", flex: "1 1 80px" }}>
+                  <div style={{ fontSize: 10, color: "var(--text3)", marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: small ? 12 : 18, fontWeight: 700, color, fontFamily: (mono || small) ? "var(--mono)" : "inherit" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: "var(--red)", fontSize: 12, fontWeight: 600 }}>
+              ⚠ Ungültige Adresse — Bereich 1–15, Linie 1–15, Gerät 1–255
+            </div>
+          )}
         </div>
       </div>
 
@@ -744,6 +764,8 @@ function TabRechner({ gaListe, raeume }) {
               <div style={{ fontSize: 20, fontWeight: 800, color: AKZENT, fontFamily: "var(--mono)" }}>
                 {gaStr(vonDez.h, vonDez.m, vonDez.u)}
               </div>
+            ) : dezIn && !dezValid ? (
+              <div style={{ fontSize: 12, color: "var(--red)", fontWeight: 600 }}>⚠ Wert muss zwischen 0 und 65535 liegen</div>
             ) : <div style={{ fontSize: 12, color: "var(--text3)" }}>Dezimalwert eingeben</div>}
           </div>
         </div>
@@ -868,8 +890,8 @@ export default function KNXPlaner() {
 
       {/* Tab-Inhalt */}
       {tab === "ga"      && <TabGA        gaListe={gaListe} raeume={raeume} onReload={reload} addToast={addToast} />}
-      {tab === "raeume"  && <TabRaeume    gaListe={gaListe} raeume={raeume} onReload={reload} addToast={addToast} />}
-      {tab === "check"   && <TabCheckliste raeume={raeume} gaListe={gaListe} checks={checks} onReload={reload} addToast={addToast} />}
+      {tab === "raeume"  && <TabRaeume    gaListe={gaListe} raeume={raeume} checks={checks} onReload={reload} addToast={addToast} />}
+      {tab === "check"   && <TabCheckliste raeume={raeume} checks={checks} onReload={reload} addToast={addToast} />}
       {tab === "rechner" && <TabRechner   gaListe={gaListe} raeume={raeume} />}
 
       <Toast toasts={toasts} />

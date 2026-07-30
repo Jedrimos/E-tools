@@ -115,9 +115,12 @@ function berechneLtg({ strom, laenge, verlegeart, material, phasen, cosphy }) {
   const kappa = KAPPA[material], UN = U_N[phasen], fak = FAKTOR[phasen];
   const duZul = (DU_MAX / 100) * UN;
   const aMin = (fak * I * L * cosPhi) / (kappa * duZul);
-  const empfQs = QS_STUFEN.find(q => q >= aMin) || QS_STUFEN[QS_STUFEN.length - 1];
   const belastbar = material === "Cu" ? BELASTBAR_CU : BELASTBAR_AL;
-  const tabelle = QS_STUFEN.filter(q => q >= aMin * 0.6).map(qs => {
+  // Empfehlung muss Spannungsfall UND Strombelastbarkeit der Verlegeart erfüllen
+  const empfQs = QS_STUFEN.find(q => q >= aMin && (belastbar[q]?.[verlegeart] ?? 0) >= I) ?? null;
+  let gefiltert = QS_STUFEN.filter(q => q >= aMin * 0.6);
+  if (gefiltert.length === 0) gefiltert = QS_STUFEN; // aMin übersteigt die Tabelle: alle Stufen statt leerer Tabelle zeigen
+  const tabelle = gefiltert.map(qs => {
     const du = (fak * I * L * cosPhi) / (kappa * qs);
     const duPct = (du / UN) * 100;
     const iMax = belastbar[qs]?.[verlegeart] ?? "–";
@@ -161,7 +164,9 @@ function TabLeitungsberechnung() {
             <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: 11, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 4 }}>Empfohlener Mindest-Querschnitt</div>
-                <div style={{ fontSize: 40, fontWeight: 800, color: AKZENT, fontFamily: "var(--mono)" }}>{erg.empfQs} mm²</div>
+                {erg.empfQs != null
+                  ? <div style={{ fontSize: 40, fontWeight: 800, color: AKZENT, fontFamily: "var(--mono)" }}>{erg.empfQs} mm²</div>
+                  : <div style={{ fontSize: 18, fontWeight: 800, color: "var(--red)" }}>⚠ Kein Standardquerschnitt (bis 120 mm²) ausreichend</div>}
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>
                   Rechnerisch: {erg.aMin} mm² · {material} · {phasen === "1P" ? "230 V" : "400 V"}
                 </div>
@@ -458,7 +463,7 @@ function TabKompensation() {
   const phi1 = valid ? Math.acos(c1) : 0;
   const phi2 = valid ? Math.acos(c2) : 0;
   const Qc   = valid ? P * (Math.tan(phi1) - Math.tan(phi2)) : 0; // VAr
-  const C    = valid ? (Qc * 1000) / (2 * Math.PI * freq * U * U) * 1e6 : 0; // µF
+  const C    = valid ? (Qc / (2 * Math.PI * freq * U * U)) * 1e6 : 0; // µF (Qc bereits in VAr)
   const Ired = valid ? (P / (Math.sqrt(3) * U)) * (1 / c1 - 1 / c2) : 0; // A gespart
 
   return (
@@ -557,7 +562,7 @@ function berechneAbstand({ laenge, anzahl, modus, wandabstand }) {
     }
   } else {
     // Freier Wandabstand: Objekte mit d Abstand von Wand, Rest gleichmäßig verteilt
-    if (d * 2 >= L) return null;
+    if (d < 0 || d * 2 >= L) return null;
     if (N === 1) {
       positionen = [L / 2];
       abstand = 0;
@@ -993,7 +998,7 @@ function RechnerKompensation() {
   const P = parseFloat(p) * 1000, cos1 = parseFloat(c1), cos2 = parseFloat(c2), U = parseFloat(u), freq = parseFloat(f);
   const valid = P > 0 && cos1 > 0 && cos2 > cos1 && U > 0 && freq > 0;
   const Qc = valid ? P * (Math.tan(Math.acos(cos1)) - Math.tan(Math.acos(cos2))) : null;
-  const C = valid ? (Qc * 1000) / (2 * Math.PI * freq * U * U) * 1e6 : null;
+  const C = valid ? (Qc / (2 * Math.PI * freq * U * U)) * 1e6 : null; // µF (Qc bereits in VAr)
   return (
     <div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>

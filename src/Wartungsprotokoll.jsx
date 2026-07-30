@@ -4,9 +4,16 @@ import { useToasts } from "./lib/useToasts.js";
 import { loadWartungDB, saveWartungDB, deleteWartungDB } from "./lib/db_wartung.js";
 import { uid } from "./lib/utils.js";
 
+// Lokales Kalenderdatum (YYYY-MM-DD) statt UTC — new Date().toISOString() liefert
+// in den ersten Stunden nach Mitternacht (Zeitzone UTC+1/+2) noch den Vortag.
+function toLocalISODate(d) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 // Module-level constants (avoid calling impure Date.now() during render)
-const HEUTE = new Date().toISOString().slice(0, 10);
-const IN30  = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+const HEUTE = toLocalISODate(new Date());
+const IN30  = toLocalISODate(new Date(Date.now() + 30 * 864e5));
 
 // ── Intervall-Definitionen ──────────────────────────────────────────────────
 const INTERVALLE = [
@@ -34,9 +41,13 @@ function intervallMonate(wert) {
 
 function addMonate(dateStr, n) {
   if (!dateStr) return "";
-  const d = new Date(dateStr + "T00:00:00");
-  d.setMonth(d.getMonth() + n);
-  return d.toISOString().slice(0, 10);
+  const [y, m, day] = dateStr.split("-").map(Number);
+  const zielMonatIndex = (m - 1) + n; // 0-basiert, kann außerhalb 0-11 liegen
+  const zielJahr = y + Math.floor(zielMonatIndex / 12);
+  const zielMonat = ((zielMonatIndex % 12) + 12) % 12;
+  const letzterTagZielmonat = new Date(zielJahr, zielMonat + 1, 0).getDate();
+  const zielTag = Math.min(day, letzterTagZielmonat); // kein Überlauf bei 29./30./31. in kürzeren Monaten
+  return toLocalISODate(new Date(zielJahr, zielMonat, zielTag));
 }
 
 function calcNaechste(aufgabe) {
@@ -46,7 +57,7 @@ function calcNaechste(aufgabe) {
 
 function statusInfo(naechste) {
   if (!naechste) return { label: "offen", color: "var(--text3)", bg: "rgba(255,255,255,0.06)" };
-  const heute = new Date().toISOString().slice(0, 10);
+  const heute = toLocalISODate(new Date());
   const diff  = Math.floor((new Date(naechste) - new Date(heute)) / 864e5);
   if (diff < 0)   return { label: `${Math.abs(diff)} Tage überfällig`, color: "var(--red)",   bg: "rgba(255,59,48,0.12)" };
   if (diff <= 30) return { label: `in ${diff} Tagen fällig`,           color: "#f59e0b",      bg: "rgba(245,158,11,0.12)" };
@@ -128,8 +139,7 @@ export default function Wartungsprotokoll({ config = {} }) {
 
   // Als erledigt markieren: setzt letzte auf heute → naechste neu berechnet
   async function erledigt(aufgabe) {
-    const heute = new Date().toISOString().slice(0, 10);
-    await speichern({ ...aufgabe, letzte: heute });
+    await speichern({ ...aufgabe, letzte: toLocalISODate(new Date()) });
   }
 
   // Filtern & Sortieren
@@ -159,6 +169,15 @@ export default function Wartungsprotokoll({ config = {} }) {
   return (
     <div style={{ padding: "20px 16px", maxWidth: 900, margin: "0 auto", color: "var(--text)" }}>
       <Toast toasts={toasts} />
+
+      {(config.firma || config.mitarbeiter) && (
+        <>
+          <style>{`.wp-print-header{display:none} @media print{.wp-print-header{display:block;margin-bottom:12px;font-size:13px;color:#000}}`}</style>
+          <div className="wp-print-header">
+            {config.firma}{config.firma && config.mitarbeiter ? " · " : ""}{config.mitarbeiter}
+          </div>
+        </>
+      )}
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
