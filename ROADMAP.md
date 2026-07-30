@@ -76,7 +76,8 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ## Neue Ideen
 
 ### 🔗 App-übergreifend
-- ⚡ **PocketBase-Migration** — Datenspeicherung auf lokalen Server (PocketBase, single Go-Binary, SQLite) umstellen. Keine Supabase-Abhängigkeit mehr. Einfach auf Coolify deployen.
+- ✅ ~~**Supabase entfernt**~~ — Umgesetzt: App speichert ausschließlich in localStorage. `@supabase/supabase-js` entfernt.
+- ⚡ **PocketBase-Migration** — Datenspeicherung auf lokalen Server (PocketBase, single Go-Binary, SQLite) umstellen. Einfach auf Coolify deployen.
 - ✅ ~~**Dark-/Light-Mode Umschalter**~~ — Umgesetzt: Toggle in Dashboard-Header und TopBar jeder App, CSS-Variablen für Light Mode in `index.css`, Einstellung in localStorage.
 - ⚡ **Zuletzt geöffnet: Projektname** — Statt App-Name den letzten Projektnamen/Protokoll-Namen als Direktlink anzeigen (VP + PP).
 - 🔨 **Offline-Sync-Konflikt-Behandlung** — Wenn Daten lokal und in Supabase geändert wurden, Merge-Dialog anzeigen.

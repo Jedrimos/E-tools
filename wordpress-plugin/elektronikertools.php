@@ -3,7 +3,7 @@
  * Plugin Name:  Elektronikertools
  * Plugin URI:   https://github.com/Jedrimos/E-tools
  * Description:  Browserbasierte Werkzeuge für Elektrofachkräfte – Verteilerplaner, Stundenbuch, Prüfprotokoll, Wissensdatenbank, Wartungsprotokoll, Elektrorechner, KNX-Planer, Materialzähler. Einbinden mit dem Shortcode [elektronikertools].
- * Version:      2026.4.0
+ * Version:      2026.7.0
  * Author:       Elektronikertools
  * License:      MIT
  * Text Domain:  elektronikertools
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ETTOOLS_VERSION',    '2026.4.0' );
+define( 'ETTOOLS_VERSION',    '2026.7.0' );
 define( 'ETTOOLS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ETTOOLS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -61,16 +61,14 @@ function ettools_enqueue_assets() {
 		true // in footer
 	);
 
-	// Supabase-Credentials und WP-Kontext an die App übergeben
+	// WP-Kontext an die App übergeben
 	wp_localize_script(
 		'elektronikertools',
 		'elektrotools_config',
 		[
-			'supabase_url' => get_option( 'ettools_supabase_url', '' ),
-			'supabase_key' => get_option( 'ettools_supabase_key', '' ),
-			'plugin_url'   => ETTOOLS_PLUGIN_URL,
-			'wp_mode'      => true,
-			'version'      => ETTOOLS_VERSION,
+			'plugin_url' => ETTOOLS_PLUGIN_URL,
+			'wp_mode'    => true,
+			'version'    => ETTOOLS_VERSION,
 		]
 	);
 }

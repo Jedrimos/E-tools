@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import Toast from "./components/Toast.jsx";
 import { useToasts } from "./lib/useToasts.js";
 import { loadProjekteDB, saveProjektDB, deleteProjektDB } from "./lib/db_materialzaehler.js";
-import { supabaseFehlermeldung } from "./lib/supabase.js";
 import { uid } from "./lib/utils.js";
 
 // ── Lokaler Speicher ──
@@ -328,7 +327,7 @@ export default function Materialzaehler({ config = {} }) {
   useEffect(() => {
     loadProjekteDB()
       .then(data => { if (data) { setProjekteLive(data); save(data); } })
-      .catch(e => addToast(supabaseFehlermeldung(e), "error"));
+      .catch(e => addToast(e.message, "error"));
   }, [addToast]);
 
   function setProjekte(fn) {
@@ -352,7 +351,7 @@ export default function Materialzaehler({ config = {} }) {
       try {
         const saved = await saveProjektDB(updated);
         if (saved) setProjekte(prev => prev.map(p => p.id === updated.id ? { ...p, db_id: saved.db_id } : p));
-      } catch (e) { addToast(supabaseFehlermeldung(e), "error"); }
+      } catch (e) { addToast(e.message, "error"); }
     } else {
       const neu = { id: uid(), name, ort, notiz, positionen: [], db_id: null };
       setProjekte(prev => [neu, ...prev]);
@@ -360,7 +359,7 @@ export default function Materialzaehler({ config = {} }) {
       try {
         const saved = await saveProjektDB(neu);
         if (saved) setProjekte(prev => prev.map(p => p.id === neu.id ? { ...p, db_id: saved.db_id } : p));
-      } catch (e) { addToast(supabaseFehlermeldung(e), "error"); }
+      } catch (e) { addToast(e.message, "error"); }
     }
     setShowProjektModal(false);
   }
@@ -371,7 +370,7 @@ export default function Materialzaehler({ config = {} }) {
     setProjekte(prev => prev.filter(x => x.id !== p.id));
     addToast("Projekt gelöscht");
     if (p.db_id) {
-      try { await deleteProjektDB(p.db_id); } catch (e) { addToast(supabaseFehlermeldung(e), "error"); }
+      try { await deleteProjektDB(p.db_id); } catch (e) { addToast(e.message, "error"); }
     }
   }
 
@@ -394,7 +393,7 @@ export default function Materialzaehler({ config = {} }) {
     try {
       const saved = await saveProjektDB(updated);
       if (saved) setProjekte(prev => prev.map(p => p.id === updated.id ? { ...p, db_id: saved.db_id } : p));
-    } catch (e) { addToast(supabaseFehlermeldung(e), "error"); }
+    } catch (e) { addToast(e.message, "error"); }
   }
 
   function handlePosDelete(posId) {
@@ -402,7 +401,7 @@ export default function Materialzaehler({ config = {} }) {
     const updated = { ...aktivProjekt, positionen: aktivProjekt.positionen.filter(p => p.id !== posId) };
     setProjekte(prev => prev.map(p => p.id === aktivProjekt.id ? updated : p));
     addToast("Position entfernt");
-    saveProjektDB(updated).catch(e => addToast(supabaseFehlermeldung(e), "error"));
+    saveProjektDB(updated).catch(e => addToast(e.message, "error"));
   }
 
   function handleMengeChange(posId, field, value) {
@@ -414,7 +413,7 @@ export default function Materialzaehler({ config = {} }) {
       ),
     };
     setProjekte(prev => prev.map(p => p.id === aktivProjekt.id ? updated : p));
-    saveProjektDB(updated).catch(e => addToast(supabaseFehlermeldung(e), "error"));
+    saveProjektDB(updated).catch(e => addToast(e.message, "error"));
   }
 
   // ── Gefilterte Positionen ──

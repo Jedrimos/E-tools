@@ -1,5 +1,4 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { isSupabaseConfigured } from "./lib/supabase.js";
 import { loadProjekteDB, saveProjektDB, deleteProjektDB } from "./lib/db.js";
 import Toast from "./components/Toast.jsx";
 import { uid } from "./lib/utils.js";
@@ -578,10 +577,11 @@ function FotoImportModal({ onClose, onImport }) {
 // ── Datei Import Modal (PDF / Excel / Word / Bild) ──
 function DateiImportModal({ onClose, onImport }) {
   const [datei, setDatei] = useState(null);
-  const [phase, setPhase] = useState("idle");
+  const [phase, setPhase] = useState("idle"); // idle | parsing | result | ki-loading | error
   const [ergebnis, setErgebnis] = useState(null);
   const [fehler, setFehler] = useState("");
   const [dateiInfo, setDateiInfo] = useState(null);
+  const [kiVerfuegbar, setKiVerfuegbar] = useState(false); // Excel/Word: KI-Verfeinerung anbieten
   const inputRef = useRef(null);
 
   const getDateiTyp = (file) => {
@@ -593,18 +593,116 @@ function DateiImportModal({ onClose, onImport }) {
     return "unbekannt";
   };
 
-  const handleFile = (file) => {
+  // ── Ohne-KI-Parsing für Excel ────────────────────────────────────────────
+  async function parseExcel(file) {
+    const buffer = await leseAlsArrayBuffer(file);
+    const xlsx = await import("xlsx");
+    const wb = xlsx.read(buffer, { type: "array" });
+    const kabelListe = [];
+    const HEADER_MAP = {
+      bezeichnung: ["bezeichnung","kabel","name","beschreibung","titel","leitung","circuit","description"],
+      raum:        ["raum","zimmer","bereich","ort","room"],
+      stockwerk:   ["stockwerk","etage","ebene","geschoss","floor"],
+      kabelTyp:    ["typ","kabeltyp","leitung","type","kabelart"],
+      kabelAdern:  ["adern","kabeladern","ader","cores","x"],
+      kabelQs:     ["querschnitt","qs","mm","mm²","mm2","cross"],
+    };
+    const findCol = (headers, keys) => {
+      const h = headers.map(h => (h||"").toString().toLowerCase().trim());
+      for (const k of keys) {
+        const idx = h.findIndex(col => col.includes(k));
+        if (idx >= 0) return idx;
+      }
+      return -1;
+    };
+    wb.SheetNames.forEach(sn => {
+      const ws = wb.Sheets[sn];
+      const rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      if (rows.length === 0) return;
+      const firstRow = rows[0].map(c => (c||"").toString());
+      const hasHeader = firstRow.some(h => /bezeichnung|kabel|name|raum|ader|qs|querschnitt|leitung/i.test(h));
+      const dataRows = hasHeader ? rows.slice(1) : rows;
+      const colBez   = hasHeader ? findCol(firstRow, HEADER_MAP.bezeichnung)  : 0;
+      const colRaum  = hasHeader ? findCol(firstRow, HEADER_MAP.raum)         : -1;
+      const colSW    = hasHeader ? findCol(firstRow, HEADER_MAP.stockwerk)     : -1;
+      const colTyp   = hasHeader ? findCol(firstRow, HEADER_MAP.kabelTyp)     : -1;
+      const colAdern = hasHeader ? findCol(firstRow, HEADER_MAP.kabelAdern)   : -1;
+      const colQs    = hasHeader ? findCol(firstRow, HEADER_MAP.kabelQs)      : -1;
+      dataRows.forEach(row => {
+        const bez = (colBez >= 0 ? row[colBez] : row[0] || "").toString().trim();
+        if (!bez) return;
+        const adern = colAdern >= 0 ? parseInt(row[colAdern]) || 3 : 3;
+        const qs = colQs >= 0 ? (row[colQs] || "2.5").toString().replace(",",".") : "2.5";
+        kabelListe.push({
+          bezeichnung: bez,
+          raum:        colRaum >= 0 ? (row[colRaum]||"").toString().trim() : "",
+          stockwerk:   colSW >= 0   ? (row[colSW]||"EG").toString().trim() : "EG",
+          kabelTyp:    colTyp >= 0  ? (row[colTyp]||"NYM-J").toString().trim() : "NYM-J",
+          kabelAdern:  adern,
+          kabelQs:     qs,
+          dreipolig:   adern >= 5,
+        });
+      });
+    });
+    return kabelListe;
+  }
+
+  // ── Ohne-KI-Parsing für Word ─────────────────────────────────────────────
+  async function parseWord(file) {
+    const buffer = await leseAlsArrayBuffer(file);
+    const mammoth = await import("mammoth");
+    const { value } = await mammoth.extractRawText({ arrayBuffer: buffer });
+    const kabelListe = [];
+    value.split(/\r?\n/).forEach(line => {
+      const bez = line.trim();
+      if (!bez || bez.length < 3) return;
+      // Versuche Kabel-Infos aus der Zeile zu extrahieren, z.B. "Küche Steckdosen 3x2,5"
+      const m = bez.match(/(\d+)\s*[x×*]\s*([\d,\.]+)/i);
+      const adern = m ? parseInt(m[1]) : 3;
+      const qs    = m ? m[2].replace(",", ".") : "2.5";
+      kabelListe.push({
+        bezeichnung: bez,
+        raum: "", stockwerk: "EG",
+        kabelTyp: "NYM-J",
+        kabelAdern: adern, kabelQs: qs,
+        dreipolig: adern >= 5,
+      });
+    });
+    return kabelListe;
+  }
+
+  const handleFile = async (file) => {
     if (!file) return;
     const typ = getDateiTyp(file);
     if (typ === "unbekannt") { setFehler("Nicht unterstütztes Format. Bitte PDF, Excel, Word oder Bild verwenden."); return; }
     setDatei(file);
     setDateiInfo({ name: file.name, typ, groesse: (file.size/1024).toFixed(0) });
-    setPhase("idle"); setErgebnis(null); setFehler("");
+    setPhase("idle"); setErgebnis(null); setFehler(""); setKiVerfuegbar(false);
+
+    // Excel und Word: sofort ohne KI einlesen
+    if (typ === "excel" || typ === "word") {
+      setPhase("parsing");
+      try {
+        const liste = typ === "excel" ? await parseExcel(file) : await parseWord(file);
+        if (liste.length === 0) {
+          setFehler("Keine Daten in der Datei gefunden. Bitte prüfen oder KI-Analyse versuchen.");
+          setPhase("error");
+        } else {
+          setErgebnis(liste.map(item => ({ ...item, _sel: true })));
+          setPhase("result");
+          setKiVerfuegbar(true);
+        }
+      } catch(e) {
+        setFehler("Datei konnte nicht gelesen werden: " + e.message);
+        setPhase("error");
+      }
+    }
   };
 
-  const analysiere = async () => {
+  // ── KI-Analyse (optional / für PDF & Bild immer) ─────────────────────────
+  const analysiereKI = async () => {
     if (!datei) return;
-    setPhase("loading"); setFehler("");
+    setPhase("ki-loading"); setFehler("");
     const typ = getDateiTyp(datei);
     try {
       const cfg = ladeApiConfig();
@@ -632,9 +730,10 @@ function DateiImportModal({ onClose, onImport }) {
       const parsed = JSON.parse(clean);
       setErgebnis(parsed.map(item => ({ ...item, _sel: true })));
       setPhase("result");
+      setKiVerfuegbar(false);
     } catch(e) {
-      setFehler("Analyse fehlgeschlagen: " + e.message);
-      setPhase("error");
+      setFehler("KI-Analyse fehlgeschlagen: " + e.message);
+      setPhase("result"); // Zurück zum manuellen Ergebnis falls vorhanden
     }
   };
 
@@ -642,6 +741,8 @@ function DateiImportModal({ onClose, onImport }) {
   const anzahl = ergebnis?.filter(x => x._sel).length || 0;
   const importieren = (ersetzen) => onImport(ergebnis.filter(x => x._sel), ersetzen);
   const typIcon = { pdf:"📄", excel:"📊", word:"📝", bild:"📷" };
+  const brauchtKI = dateiInfo && (dateiInfo.typ === "pdf" || dateiInfo.typ === "bild");
+  const isLoading = phase === "parsing" || phase === "ki-loading";
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
@@ -649,7 +750,7 @@ function DateiImportModal({ onClose, onImport }) {
         <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
           <div>
             <div style={{fontSize:16,fontWeight:800}}>📂 Kabelliste aus Datei importieren</div>
-            <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>PDF · Excel (.xlsx) · Word (.docx) · Foto</div>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Excel/Word: direkt · PDF/Foto: KI-Analyse</div>
           </div>
           <button onClick={onClose} style={{background:"transparent",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:22}}>×</button>
         </div>
@@ -666,31 +767,54 @@ function DateiImportModal({ onClose, onImport }) {
                   <div style={{fontSize:36,marginBottom:8}}>📂</div>
                   <div style={{fontSize:14,color:"var(--text3)",fontWeight:600}}>Datei antippen oder reinziehen</div>
                   <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginTop:8}}>
-                    {["📄 PDF","📊 Excel","📝 Word","📷 Foto"].map(t=>(
-                      <span key={t} style={{background:"var(--bg3)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 8px",fontSize:11,color:"var(--text2)"}}>{t}</span>
+                    {[{t:"📊 Excel",h:"Direkt, ohne KI"},{t:"📝 Word",h:"Direkt, ohne KI"},{t:"📄 PDF",h:"KI erforderlich"},{t:"📷 Foto",h:"KI erforderlich"}].map(({t,h})=>(
+                      <div key={t} style={{textAlign:"center"}}>
+                        <span style={{background:"var(--bg3)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 8px",fontSize:11,color:"var(--text2)"}}>{t}</span>
+                        <div style={{fontSize:9,color:"var(--text3)",marginTop:2}}>{h}</div>
+                      </div>
                     ))}
                   </div>
                 </>
             }
             <input ref={inputRef} type="file" accept=".pdf,.xlsx,.xls,.docx,.doc,image/*" onChange={e=>handleFile(e.target.files[0])} style={{display:"none"}}/>
           </div>
-          {dateiInfo&&phase!=="result"&&(
-            <button onClick={analysiere} disabled={phase==="loading"}
-              style={{...bPrimary,width:"100%",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:phase==="loading"?0.6:1}}>
-              {phase==="loading"?<><span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⏳</span> Analysiere...</>:"🔍 Kabelliste analysieren"}
+
+          {/* Lade-Indikator */}
+          {isLoading&&(
+            <div style={{...bPrimary,width:"100%",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:0.6,borderRadius:8,padding:"11px 20px",fontSize:13,fontWeight:700}}>
+              <span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⏳</span>
+              {phase==="parsing"?"Datei wird eingelesen…":"KI analysiert…"}
+            </div>
+          )}
+
+          {/* KI-Button für PDF/Bild (immer nötig) und optionale Verfeinerung für Excel/Word */}
+          {dateiInfo&&!isLoading&&phase!=="result"&&brauchtKI&&(
+            <button onClick={analysiereKI}
+              style={{...bPrimary,width:"100%",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              🔍 Mit KI analysieren
             </button>
           )}
+
           {phase==="error"&&<div style={{background:"#200000",border:"1px solid #e05252",borderRadius:8,padding:"10px 14px",marginBottom:12,color:"var(--red)",fontSize:12}}>⚠ {fehler}</div>}
+
           {phase==="result"&&ergebnis&&(
             <>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                <div style={{fontSize:13,color:"var(--green)",fontWeight:700}}>✓ {ergebnis.length} Kabel erkannt</div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{fontSize:13,color:"var(--green)",fontWeight:700}}>✓ {ergebnis.length} Kabel eingelesen</div>
                 <div style={{display:"flex",gap:6}}>
                   <button onClick={()=>setErgebnis(e=>e.map(x=>({...x,_sel:true})))} style={{...bSec2,color:"var(--green)"}}>Alle</button>
                   <button onClick={()=>setErgebnis(e=>e.map(x=>({...x,_sel:false})))} style={bSec2}>Keine</button>
                 </div>
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:280,overflowY:"auto",marginBottom:14}}>
+              {/* Optionale KI-Verfeinerung für Excel/Word */}
+              {kiVerfuegbar&&(
+                <button onClick={analysiereKI}
+                  style={{width:"100%",background:"var(--bg3)",border:"1px solid rgba(33,150,201,0.3)",color:"var(--blue)",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:600,marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  🤖 Mit KI verfeinern (bessere Zuordnung)
+                </button>
+              )}
+              {fehler&&<div style={{background:"#200000",border:"1px solid #e05252",borderRadius:8,padding:"8px 12px",marginBottom:10,color:"var(--red)",fontSize:11}}>⚠ {fehler}</div>}
+              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:260,overflowY:"auto",marginBottom:14}}>
                 {ergebnis.map((item,idx)=>(
                   <div key={idx} onClick={()=>toggle(idx)}
                     style={{display:"flex",gap:10,alignItems:"center",background:item._sel?"var(--bg3)":"#0f0f0f",border:`1px solid ${item._sel?"rgba(33,150,201,0.15)":"var(--bg3)"}`,borderRadius:8,padding:"8px 12px",cursor:"pointer",opacity:item._sel?1:0.45}}>
@@ -728,7 +852,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   const [phase, setPhase] = useState("start"); // "start" | "neu" | "laden"
   const [form, setForm] = useState({ name:"", adresse:"", ersteller:"", standort:"" });
   const [suche, setSuche] = useState("");
-  const dbOk = isSupabaseConfigured();
+  const dbOk = false;
   const gefilterteProjekte = suche.trim()
     ? projekte.filter(p => (p.name||"").toLowerCase().includes(suche.toLowerCase()) || (p.projekt?.adresse||"").toLowerCase().includes(suche.toLowerCase()))
     : projekte;
@@ -1269,25 +1393,12 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
     uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
   });
 
-  // ── Speichern (lokal + optional Supabase) ─────────────────────────────────
+  // ── Speichern (lokal) ────────────────────────────────────────────────────
   const speichere = async () => {
     const nameToSave = saveName.trim() || projekt.name || `Projekt ${new Date().toLocaleDateString("de-DE")}`;
     const payload = buildSavePayload(nameToSave);
 
-    // 1. Supabase (wenn konfiguriert)
-    let newDbId = currentDbId;
-    if (isSupabaseConfigured()) {
-      try {
-        const saved = await saveProjektDB(payload);
-        newDbId = saved.db_id;
-        setCurrentDbId(newDbId);
-        showToast(`"${nameToSave}" in Datenbank gespeichert ✓`);
-      } catch(e) {
-        showToast(`Datenbank-Fehler: ${e.message}`, "error", 4000);
-      }
-    }
-
-    // 2. Immer auch lokal speichern (Fallback)
+    const newDbId = currentDbId;
     const entry = {
       id: newDbId || uid(),
       db_id: newDbId,
@@ -1299,20 +1410,12 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
     };
     const neu = [entry, ...projekte.filter(p => p.name !== nameToSave && p.id !== entry.id)];
     setProjekte(neu); saveProjekte(neu); setShowSave(false); setSaveName("");
-    if (!isSupabaseConfigured()) showToast(`"${nameToSave}" gespeichert ✓`);
+    showToast(`"${nameToSave}" gespeichert ✓`);
   };
 
   // ── Auto-Speichern (nach Plan-Generierung, wenn Projekt hat Name) ──────────
   const autoSpeichere = useCallback(async () => {
     if (!projekt.name) return;
-    const payload = buildSavePayload(projekt.name);
-    if (isSupabaseConfigured()) {
-      try {
-        const saved = await saveProjektDB(payload);
-        setCurrentDbId(saved.db_id);
-        showToast("Auto-gespeichert ✓", "success", 1800);
-      } catch { /* still works locally */ }
-    }
     const entry = {
       id: currentDbId || uid(), db_id: currentDbId,
       name: projekt.name, datum: new Date().toLocaleDateString("de-DE"),
@@ -1362,22 +1465,6 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
     setShowStartScreen(false);
   };
 
-  // ── Projekte-Liste beim Start aus Supabase laden ───────────────────────────
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    loadProjekteDB().then(dbList => {
-      if (dbList && dbList.length > 0) {
-        // Merge DB-Projekte mit lokalen (DB hat Priorität)
-        const merged = [...dbList];
-        loadProjekte().forEach(local => {
-          if (!merged.find(d => d.id === local.db_id || d.name === local.name))
-            merged.push(local);
-        });
-        setProjekte(merged);
-        saveProjekte(merged);
-      }
-    }).catch(() => { /* Fallback auf localStorage bleibt */ });
-  }, []);
 
   // ── WhatsApp Clipboard Export ──
   const [kopiert, setKopiert] = useState(null); // "stueckliste" | "beschriftung"
@@ -1461,9 +1548,6 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
     const neu = projekte.filter(x => x.id !== id && x.db_id !== id);
     setProjekte(neu); saveProjekte(neu);
     if (p) showToast(`"${p.name}" gelöscht`, "error");
-    if (p?.db_id && isSupabaseConfigured()) {
-      try { await deleteProjektDB(p.db_id); } catch { /* lokal schon gelöscht */ }
-    }
   };
 
   // Foto-Import
@@ -1889,7 +1973,7 @@ const stueckliste = (() => {
             <div className="header-logo-text">
               <div style={{fontSize:13,fontWeight:800,color:"var(--text)",letterSpacing:"-0.3px",lineHeight:1}}>Verteilerplaner</div>
             </div>
-            <span className="header-version" style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.3.3</span>
+            <span className="header-version" style={{fontSize:8,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:3,padding:"2px 5px",letterSpacing:"0.3px",flexShrink:0}}>v2026.7.0</span>
           </div>
         </div>
 
@@ -3558,7 +3642,7 @@ const stueckliste = (() => {
               <div style={{width:48,height:48,borderRadius:12,background:"rgba(33,150,201,0.12)",border:"1px solid rgba(33,150,201,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>⚡</div>
               <div>
                 <div style={{fontSize:20,fontWeight:800,color:"var(--text)",letterSpacing:"-0.5px"}}>Verteilerplaner</div>
-                <div style={{fontSize:12,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:600,marginTop:2}}>Version 2026.3 · by Jedrimos</div>
+                <div style={{fontSize:12,color:"var(--blue)",fontFamily:"var(--mono)",fontWeight:600,marginTop:2}}>Version 2026.7 · by Jedrimos</div>
               </div>
             </div>
 

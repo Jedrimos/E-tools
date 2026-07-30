@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import Toast from "./components/Toast.jsx";
 import { useToasts } from "./lib/useToasts.js";
 import { loadWissenDB, saveArtikelDB, deleteArtikelDB } from "./lib/db_wissen.js";
-import { supabaseFehlermeldung } from "./lib/supabase.js";
-import { isSupabaseConfigured } from "./lib/supabase.js";
 import { uid } from "./lib/utils.js";
 
 const LS_KEY = "elektronikertools_wissen";
@@ -277,7 +275,7 @@ function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
               <div style={{fontSize:28}}>📚</div>
               <div>
                 <div style={{fontSize:20,fontWeight:800}}>Wissensdatenbank</div>
-                <div style={{fontSize:12,color:TEAL}}>Version 2026.3 · by Jedrimos</div>
+                <div style={{fontSize:12,color:TEAL}}>Version 2026.7 · by Jedrimos</div>
               </div>
             </div>
             <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>
@@ -391,7 +389,7 @@ export default function Wissensdatenbank({ config = {} }) {
       .then(data => {
         if (data) { setArtikelLive(data); save(data); setDbSync(true); }
       })
-      .catch(e => addToast("Datenbank: " + supabaseFehlermeldung(e), "error"));
+      .catch(e => addToast("Fehler: " + e.message, "error"));
   }, [addToast]);
 
   function setArtikel(fn) {
@@ -444,7 +442,7 @@ export default function Wissensdatenbank({ config = {} }) {
           onOpen={a => setAnsicht({ typ: "lesen", artikel: a })}
           onNew={handleNew}
           dbSync={dbSync}
-          dbRequired={isSupabaseConfigured()}
+          dbRequired={false}
         />
       )}
       {ansicht.typ === "lesen" && (
