@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import Toast from "./components/Toast.jsx";
 import { useToasts } from "./lib/useToasts.js";
 import { loadWartungDB, saveWartungDB, deleteWartungDB } from "./lib/db_wartung.js";
-import { supabaseFehlermeldung } from "./lib/supabase.js";
 import { uid } from "./lib/utils.js";
 
 // Module-level constants (avoid calling impure Date.now() during render)
@@ -84,7 +83,7 @@ const btnStyle = (bg, color, extra = {}) => ({
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-export default function Wartungsprotokoll() {
+export default function Wartungsprotokoll({ config = {} }) {
   const { toasts, addToast } = useToasts();
   const [aufgaben, setAufgaben] = useState([]);
   const [editAufgabe, setEditAufgabe] = useState(null);
@@ -96,7 +95,7 @@ export default function Wartungsprotokoll() {
   useEffect(() => {
     loadWartungDB()
       .then(data => setAufgaben(data))
-      .catch(e => addToast(supabaseFehlermeldung(e), "error"));
+      .catch(e => addToast(e.message, "error"));
   }, [addToast]);
 
   // Speichern
@@ -112,7 +111,7 @@ export default function Wartungsprotokoll() {
       addToast("Gespeichert");
       setEditAufgabe(null);
     } catch (e) {
-      addToast(supabaseFehlermeldung(e), "error");
+      addToast(e.message, "error");
     }
   }
 
@@ -123,7 +122,7 @@ export default function Wartungsprotokoll() {
       setAufgaben(prev => prev.filter(a => a.id !== id));
       addToast("Gelöscht");
     } catch (e) {
-      addToast(supabaseFehlermeldung(e), "error");
+      addToast(e.message, "error");
     }
   }
 

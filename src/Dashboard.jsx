@@ -7,7 +7,6 @@ import Wartungsprotokoll from "./Wartungsprotokoll.jsx";
 import Leitungsberechnung from "./Leitungsberechnung.jsx";
 import KNXPlaner from "./KNXPlaner.jsx";
 import Materialzaehler from "./Materialzaehler.jsx";
-import { isSupabaseConfigured, supabase } from "./lib/supabase.js";
 
 // ── Lokaler Speicher für Konfiguration ──
 const CONFIG_KEY = "elektronikertools_config";
@@ -66,6 +65,12 @@ const BACKUP_KEYS = [
   "knx_raeume",
   "knx_checkliste",
   "elektronikertools_materialzaehler",
+  // Einstellungen + UI-Zustand
+  "stundenbuch_projekte",
+  "ui_theme",
+  "elektronikertools_zuletzt",
+  "vp_settings",
+  "vp_api_config",
 ];
 
 function exportBackup() {
@@ -190,9 +195,6 @@ const CONFIG_FELDER = [
   { key: "firma",       label: "Firmenname",        placeholder: "z.B. Elektro Mustermann GmbH", icon: "🏢" },
   { key: "mitarbeiter", label: "Mitarbeiter / Name", placeholder: "z.B. Max Mustermann",          icon: "👤" },
   { key: "ort",         label: "Ort",                placeholder: "z.B. München",                 icon: "📍" },
-  { key: "dbName",      label: "Datenbank-Name",     placeholder: "z.B. elektronikertools_db",    icon: "🗄️" },
-  { key: "supabaseUrl", label: "Supabase URL",        placeholder: "https://xxx.supabase.co",     icon: "🔗" },
-  { key: "supabaseKey", label: "Supabase Anon Key",  placeholder: "eyJ…",                         icon: "🔑", password: true },
   { key: "notizen",     label: "Notizen",             placeholder: "Sonstige Einstellungen…",     icon: "📝" },
 ];
 
@@ -203,7 +205,6 @@ export default function Dashboard() {
   const [showConfig, setShowConfig] = useState(false);
   const [configDraft, setConfigDraft] = useState({});
   const [ablauf, setAblauf] = useState(ladeAblaufInfo);
-  const [dbStatus, setDbStatus] = useState(() => isSupabaseConfigured() ? "unbekannt" : "nicht-konfiguriert");
   const [importMsg, setImportMsg] = useState("");
   const [stats, setStats] = useState(ladeLiveStats);
   const [zuletzt, setZuletzt] = useState(ladeZuletzt);
@@ -219,14 +220,6 @@ export default function Dashboard() {
   function toggleTheme() { setTheme(t => t === "dark" ? "light" : "dark"); }
 
   useEffect(() => { saveConfig(config); }, [config]);
-
-  // Supabase-Ping
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    supabase.from("projekte").select("id", { head: true, count: "exact" }).then(({ error }) => {
-      setDbStatus(error ? "fehler" : "ok");
-    }).catch(() => setDbStatus("fehler"));
-  }, []);
 
   function openConfig() {
     setConfigDraft({ ...config });
@@ -492,11 +485,9 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* Supabase-Status */}
+      {/* Speicher-Info */}
       <div style={{ marginBottom: 20, fontSize: 12, color: "var(--text3)", display: "flex", alignItems: "center", gap: 6 }}>
-        {dbStatus === "ok" && <span style={{ color: "var(--green)" }}>● Datenbank verbunden</span>}
-        {dbStatus === "fehler" && <span style={{ color: "var(--red)" }}>● Datenbank nicht erreichbar</span>}
-        {dbStatus === "nicht-konfiguriert" && <span>💾 Lokale Speicherung (kein Supabase)</span>}
+        <span>💾 Daten werden lokal im Browser gespeichert</span>
       </div>
 
       {/* Backup / Restore */}

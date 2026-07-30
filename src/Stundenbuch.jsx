@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import Toast from "./components/Toast.jsx";
 import { useToasts } from "./lib/useToasts.js";
 import { loadStundenDB, saveEintragDB, deleteEintragDB } from "./lib/db_stundenbuch.js";
-import { supabaseFehlermeldung } from "./lib/supabase.js";
 import { uid } from "./lib/utils.js";
 
 function formatDuration(minutes) {
@@ -290,7 +289,7 @@ export default function Stundenbuch({ config = {} }) {
   useEffect(() => {
     loadStundenDB()
       .then(data => { if (data) setEintraege(data); })
-      .catch(e => addToast("Datenbank: " + supabaseFehlermeldung(e), "error"));
+      .catch(e => addToast("Fehler: " + e.message, "error"));
   }, [addToast]);
 
   // Projektliste: gespeicherte + auto-extrahierte aus Einträgen (ohne Duplikate)
@@ -417,7 +416,7 @@ export default function Stundenbuch({ config = {} }) {
               <div style={{fontSize:28}}>⏱</div>
               <div>
                 <div style={{fontSize:20,fontWeight:800}}>Stundenbuch</div>
-                <div style={{fontSize:12,color:"var(--green)"}}>Version 2026.3 · by Jedrimos</div>
+                <div style={{fontSize:12,color:"var(--green)"}}>Version 2026.7 · by Jedrimos</div>
               </div>
             </div>
             <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>

@@ -6,6 +6,54 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.7.0] – 2026-07-30
+
+### 💥 Breaking — Supabase komplett entfernt
+
+- **localStorage ist jetzt die einzige Speichermethode** — keine externe Datenbankverbindung mehr nötig
+- Alle `db_*.js`-Layer (db.js, db_stundenbuch.js, db_pruefprotokoll.js, db_wissen.js, db_wartung.js, db_materialzaehler.js, db_knx.js) auf localStorage-only umgestellt
+- `src/lib/supabase.js` ist jetzt ein leeres Stub (kein `@supabase/supabase-js`-Import mehr)
+- `@supabase/supabase-js` aus beiden `package.json` entfernt
+- **Dashboard**: Supabase-Ping-Indikator entfernt, Supabase URL/Key aus den Konfig-Feldern entfernt
+- **WP-Plugin**: Supabase-Felder aus der Admin-Einstellungsseite entfernt, keine Credentials mehr im `wp_localize_script`
+- **Wissensdatenbank**: „nur lokal"-Hinweis entfernt (Supabase-Warnung ist nicht mehr relevant)
+
+### ✨ Neu — Verteilerplaner: Datei-Import ohne KI (Excel & Word)
+
+- **Excel (.xlsx/.xls)**: Wird sofort beim Hochladen eingelesen — kein KI-Server nötig
+  - Automatische Spaltenerkennung: Bezeichnung, Raum, Stockwerk, Kabeltyp, Adern, Querschnitt
+  - Fallback: erste Spalte = Bezeichnung, Rest mit Standardwerten
+- **Word (.docx)**: Text wird sofort extrahiert — jede Zeile = ein Kabel, Format `3x2,5` wird erkannt
+- Optionaler „🤖 Mit KI verfeinern"-Button für bessere Zuordnung nach manuellem Einlesen
+- **PDF & Bilder**: weiterhin KI erforderlich (Anthropic API)
+
+### ✨ Neu — Verteilerplaner: Datei-Import (aus vorheriger Version)
+
+- Neuer `DateiImportModal` für PDF/Excel/Word/Fotos (Button in Header + Kabelbereich)
+- PDF: Anthropic Document API · Excel: SheetJS → CSV · Word: mammoth
+
+### 🔢 Version
+
+- Alle Apps auf `2026.7` hochgezogen (Verteilerplaner, Stundenbuch, Prüfprotokoll, Wissensdatenbank)
+- `package.json` und WordPress-Plugin auf `2026.7.0`
+
+---
+
+## [2026.4.2] – 2026-07-30
+
+### ✨ Neu — Verteilerplaner: Datei-Import (PDF / Excel / Word)
+
+- **Neuer Button** „📂 PDF / Excel / Word importieren" in Kabelbereich und Header-Toolbar
+- **PDF** (nur Anthropic API): Nativ-Verarbeitung via Anthropic Document API — kein Parsen nötig
+- **Excel** (.xlsx / .xls): Alle Blätter werden per SheetJS in CSV konvertiert und zur KI gesendet
+- **Word** (.docx): Textextraktion via `mammoth`, anschließend KI-Analyse
+- **Bilder**: Auch im Datei-Modal weiterhin unterstützt (gleicher Pfad wie bestehender Foto-Import)
+- **`DateiImportModal`**: Neue Komponente mit Drag & Drop, Dateitypanzeige und identischer Ergebnisansicht wie beim Foto-Import
+- **`KABEL_PROMPT`**: Kabel-Erkennungsprompt als gemeinsame Konstante ausgelagert (kein Duplikat mehr)
+- Beide Bundles neu gebaut: Standalone (`dist/`) und WordPress (`wordpress-plugin/assets/`)
+
+---
+
 ## [2026.4.1] – 2026-07-02
 
 ### ✨ Neu — WordPress Plugin

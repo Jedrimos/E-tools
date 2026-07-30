@@ -5,7 +5,6 @@ import {
   loadProtokolleDB, saveProtokollDB, deleteProtokollDB,
   loadProjekteForImport,
 } from "./lib/db_pruefprotokoll.js";
-import { supabaseFehlermeldung } from "./lib/supabase.js";
 import { uid } from "./lib/utils.js";
 import { GW, evalStromkreis, risoMin } from "./lib/vde.js";
 // jsPDF wird lazy geladen (nur bei PDF-Export, ~250kB gespart beim ersten Laden)
@@ -796,7 +795,7 @@ function ProtokollListe({ protokolle, onOpen, onNew, onImport, onDelete, dbSync,
               <div style={{fontSize:28}}>📋</div>
               <div>
                 <div style={{fontSize:20,fontWeight:800}}>Prüfprotokoll</div>
-                <div style={{fontSize:12,color:"#f59e0b"}}>Version 2026.3 · by Jedrimos</div>
+                <div style={{fontSize:12,color:"#f59e0b"}}>Version 2026.7 · by Jedrimos</div>
               </div>
             </div>
             <div style={{fontSize:13,color:"var(--text2)",lineHeight:1.7,marginBottom:20}}>
@@ -924,7 +923,7 @@ export default function Pruefprotokoll({ config = {} }) {
       .then(data => {
         if (data) { setProtokolleLive(data); save(data); setDbSync(true); }
       })
-      .catch(e => addToast("Datenbank: " + supabaseFehlermeldung(e), "error"));
+      .catch(e => addToast("Fehler: " + e.message, "error"));
   }, [addToast]);
 
   function setProtokolle(fn) {
@@ -956,7 +955,7 @@ export default function Pruefprotokoll({ config = {} }) {
         setProtokolle(prev => prev.map(x => x.id === p.id ? { ...x, db_id: saved.db_id } : x));
       }
     } catch (e) {
-      addToast("Datenbank: " + supabaseFehlermeldung(e), "error");
+      addToast("Fehler: " + e.message, "error");
     }
   }
 

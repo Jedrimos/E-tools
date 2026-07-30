@@ -9,6 +9,8 @@ import {
   ladeCheckliste, speichereCheckItem, loescheCheckItem,
 } from "./lib/db_knx.js";
 import { uid } from "./lib/utils.js";
+import { useToasts } from "./lib/useToasts.js";
+import Toast from "./components/Toast.jsx";
 
 const AKZENT = "#e11d48";
 
@@ -194,7 +196,7 @@ function GAForm({ initial, raeume, onSave, onCancel }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab 1: Gruppenadress-Planer
 // ══════════════════════════════════════════════════════════════════════════════
-function TabGA({ gaListe, raeume, onReload }) {
+function TabGA({ gaListe, raeume, onReload, addToast }) {
   const [showForm, setShowForm] = useState(false);
   const [editGA, setEditGA] = useState(null);
   const [filterFunk, setFilterFunk] = useState("Alle");
@@ -230,15 +232,19 @@ function TabGA({ gaListe, raeume, onReload }) {
   const raumMap = useMemo(() => Object.fromEntries(raeume.map(r => [r.id, r])), [raeume]);
 
   async function handleSave(form) {
-    await speichereGA({ ...form, id: editGA?.id || uid() });
-    setShowForm(false); setEditGA(null);
-    onReload();
+    try {
+      await speichereGA({ ...form, id: editGA?.id || uid() });
+      setShowForm(false); setEditGA(null);
+      onReload();
+    } catch(e) { addToast("Speichern fehlgeschlagen: " + e.message, "error"); }
   }
 
   async function handleDelete(ga) {
     if (!confirm(`"${ga.name}" löschen?`)) return;
-    await loescheGA(ga.id);
-    onReload();
+    try {
+      await loescheGA(ga.id);
+      onReload();
+    } catch(e) { addToast("Löschen fehlgeschlagen: " + e.message, "error"); }
   }
 
   return (
@@ -335,7 +341,7 @@ function TabGA({ gaListe, raeume, onReload }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab 2: Raumplan
 // ══════════════════════════════════════════════════════════════════════════════
-function TabRaeume({ gaListe, raeume, onReload }) {
+function TabRaeume({ gaListe, raeume, onReload, addToast }) {
   const [aktEtage, setAktEtage] = useState(null);
   const [showRaumForm, setShowRaumForm] = useState(false);
   const [raumForm, setRaumForm] = useState({ name: "", etage: "EG", typ: "Wohnzimmer" });
@@ -347,26 +353,32 @@ function TabRaeume({ gaListe, raeume, onReload }) {
 
   async function raumSpeichern() {
     const etage = raumForm.etage;
-    await speichereRaum({ ...raumForm, id: uid(), position: raeume.length });
-    setShowRaumForm(false);
-    setRaumForm({ name: "", etage: "EG", typ: "Wohnzimmer" });
-    setAktEtage(etage); // jump to the new room's floor
-    onReload();
+    try {
+      await speichereRaum({ ...raumForm, id: uid(), position: raeume.length });
+      setShowRaumForm(false);
+      setRaumForm({ name: "", etage: "EG", typ: "Wohnzimmer" });
+      setAktEtage(etage);
+      onReload();
+    } catch(e) { addToast("Raum speichern fehlgeschlagen: " + e.message, "error"); }
   }
 
   async function raumLoeschen(id) {
     if (!confirm("Raum löschen?")) return;
     const betroffene = gaListe.filter(g => g.raum_id === id);
-    await Promise.all([
-      loescheRaum(id),
-      ...betroffene.map(ga => speichereGA({ ...ga, raum_id: "" })),
-    ]);
-    onReload();
+    try {
+      await Promise.all([
+        loescheRaum(id),
+        ...betroffene.map(ga => speichereGA({ ...ga, raum_id: "" })),
+      ]);
+      onReload();
+    } catch(e) { addToast("Raum löschen fehlgeschlagen: " + e.message, "error"); }
   }
 
   async function gaZuweisen(ga, raumId) {
-    await speichereGA({ ...ga, raum_id: raumId || "" });
-    onReload();
+    try {
+      await speichereGA({ ...ga, raum_id: raumId || "" });
+      onReload();
+    } catch(e) { addToast("Zuweisung fehlgeschlagen: " + e.message, "error"); }
   }
 
   return (
@@ -481,35 +493,43 @@ function TabRaeume({ gaListe, raeume, onReload }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab 3: Inbetriebnahme-Checkliste
 // ══════════════════════════════════════════════════════════════════════════════
-function TabCheckliste({ raeume, gaListe, checks, onReload }) {
+function TabCheckliste({ raeume, gaListe, checks, onReload, addToast }) {
   const [aktRaum, setAktRaum] = useState(null);
   const [neuItem, setNeuItem] = useState("");
   const [neuKat, setNeuKat] = useState("Allgemein");
 
   async function addVorlage(raumId, kat) {
     const items = CHECK_TEMPLATES[kat] || [];
-    await Promise.all(
-      items.map((bezeichnung, i) =>
-        speichereCheckItem({ id: uid(), raum_id: raumId, kategorie: kat, bezeichnung, erledigt: false, notiz: "", position: i })
-      )
-    );
-    onReload();
+    try {
+      await Promise.all(
+        items.map((bezeichnung, i) =>
+          speichereCheckItem({ id: uid(), raum_id: raumId, kategorie: kat, bezeichnung, erledigt: false, notiz: "", position: i })
+        )
+      );
+      onReload();
+    } catch(e) { addToast("Vorlage laden fehlgeschlagen: " + e.message, "error"); }
   }
 
   async function addItem(raumId) {
     if (!neuItem.trim()) return;
-    await speichereCheckItem({ id: uid(), raum_id: raumId, kategorie: neuKat, bezeichnung: neuItem.trim(), erledigt: false, notiz: "", position: 999 });
-    setNeuItem(""); onReload();
+    try {
+      await speichereCheckItem({ id: uid(), raum_id: raumId, kategorie: neuKat, bezeichnung: neuItem.trim(), erledigt: false, notiz: "", position: 999 });
+      setNeuItem(""); onReload();
+    } catch(e) { addToast("Eintrag speichern fehlgeschlagen: " + e.message, "error"); }
   }
 
   async function toggleItem(item) {
-    await speichereCheckItem({ ...item, erledigt: !item.erledigt });
-    onReload();
+    try {
+      await speichereCheckItem({ ...item, erledigt: !item.erledigt });
+      onReload();
+    } catch(e) { addToast("Status aktualisieren fehlgeschlagen: " + e.message, "error"); }
   }
 
   async function deleteItem(id) {
-    await loescheCheckItem(id);
-    onReload();
+    try {
+      await loescheCheckItem(id);
+      onReload();
+    } catch(e) { addToast("Eintrag löschen fehlgeschlagen: " + e.message, "error"); }
   }
 
   // Gesamt-Progress
@@ -808,11 +828,14 @@ export default function KNXPlaner() {
   const [gaListe, setGA]    = useState([]);
   const [raeume, setRaeume] = useState([]);
   const [checks, setChecks] = useState([]);
+  const { toasts, addToast } = useToasts();
 
   const reload = useCallback(async () => {
-    const [g, r, c] = await Promise.all([ladeGA(), ladeRaeume(), ladeCheckliste()]);
-    setGA(g); setRaeume(r); setChecks(c);
-  }, []);
+    try {
+      const [g, r, c] = await Promise.all([ladeGA(), ladeRaeume(), ladeCheckliste()]);
+      setGA(g); setRaeume(r); setChecks(c);
+    } catch(e) { addToast("Ladefehler: " + e.message, "error"); }
+  }, [addToast]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -844,10 +867,12 @@ export default function KNXPlaner() {
       </div>
 
       {/* Tab-Inhalt */}
-      {tab === "ga"      && <TabGA        gaListe={gaListe} raeume={raeume} onReload={reload} />}
-      {tab === "raeume"  && <TabRaeume    gaListe={gaListe} raeume={raeume} onReload={reload} />}
-      {tab === "check"   && <TabCheckliste raeume={raeume} gaListe={gaListe} checks={checks} onReload={reload} />}
+      {tab === "ga"      && <TabGA        gaListe={gaListe} raeume={raeume} onReload={reload} addToast={addToast} />}
+      {tab === "raeume"  && <TabRaeume    gaListe={gaListe} raeume={raeume} onReload={reload} addToast={addToast} />}
+      {tab === "check"   && <TabCheckliste raeume={raeume} gaListe={gaListe} checks={checks} onReload={reload} addToast={addToast} />}
       {tab === "rechner" && <TabRechner   gaListe={gaListe} raeume={raeume} />}
+
+      <Toast toasts={toasts} />
     </div>
   );
 }

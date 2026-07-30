@@ -76,7 +76,8 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 ## Neue Ideen
 
 ### 🔗 App-übergreifend
-- ⚡ **PocketBase-Migration** — Datenspeicherung auf lokalen Server (PocketBase, single Go-Binary, SQLite) umstellen. Keine Supabase-Abhängigkeit mehr. Einfach auf Coolify deployen.
+- ✅ ~~**Supabase entfernt**~~ — Umgesetzt: App speichert ausschließlich in localStorage. `@supabase/supabase-js` entfernt.
+- ⚡ **PocketBase-Migration** — Datenspeicherung auf lokalen Server (PocketBase, single Go-Binary, SQLite) umstellen. Einfach auf Coolify deployen.
 - ✅ ~~**Dark-/Light-Mode Umschalter**~~ — Umgesetzt: Toggle in Dashboard-Header und TopBar jeder App, CSS-Variablen für Light Mode in `index.css`, Einstellung in localStorage.
 - ⚡ **Zuletzt geöffnet: Projektname** — Statt App-Name den letzten Projektnamen/Protokoll-Namen als Direktlink anzeigen (VP + PP).
 - 🔨 **Offline-Sync-Konflikt-Behandlung** — Wenn Daten lokal und in Supabase geändert wurden, Merge-Dialog anzeigen.
@@ -95,6 +96,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - 🔨 **Regiezettel** — Stunden + Materialien (aus Verteilerplaner-Stückliste) zu einfacher Regie-Rechnung kombinieren.
 
 ### ⚡ Verteilerplaner
+- ✅ ~~**KI-Import: PDF / Excel / Word**~~ — Umgesetzt: `DateiImportModal` mit Anthropic Document API (PDF), SheetJS (Excel), mammoth (Word); Button in Header + Kabelbereich.
 - ⚡ **Kabelfarbe im Plan** — Leitung in der Belegungsplan-Tabelle in Stockwerk-Farbe einfärben.
 - ⚡ **Leitungsberechnung: cos φ wählbar** — Für Motorlasten etc. cos φ ≠ 1 einstellbar machen.
 - 🔨 **Selektivitäts-Hinweis** — Grobe Prüfung ob vorgelagerte Sicherung selektiv zu nachgelagerter ist.
