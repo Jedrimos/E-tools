@@ -235,7 +235,7 @@ function ArtikelView({ artikel, onBack, onEdit, onDelete }) {
 }
 
 // ── Artikel-Liste ─────────────────────────────────────────────────────────────
-function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
+function ArtikelListe({ artikel, onOpen, onNew, dbSync }) {
   const [suche, setSuche] = useState("");
   const [kat, setKat] = useState("Alle");
   const [showInfo, setShowInfo] = useState(false);
@@ -268,11 +268,6 @@ function ArtikelListe({ artikel, onOpen, onNew, dbSync, dbRequired }) {
         </div>
         <div style={{ flex: 1 }} />
         {dbSync && <span style={{ fontSize: 11, color: TEAL, background: `${TEAL}15`, border: `1px solid ${TEAL}30`, borderRadius: 6, padding: "3px 8px", alignSelf: "center" }}>☁ Geteilt im Team</span>}
-        {!dbSync && dbRequired && (
-          <span style={{ fontSize: 11, color: "var(--red)", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.2)", borderRadius: 6, padding: "3px 8px", alignSelf: "center" }}>
-            ⚠ Supabase nicht konfiguriert – nur lokal
-          </span>
-        )}
         <button style={bPrim} onClick={onNew}>+ Neuer Artikel</button>
         <button onClick={() => setShowInfo(true)} title="Info" style={{...bPrim,background:"transparent",border:"1px solid var(--border2)",color:"var(--text2)",padding:"6px 10px"}}>ℹ</button>
       </div>
@@ -452,7 +447,6 @@ export default function Wissensdatenbank({ config = {} }) {
           onOpen={a => setAnsicht({ typ: "lesen", artikel: a })}
           onNew={handleNew}
           dbSync={dbSync}
-          dbRequired={false}
         />
       )}
       {ansicht.typ === "lesen" && (
