@@ -65,6 +65,12 @@ const BACKUP_KEYS = [
   "knx_raeume",
   "knx_checkliste",
   "elektronikertools_materialzaehler",
+  // Einstellungen + UI-Zustand
+  "stundenbuch_projekte",
+  "ui_theme",
+  "elektronikertools_zuletzt",
+  "vp_settings",
+  "vp_api_config",
 ];
 
 function exportBackup() {

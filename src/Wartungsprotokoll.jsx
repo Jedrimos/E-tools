@@ -83,7 +83,7 @@ const btnStyle = (bg, color, extra = {}) => ({
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-export default function Wartungsprotokoll() {
+export default function Wartungsprotokoll({ config = {} }) {
   const { toasts, addToast } = useToasts();
   const [aufgaben, setAufgaben] = useState([]);
   const [editAufgabe, setEditAufgabe] = useState(null);

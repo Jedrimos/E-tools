@@ -1413,19 +1413,6 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
     showToast(`"${nameToSave}" gespeichert ✓`);
   };
 
-  // ── Auto-Speichern (nach Plan-Generierung, wenn Projekt hat Name) ──────────
-  const autoSpeichere = useCallback(async () => {
-    if (!projekt.name) return;
-    const entry = {
-      id: currentDbId || uid(), db_id: currentDbId,
-      name: projekt.name, datum: new Date().toLocaleDateString("de-DE"),
-      projekt, fiKonfigs, kabel, sicherungen, stockwerke, raeume, swColorMap,
-      plan, uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
-    };
-    const neu = [entry, ...projekte.filter(p => p.name !== projekt.name && p.id !== entry.id)];
-    setProjekte(neu); saveProjekte(neu);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projekt, kabel, sicherungen, fiKonfigs, stockwerke, raeume, swColorMap, currentDbId, projekte]);
 
   // ── Laden ─────────────────────────────────────────────────────────────────
   const lade = p => {
@@ -1605,10 +1592,21 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
   const generiere = () => {
     showToast("Plan erfolgreich generiert ⚡");
     const sichFuerPlan = buildSicherungenFuerPlan();
-    setPlan(verteile(sichFuerPlan, fiKonfigs));
+    const neuerPlan = verteile(sichFuerPlan, fiKonfigs);
+    setPlan(neuerPlan);
     setStep(5); setActiveTab("plan"); setMitRK(false);
-    // Auto-Save nach Plangenerierung
-    setTimeout(() => autoSpeichere(), 500);
+    // Auto-Save mit dem frisch generierten Plan (kein stale-closure-Problem)
+    if (projekt.name) {
+      const entry = {
+        id: currentDbId || uid(), db_id: currentDbId,
+        name: projekt.name, datum: new Date().toLocaleDateString("de-DE"),
+        projekt, fiKonfigs, kabel, sicherungen, stockwerke, raeume, swColorMap,
+        plan: neuerPlan,
+        uiState: { step: 5, activeTab: "plan", planTyp, mitRK: false, mitQV, mitNBruecke, istKNX },
+      };
+      const neu = [entry, ...projekte.filter(p => p.name !== projekt.name && p.id !== entry.id)];
+      setProjekte(neu); saveProjekte(neu);
+    }
   };
 
   // Aufklapp-Status für Sicherungs-Karten (Step 3)
