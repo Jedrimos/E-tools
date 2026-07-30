@@ -18,12 +18,19 @@ function saveConfig(cfg) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 }
 
+// Lokales Kalenderdatum (YYYY-MM-DD) statt UTC — new Date().toISOString() liefert
+// in den ersten Stunden nach Mitternacht (Zeitzone UTC+1/+2) noch den Vortag.
+function toLocalISODate(d = new Date()) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 // ── Ablauf-Check Prüfprotokoll ──
 function ladeAblaufInfo() {
   try {
     const protokolle = JSON.parse(localStorage.getItem("elektronikertools_pruefprotokoll")) || [];
-    const heute = new Date().toISOString().slice(0, 10);
-    const in30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    const heute = toLocalISODate();
+    const in30 = toLocalISODate(new Date(Date.now() + 30 * 864e5));
     const abgelaufen = protokolle.filter(p => p.naechste_pruefung && p.naechste_pruefung < heute).length;
     const baldFaellig = protokolle.filter(p => p.naechste_pruefung && p.naechste_pruefung >= heute && p.naechste_pruefung <= in30).length;
     return { abgelaufen, baldFaellig };
@@ -36,7 +43,7 @@ function ladeLiveStats() {
     const projekte   = JSON.parse(localStorage.getItem("vp_projekte") || "[]");
     const protokolle = JSON.parse(localStorage.getItem("elektronikertools_pruefprotokoll") || "[]");
     const eintraege  = JSON.parse(localStorage.getItem("elektronikertools_stundenbuch") || "[]");
-    const monat = new Date().toISOString().slice(0, 7);
+    const monat = toLocalISODate().slice(0, 7);
     const minuten = eintraege
       .filter(e => e.datum?.startsWith(monat))
       .reduce((sum, e) => {
@@ -77,13 +84,15 @@ function exportBackup() {
   const data = {};
   BACKUP_KEYS.forEach(k => {
     const v = localStorage.getItem(k);
-    if (v) data[k] = JSON.parse(v);
+    if (!v) return;
+    try { data[k] = JSON.parse(v); }
+    catch (e) { console.error(`Backup: "${k}" enthält kein gültiges JSON, wird übersprungen:`, e); }
   });
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `elektronikertools_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `elektronikertools_backup_${toLocalISODate()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
