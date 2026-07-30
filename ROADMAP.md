@@ -118,7 +118,8 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - ✅ ~~`uid()` in jeder Datei dupliziert~~ — Umgesetzt: `src/lib/utils.js` zentralisiert
 - ✅ ~~ESLint-Fehler bereinigen~~ — Umgesetzt: alle 21 Fehler behoben (leere catch, ungenutzte Variablen, setState in Effects, Ref-Updates in Render, impure Functions, Fast-Refresh)
 - ✅ ~~Tests — zumindest Unit-Tests für VDE-Grenzwertbewertung im Prüfprotokoll~~ — Umgesetzt: 26 Tests in `src/lib/__tests__/vde.test.js` (vitest), VDE-Logik in `src/lib/vde.js` ausgelagert
-- ✅ ~~Fehlerbehandlung — Supabase-Fehler verständlicher anzeigen~~ — Umgesetzt: `supabaseFehlermeldung()` in `src/lib/supabase.js`, erkennt fehlende Tabellen, abgelaufene JWT, Netzwerkfehler, RLS-Probleme
+- ✅ ~~Fehlerbehandlung — Supabase-Fehler verständlicher anzeigen~~ — obsolet: Supabase wurde komplett entfernt (localStorage-only), `src/lib/supabase.js` gelöscht
+- ✅ ~~Repo-weiter Bugfix-Audit~~ — Umgesetzt (2026.7.1): Multi-Agent-Review über den gesamten Code, 67 bestätigte Findings behoben (u.a. sicherheitskritische VDE-Prüflogik, Rechenfehler in Leitungsberechnung/Verteilerplaner, XSS-Lücke, UTC-Datumsbugs, State-Bugs, tote Supabase-Migrationsreste)
 
 ---
 

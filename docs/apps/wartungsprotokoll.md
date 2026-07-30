@@ -11,37 +11,19 @@ Wiederkehrende Wartungsaufgaben verwalten mit Intervallen, automatischer Fällig
 - „✓ Erledigt"-Button setzt Datum auf heute und berechnet Fälligkeit neu
 - Filter nach Kategorie, Suche, Sortierung nach Fälligkeit / Name / Kategorie
 - Drucken / PDF via `window.print()`
-- Supabase-Sync + localStorage-Fallback
+- Speicherung in `localStorage`
 
 ## Kategorien
 
 E-Check · Blitzschutz · Notbeleuchtung · Brandschutz · Aufzug · Heizung/Lüftung · Allgemein · Sonstige
 
-## Datenbank
+## Datenspeicherung
 
-Supabase-Tabelle: `wartungsaufgaben`
-
-```sql
-create table wartungsaufgaben (
-  id          text primary key,
-  bezeichnung text not null,
-  kategorie   text default '',
-  intervall   text default 'jaehrlich',
-  letzte      text default '',
-  naechste    text default '',
-  zustaendig  text default '',
-  notiz       text default '',
-  created_at  timestamptz default now()
-);
-alter table wartungsaufgaben enable row level security;
-create policy "allow all" on wartungsaufgaben for all using (true) with check (true);
-```
-
-Vollständige SQL-Datei: [docs/supabase.sql](../supabase.sql)
+`localStorage` unter Key `elektronikertools_wartung`, im globalen Backup-Export enthalten.
 
 ## Dateien
 
 | Datei | Beschreibung |
 |---|---|
 | `src/Wartungsprotokoll.jsx` | Haupt-Komponente |
-| `src/lib/db_wartung.js` | DB-Layer (Supabase + localStorage) |
+| `src/lib/db_wartung.js` | localStorage-Layer |

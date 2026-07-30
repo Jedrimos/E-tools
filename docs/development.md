@@ -5,25 +5,31 @@
 ```
 src/
 ├── Dashboard.jsx              App-Router + Startseite
-├── Verteilerplaner.jsx        Tool: Verteilerplaner (~3000 Zeilen)
+├── Verteilerplaner.jsx        Tool: Verteilerplaner (~3600 Zeilen)
 ├── Stundenbuch.jsx            Tool: Stundenbuch
 ├── Pruefprotokoll.jsx         Tool: Prüfprotokoll
 ├── Wissensdatenbank.jsx       Tool: Wissensdatenbank
+├── Wartungsprotokoll.jsx      Tool: Wartungsprotokoll
+├── Leitungsberechnung.jsx     Tool: Elektrorechner
+├── Materialzaehler.jsx        Tool: Materialzähler
+├── KNXPlaner.jsx              Tool: KNX-Planer
 ├── components/
 │   └── Toast.jsx              Gemeinsame Toast-Komponente + useToasts-Hook
 ├── lib/
-│   ├── supabase.js            Supabase-Client (aus Env-Vars)
-│   ├── db.js                  DB-Layer Verteilerplaner
-│   ├── db_pruefprotokoll.js   DB-Layer Prüfprotokoll
-│   ├── db_stundenbuch.js      DB-Layer Stundenbuch
-│   └── db_wissen.js           DB-Layer Wissensdatenbank
+│   ├── utils.js                Gemeinsame Hilfsfunktionen (uid, …)
+│   ├── vde.js                  VDE-Grenzwerte & Bewertungslogik (Prüfprotokoll)
+│   ├── db_pruefprotokoll.js    localStorage-Layer Prüfprotokoll
+│   ├── db_stundenbuch.js       localStorage-Layer Stundenbuch
+│   ├── db_wissen.js            localStorage-Layer Wissensdatenbank
+│   ├── db_wartung.js           localStorage-Layer Wartungsprotokoll
+│   ├── db_materialzaehler.js   localStorage-Layer Materialzähler
+│   └── db_knx.js               localStorage-Layer KNX-Planer
 ├── index.css                  Globale CSS Custom Properties + Reset
 └── main.jsx                   Einstiegspunkt
 
 docs/
 ├── index.md                   Dokumentations-Übersicht
 ├── setup.md                   Installation & Deployment
-├── supabase.sql               Vollständiges SQL-Schema
 ├── development.md             Diese Datei
 └── apps/                      Per-App Dokumentation
 ```
@@ -37,7 +43,8 @@ docs/
 `src/MeineApp.jsx`:
 ```jsx
 import React, { useState, useEffect } from "react";
-import Toast, { useToasts } from "./components/Toast.jsx";
+import Toast from "./components/Toast.jsx";
+import { useToasts } from "./lib/useToasts.js";
 import { loadXyzDB, saveXyzDB, deleteXyzDB } from "./lib/db_xyz.js";
 
 const FARBE = "#8b5cf6"; // Neue Farbe wählen
@@ -49,26 +56,23 @@ export default function MeineApp({ config = {} }) {
 
 ### 2. DB-Layer erstellen
 
-`src/lib/db_xyz.js` — immer nach diesem Muster:
+`src/lib/db_xyz.js` — localStorage-only, immer nach diesem Muster:
 ```js
-/**
- * Benötigte SQL-Migration:
- * CREATE TABLE xyz (...);
- */
-import { supabase, isSupabaseConfigured } from "./supabase.js";
-const TABLE = "xyz";
+const LS_KEY = "elektronikertools_xyz";
+function lsGet() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }
+function lsSet(list) { localStorage.setItem(LS_KEY, JSON.stringify(list)); }
 
-function toRow(item) { /* ... */ }
-function fromRow(row) { /* ... */ }
-
-export async function loadXyzDB() {
-  if (!isSupabaseConfigured()) return null;
-  const { data, error } = await supabase.from(TABLE).select("*").order("updated_at", { ascending: false });
-  if (error) throw error;
-  return (data || []).map(fromRow);
+export async function loadXyzDB() { return lsGet(); }
+export async function saveXyzDB(item) {
+  const list = lsGet();
+  const idx = list.findIndex(x => x.id === item.id);
+  if (idx >= 0) list[idx] = item; else list.push(item);
+  lsSet(list);
+  return item;
 }
-export async function saveXyzDB(item) { /* upsert */ }
-export async function deleteXyzDB(dbId) { /* delete */ }
+export async function deleteXyzDB(id) {
+  lsSet(lsGet().filter(x => x.id !== id));
+}
 ```
 
 ### 3. Dashboard registrieren
@@ -93,10 +97,9 @@ if (aktiveApp === "meinapp") {
 }
 ```
 
-### 4. Dokumentation + SQL
+### 4. Dokumentation
 
 - `docs/apps/meinapp.md` erstellen
-- `docs/supabase.sql` — neue Tabelle ergänzen
 - `README.md` — neue App-Sektion
 - `CHANGELOG.md` — neue Version
 - `ROADMAP.md` — Punkt als erledigt
@@ -128,26 +131,22 @@ Alle Design-Tokens sind in `src/index.css` als CSS Custom Properties:
 
 ---
 
-## Supabase-Muster
+## Speicher-Muster
 
-Alle Apps verwenden das gleiche Muster:
-1. **Beim Start:** `loadXxxDB()` aufrufen, bei Erfolg State + localStorage aktualisieren
-2. **Beim Speichern:** Sofort lokal aktualisieren, dann async Supabase-Sync
-3. **Beim Löschen:** Sofort lokal löschen, dann async `db_id` aus Supabase löschen
-4. **Fallback:** Immer `localStorage` wenn Supabase nicht konfiguriert
+Alle Apps speichern ausschließlich in `localStorage` (keine Datenbank/Backend). Muster:
+1. **Beim Start:** State per lazy `useState(loadXyzDB)`-Initializer oder in einem `useEffect` laden
+2. **Beim Speichern/Löschen:** State sofort aktualisieren, `save`-Funktion synchron aufrufen (try/catch für Speicherfehler, z.B. Quota), Toast anzeigen
+3. **Neue localStorage-Keys** immer in `BACKUP_KEYS` (`src/Dashboard.jsx`) ergänzen, sonst gehen sie beim Backup/Restore verloren
 
 ```js
 // Muster für handleSave:
 async function handleSave(item) {
-  // 1. Sofort lokal
   setItems(prev => [...prev, item]);
-  addToast("Gespeichert ✓");
-  // 2. Async DB
   try {
-    const saved = await saveXyzDB(item);
-    if (saved) setItems(prev => prev.map(x => x.id === item.id ? { ...x, db_id: saved.db_id } : x));
+    await saveXyzDB(item);
+    addToast("Gespeichert ✓");
   } catch (e) {
-    addToast("DB-Fehler: " + e.message, "error");
+    addToast("Speichern fehlgeschlagen: " + e.message, "error");
   }
 }
 ```

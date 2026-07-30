@@ -73,31 +73,8 @@ Button **⚡ Aus Verteilerplaner** öffnet ein Modal mit allen gespeicherten Ver
 
 ## Datenspeicherung
 
-- **Lokal:** `localStorage` unter Key `elektronikertools_pruefprotokoll`
-- **Supabase:** Tabelle `pruefprotokolle`
-  - `verteiler_id` verknüpft mit dem Quell-Projekt in `projekte`
-
-## Supabase-Tabelle
-
-```sql
-CREATE TABLE pruefprotokolle (
-  id                uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name              text NOT NULL DEFAULT 'Protokoll',
-  auftraggeber      text DEFAULT '',
-  auftragnummer     text DEFAULT '',
-  anlagenstandort   text DEFAULT '',
-  anlage_art        text DEFAULT 'Wohngebäude',
-  nennspannung      text DEFAULT '230/400',
-  pruefer           text DEFAULT '',
-  datum             date,
-  naechste_pruefung date,
-  stromkreise       jsonb DEFAULT '[]',
-  notiz             text DEFAULT '',
-  verteiler_id      uuid REFERENCES projekte(id) ON DELETE SET NULL,
-  created_at        timestamptz DEFAULT now(),
-  updated_at        timestamptz DEFAULT now()
-);
-```
+- `localStorage` unter Key `elektronikertools_pruefprotokoll`
+- Im globalen Backup-Export enthalten
 
 ---
 

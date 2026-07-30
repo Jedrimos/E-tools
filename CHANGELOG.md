@@ -6,6 +6,49 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.7.1] – 2026-07-30
+
+### 🐛 Umfassender Bugfix-Durchgang (Repo-weiter Multi-Agent-Audit, 67 bestätigte Findings)
+
+**Sicherheitskritisch**
+- **`vde.js`**: Schleifenimpedanz (Zs) und Kurzschlussstrom (Ik) wurden bisher **nie** gegen einen Grenzwert geprüft — ein Stromkreis mit lebensgefährlich hoher Zs konnte als "bestanden" durchgehen. Neu: `Zs ≤ U₀/Ia` bzw. `Ik ≥ Ia` für Sicherungstyp B/C/D. Falsche NormInfo-Formel in Pruefprotokoll.jsx (war 5× zu streng) korrigiert.
+- **`Materialzaehler.jsx`**: Echte XSS-Lücke in `drucken()` behoben — Projekt-/Positionsfelder wurden ungeescaped per `document.write()` in ein neues Fenster geschrieben.
+
+**Rechenfehler**
+- **`Leitungsberechnung.jsx`**: Kompensationskondensator-Formel war Faktor 1000 zu groß (2 Stellen betroffen). Kabel-Querschnitt-Empfehlung prüfte nie die Strombelastbarkeit der Verlegeart und konnte ein thermisch unterdimensioniertes Kabel empfehlen; fiel bei zu hohem Spannungsfall-Bedarf zudem still auf 120 mm² zurück statt zu warnen.
+- **`Verteilerplaner.jsx`**: FILS-Stromkreise wurden unabhängig vom Sicherungstyp immer als "3P" beschriftet. Manuelle Phasenwahl bei 3-poligen Sicherungen verwarf die 3P-Kennzeichnung. Leitungsrechner (Step 2) nutzte immer die einphasige Formel unabhängig von der Aderzahl. N-Brücken-Länge wich zwischen Stückliste und Klemmenleisten-Visualisierung um genau eine Klemmenbreite ab.
+- **`Pruefprotokoll.jsx`**: Gesamtergebnis "bestanden" verlangte nur "kein fail" statt "alle Stromkreise gemessen" — unvermessene Stromkreise zählten automatisch als bestanden. Drei verschiedene Statuslogiken (Liste/Editor/PDF) widersprachen sich, jetzt über `gesamtStatus()` vereinheitlicht. Ik(kA)-Label korrigiert zu Ik(A).
+
+**Datums-/Zeitbugs** (UTC statt lokaler Zeit — betraf alle Nutzer in Deutschland zwischen 00:00–02:00 Uhr)
+- Dashboard, Stundenbuch, Wartungsprotokoll, Wissensdatenbank: `new Date().toISOString()` lieferte in den ersten Stunden nach Mitternacht/Monatswechsel den falschen Vortag/-monat (überfällige Prüfprotokolle wurden nicht als abgelaufen gezählt, Monats-Stundenwidget zeigte Vormonats-Werte).
+- Wartungsprotokoll `addMonate()`: Monatsend-Daten (29./30./31.) liefen durch JS-`setMonth`-Überlauf in den übernächsten Monat statt korrekt zu clampen.
+- Stundenbuch `calcNetto()`: Schichten über Mitternacht (Notdienst) ergaben 0 Minuten statt der tatsächlichen Dauer.
+
+**State-/Formular-Bugs**
+- Stundenbuch, KNXPlaner: Formulare ohne `key`-Remount behielten beim direkten Wechsel des Bearbeitungsziels den alten State und konnten fremde Einträge überschreiben.
+- Stundenbuch `timerStoppen()`: befüllte nicht alle Felder (id/pause fehlten) → NaN in Netto-Stunden nach dem Speichern.
+- Verteilerplaner `geheZuFIPlanung()`: überschrieb bei jedem Schritt-3→4-Wechsel die komplette FI-Konfiguration und verwarf dabei manuelle Anpassungen; berechnet jetzt nur noch beim ersten Mal automatisch.
+- Wissensdatenbank: "Neuer Artikel"-Titel wurde nie angezeigt (Bedingung war für jeden frischen Artikel bereits wahr).
+- KNXPlaner `raumLoeschen()`: räumte die Checkliste nicht auf (verwaiste Einträge verfälschten den Fortschritt dauerhaft), `aktEtage` wurde nicht zurückgesetzt.
+
+**Sonstiges**
+- KI-Analyse-Fehler beim PDF/Foto-Import im Verteilerplaner zeigte keine Fehlermeldung und keinen Retry-Button.
+- Wissensdatenbank: Inline-Markdown-Regex interpretierte einzelne `*` (z.B. Multiplikation in Formeln) fälschlich als Kursiv-Markup.
+- CSV-Exports (KNXPlaner, Stundenbuch) escapen jetzt Semikolons/Anführungszeichen und verhindern Formula-Injection.
+- KNXPlaner: GA-Felder erzwingen jetzt Ganzzahligkeit, KNX-Rechner validiert Bereich/Linie/Gerät und Dezimal-Eingabe.
+- Materialzaehler/Wartungsprotokoll zeigen jetzt `config.firma`/`config.mitarbeiter` auf Ausdrucken (vorher stillschweigend ignoriert); Verteilerplaner erhält jetzt die globale Firmenkonfiguration als Fallback.
+- Verteilerplaner: fehlender Zurück-Button im Startbildschirm ergänzt; toter "Datenbank einrichten"-Link und weitere Supabase-Migrationsreste entfernt.
+- localStorage-Schreibfehler (Verteilerplaner: Projekte/Einstellungen/API-Config) brachen den Speichervorgang bisher lautlos ab — zeigen jetzt eine Fehler-Toast.
+- `eslint.config.js` ignorierte das mitgelieferte WordPress-Bundle nicht, wodurch `npm run lint` ~984 Fake-Fehler aus dem minifizierten Code zeigte statt echten Source-Problemen.
+
+**Aufräumarbeiten**
+- `src/lib/supabase.js` und `src/lib/db.js` komplett entfernt (vollständig unbenutzte Migrationsreste).
+- `uid()` nutzt jetzt `crypto.randomUUID()` statt reinem `Math.random()` — verhindert seltene ID-Kollisionen (verwaiste/überschriebene Einträge bei schnell aufeinanderfolgenden Speichervorgängen).
+- `wordpress-plugin/package.json` fehlten `xlsx` und `mammoth`, obwohl der Verteilerplaner sie dynamisch importiert — der Build funktionierte bisher nur zufällig über einen Parent-node_modules-Fallback.
+- 14 neue Unit-Tests für die neue Zs/Ik- und `gesamtStatus()`-Logik in `vde.js` (insgesamt jetzt 40 Tests).
+
+---
+
 ## [2026.7.0] – 2026-07-30
 
 ### 💥 Breaking — Supabase komplett entfernt
