@@ -32,6 +32,13 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 - Neuer `DateiImportModal` für PDF/Excel/Word/Fotos (Button in Header + Kabelbereich)
 - PDF: Anthropic Document API · Excel: SheetJS → CSV · Word: mammoth
 
+### 🐛 Bugfixes
+
+- **Verteilerplaner**: stale-closure in `autoSpeichere`-useCallback entfernt — Auto-Save läuft jetzt direkt in `generiere()` mit dem frisch berechneten Plan (Plan wurde vorher immer als `null` gespeichert)
+- **Dashboard Backup-Export**: 5 fehlende localStorage-Keys ergänzt (`stundenbuch_projekte`, `ui_theme`, `elektronikertools_zuletzt`, `vp_settings`, `vp_api_config`)
+- **Wartungsprotokoll**: fehlende `config`-Prop mit Default `{ config = {} }` ergänzt (Dashboard-Crash behoben)
+- **KNXPlaner**: alle async-Mutationen mit try-catch + Toast-Fehlermeldungen umschlossen (`handleSave`, `handleDelete`, `raumSpeichern`, `raumLoeschen`, `gaZuweisen`, `addVorlage`, `addItem`, `toggleItem`, `deleteItem`)
+
 ### 🔢 Version
 
 - Alle Apps auf `2026.7` hochgezogen (Verteilerplaner, Stundenbuch, Prüfprotokoll, Wissensdatenbank)
