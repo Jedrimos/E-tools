@@ -95,6 +95,7 @@ Ideen und geplante Features, ungefähr nach Priorität sortiert. Kein fester Zei
 - 🔨 **Regiezettel** — Stunden + Materialien (aus Verteilerplaner-Stückliste) zu einfacher Regie-Rechnung kombinieren.
 
 ### ⚡ Verteilerplaner
+- ✅ ~~**KI-Import: PDF / Excel / Word**~~ — Umgesetzt: `DateiImportModal` mit Anthropic Document API (PDF), SheetJS (Excel), mammoth (Word); Button in Header + Kabelbereich.
 - ⚡ **Kabelfarbe im Plan** — Leitung in der Belegungsplan-Tabelle in Stockwerk-Farbe einfärben.
 - ⚡ **Leitungsberechnung: cos φ wählbar** — Für Motorlasten etc. cos φ ≠ 1 einstellbar machen.
 - 🔨 **Selektivitäts-Hinweis** — Grobe Prüfung ob vorgelagerte Sicherung selektiv zu nachgelagerter ist.

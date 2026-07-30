@@ -6,6 +6,21 @@ Versionierung nach dem Schema **`JAHR.MONAT.PATCH`** (analog zu Home Assistant).
 
 ---
 
+## [2026.4.2] – 2026-07-30
+
+### ✨ Neu — Verteilerplaner: Datei-Import (PDF / Excel / Word)
+
+- **Neuer Button** „📂 PDF / Excel / Word importieren" in Kabelbereich und Header-Toolbar
+- **PDF** (nur Anthropic API): Nativ-Verarbeitung via Anthropic Document API — kein Parsen nötig
+- **Excel** (.xlsx / .xls): Alle Blätter werden per SheetJS in CSV konvertiert und zur KI gesendet
+- **Word** (.docx): Textextraktion via `mammoth`, anschließend KI-Analyse
+- **Bilder**: Auch im Datei-Modal weiterhin unterstützt (gleicher Pfad wie bestehender Foto-Import)
+- **`DateiImportModal`**: Neue Komponente mit Drag & Drop, Dateitypanzeige und identischer Ergebnisansicht wie beim Foto-Import
+- **`KABEL_PROMPT`**: Kabel-Erkennungsprompt als gemeinsame Konstante ausgelagert (kein Duplikat mehr)
+- Beide Bundles neu gebaut: Standalone (`dist/`) und WordPress (`wordpress-plugin/assets/`)
+
+---
+
 ## [2026.4.1] – 2026-07-02
 
 ### ✨ Neu — WordPress Plugin

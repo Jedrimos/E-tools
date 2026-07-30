@@ -319,6 +319,81 @@ async function callVisionAPI(base64, prompt) {
   return json?.choices?.[0]?.message?.content || json?.content?.[0]?.text || json?.message?.content || "";
 }
 
+const KABEL_PROMPT = `Du bist Elektrotechnik-Experte. Analysiere diese Kabelliste.
+Jede Zeile ist ein einzelnes Kabel/eine Leitung, z.B.:
+- "Küche Steckdose 3x2,5"  → ein Kabel
+- "Herd 5x2,5"             → ein Kabel (3-phasig)
+
+Gib JSON-Array zurück, ein Objekt pro Kabel:
+- "bezeichnung": Name/Beschreibung (z.B. "Steckdosen Küche")
+- "raum": Raumname oder ""
+- "stockwerk": KG/EG/OG1/OG2/DG oder "EG"
+- "kabelTyp": "NYM-J" standard, sonst wie angegeben
+- "kabelAdern": Zahl (3 einphasig, 5 dreiphasig)
+- "kabelQs": Querschnitt als String ("1.5","2.5","4","6")
+- "dreipolig": true wenn 5+ Adern oder Herd/Wallbox/Sauna
+
+NUR JSON, keine Backticks, kein Text davor/danach.`;
+
+function leseAlsBase64(datei) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(datei);
+  });
+}
+
+function leseAlsArrayBuffer(datei) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(datei);
+  });
+}
+
+async function callTextAPI(textContent, prompt) {
+  const cfg = ladeApiConfig();
+  const headers = { "Content-Type": "application/json" };
+  if (cfg.apiKey) headers["Authorization"] = `Bearer ${cfg.apiKey}`;
+  if (cfg.url.includes("anthropic.com")) {
+    headers["x-api-key"] = cfg.apiKey;
+    headers["anthropic-version"] = "2023-06-01";
+    headers["anthropic-dangerous-direct-browser-access"] = "true";
+    delete headers["Authorization"];
+  }
+  const body = JSON.stringify({
+    model: cfg.model, max_tokens: 2000,
+    messages: [{ role: "user", content: `${prompt}\n\n---\n${textContent}` }]
+  });
+  const resp = await fetch(cfg.url, { method: "POST", headers, body });
+  if (!resp.ok) { const e = await resp.text(); throw new Error(`API ${resp.status}: ${e.slice(0,200)}`); }
+  const json = await resp.json();
+  return json?.choices?.[0]?.message?.content || json?.content?.[0]?.text || "";
+}
+
+async function callDocumentAPI(base64, mimeType, prompt) {
+  const cfg = ladeApiConfig();
+  const headers = {
+    "Content-Type": "application/json",
+    "x-api-key": cfg.apiKey,
+    "anthropic-version": "2023-06-01",
+    "anthropic-dangerous-direct-browser-access": "true",
+  };
+  const body = JSON.stringify({
+    model: cfg.model, max_tokens: 2000,
+    messages: [{ role: "user", content: [
+      { type: "document", source: { type: "base64", media_type: mimeType, data: base64 } },
+      { type: "text", text: prompt }
+    ]}]
+  });
+  const resp = await fetch(cfg.url, { method: "POST", headers, body });
+  if (!resp.ok) { const e = await resp.text(); throw new Error(`API ${resp.status}: ${e.slice(0,200)}`); }
+  const json = await resp.json();
+  return json?.content?.[0]?.text || "";
+}
+
 // ── Kleine UI-Komponenten ──
 function ACInput({ value, onChange, suggestions, placeholder, style={}, onCommit }) {
   const [open, setOpen] = useState(false);
@@ -415,22 +490,7 @@ function FotoImportModal({ onClose, onImport }) {
     if (!base64) return;
     setPhase("loading"); setFehler("");
     try {
-      const prompt = `Du bist Elektrotechnik-Experte. Analysiere diese handgeschriebene Kabelliste.
-Jede Zeile ist ein einzelnes Kabel/eine Leitung, z.B.:
-- "Küche Steckdose 3x2,5"  → ein Kabel
-- "Herd 5x2,5"             → ein Kabel (3-phasig)
-
-Gib JSON-Array zurück, ein Objekt pro Kabel:
-- "bezeichnung": Name/Beschreibung (z.B. "Steckdosen Küche")
-- "raum": Raumname oder ""
-- "stockwerk": KG/EG/OG1/OG2/DG oder "EG"
-- "kabelTyp": "NYM-J" standard, sonst wie angegeben
-- "kabelAdern": Zahl (3 einphasig, 5 dreiphasig)
-- "kabelQs": Querschnitt als String ("1.5","2.5","4","6")
-- "dreipolig": true wenn 5+ Adern oder Herd/Wallbox/Sauna
-
-NUR JSON, keine Backticks, kein Text davor/danach.`;
-      const text = await callVisionAPI(base64, prompt);
+      const text = await callVisionAPI(base64, KABEL_PROMPT);
       const clean = text.replace(/```json|```/g,"").trim();
       const parsed = JSON.parse(clean);
       setErgebnis(parsed.map(item=>({...item,_sel:true})));
@@ -469,6 +529,152 @@ NUR JSON, keine Backticks, kein Text davor/danach.`;
             <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={e=>handleFile(e.target.files[0])} style={{display:"none"}}/>
           </div>
           {preview&&phase!=="result"&&(
+            <button onClick={analysiere} disabled={phase==="loading"}
+              style={{...bPrimary,width:"100%",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:phase==="loading"?0.6:1}}>
+              {phase==="loading"?<><span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⏳</span> Analysiere...</>:"🔍 Kabelliste analysieren"}
+            </button>
+          )}
+          {phase==="error"&&<div style={{background:"#200000",border:"1px solid #e05252",borderRadius:8,padding:"10px 14px",marginBottom:12,color:"var(--red)",fontSize:12}}>⚠ {fehler}</div>}
+          {phase==="result"&&ergebnis&&(
+            <>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{fontSize:13,color:"var(--green)",fontWeight:700}}>✓ {ergebnis.length} Kabel erkannt</div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setErgebnis(e=>e.map(x=>({...x,_sel:true})))} style={{...bSec2,color:"var(--green)"}}>Alle</button>
+                  <button onClick={()=>setErgebnis(e=>e.map(x=>({...x,_sel:false})))} style={bSec2}>Keine</button>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:280,overflowY:"auto",marginBottom:14}}>
+                {ergebnis.map((item,idx)=>(
+                  <div key={idx} onClick={()=>toggle(idx)}
+                    style={{display:"flex",gap:10,alignItems:"center",background:item._sel?"var(--bg3)":"#0f0f0f",border:`1px solid ${item._sel?"rgba(33,150,201,0.15)":"var(--bg3)"}`,borderRadius:8,padding:"8px 12px",cursor:"pointer",opacity:item._sel?1:0.45}}>
+                    <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${item._sel?"var(--blue)":"var(--text3)"}`,background:item._sel?"var(--blue)":"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {item._sel&&<span style={{color:"#fff",fontSize:10,fontWeight:800}}>✓</span>}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{item.bezeichnung||item.kabel}</div>
+                      <div style={{fontSize:10,color:"var(--text3)",marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
+                        {item.raum&&<span style={{color:"rgba(33,150,201,0.6)"}}>{item.raum}</span>}
+                        <span>{item.stockwerk}</span>
+                        <span style={{color:"rgba(33,150,201,0.5)",fontFamily:"monospace"}}>{item.kabelTyp||"NYM-J"} {item.kabelAdern}×{item.kabelQs}mm²</span>
+                        {item.dreipolig&&<span style={{color:"var(--purple)",fontWeight:600}}>3-phasig</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>importieren(false)} style={{...bPrimary,flex:2,opacity:anzahl===0?0.4:1}}>+ Hinzufügen ({anzahl})</button>
+                <button onClick={()=>importieren(true)} style={{flex:1,background:"transparent",border:"1px solid #e0525244",color:"var(--red)",borderRadius:9,padding:"11px",cursor:"pointer",fontSize:12,fontWeight:600,opacity:anzahl===0?0.4:1}}>⚠ Ersetzen</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Datei Import Modal (PDF / Excel / Word / Bild) ──
+function DateiImportModal({ onClose, onImport }) {
+  const [datei, setDatei] = useState(null);
+  const [phase, setPhase] = useState("idle");
+  const [ergebnis, setErgebnis] = useState(null);
+  const [fehler, setFehler] = useState("");
+  const [dateiInfo, setDateiInfo] = useState(null);
+  const inputRef = useRef(null);
+
+  const getDateiTyp = (file) => {
+    const n = file.name.toLowerCase();
+    if (n.endsWith(".pdf")) return "pdf";
+    if (n.endsWith(".xlsx") || n.endsWith(".xls")) return "excel";
+    if (n.endsWith(".docx") || n.endsWith(".doc")) return "word";
+    if (file.type.startsWith("image/")) return "bild";
+    return "unbekannt";
+  };
+
+  const handleFile = (file) => {
+    if (!file) return;
+    const typ = getDateiTyp(file);
+    if (typ === "unbekannt") { setFehler("Nicht unterstütztes Format. Bitte PDF, Excel, Word oder Bild verwenden."); return; }
+    setDatei(file);
+    setDateiInfo({ name: file.name, typ, groesse: (file.size/1024).toFixed(0) });
+    setPhase("idle"); setErgebnis(null); setFehler("");
+  };
+
+  const analysiere = async () => {
+    if (!datei) return;
+    setPhase("loading"); setFehler("");
+    const typ = getDateiTyp(datei);
+    try {
+      const cfg = ladeApiConfig();
+      let text;
+      if (typ === "pdf") {
+        if (!cfg.url.includes("anthropic.com")) throw new Error("PDF-Import wird nur mit der Anthropic API unterstützt. Bitte in den KI-Einstellungen auf Anthropic Claude wechseln.");
+        const b64 = await leseAlsBase64(datei);
+        text = await callDocumentAPI(b64, "application/pdf", KABEL_PROMPT);
+      } else if (typ === "excel") {
+        const buffer = await leseAlsArrayBuffer(datei);
+        const xlsx = await import("xlsx");
+        const wb = xlsx.read(buffer, { type: "array" });
+        const csvParts = wb.SheetNames.map(sn => `=== Blatt: ${sn} ===\n${xlsx.utils.sheet_to_csv(wb.Sheets[sn])}`);
+        text = await callTextAPI(csvParts.join("\n\n"), KABEL_PROMPT);
+      } else if (typ === "word") {
+        const buffer = await leseAlsArrayBuffer(datei);
+        const mammoth = await import("mammoth");
+        const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+        text = await callTextAPI(result.value, KABEL_PROMPT);
+      } else {
+        const b64 = await leseAlsBase64(datei);
+        text = await callVisionAPI(b64, KABEL_PROMPT);
+      }
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      setErgebnis(parsed.map(item => ({ ...item, _sel: true })));
+      setPhase("result");
+    } catch(e) {
+      setFehler("Analyse fehlgeschlagen: " + e.message);
+      setPhase("error");
+    }
+  };
+
+  const toggle = (idx) => setErgebnis(e => e.map((x,i) => i===idx ? {...x,_sel:!x._sel} : x));
+  const anzahl = ergebnis?.filter(x => x._sel).length || 0;
+  const importieren = (ersetzen) => onImport(ergebnis.filter(x => x._sel), ersetzen);
+  const typIcon = { pdf:"📄", excel:"📊", word:"📝", bild:"📷" };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:16,width:"100%",maxWidth:600,maxHeight:"92vh",overflow:"auto",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800}}>📂 Kabelliste aus Datei importieren</div>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>PDF · Excel (.xlsx) · Word (.docx) · Foto</div>
+          </div>
+          <button onClick={onClose} style={{background:"transparent",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:22}}>×</button>
+        </div>
+        <div style={{padding:20,flex:1,overflow:"auto"}}>
+          <div onClick={()=>inputRef.current?.click()} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFile(e.dataTransfer.files[0]);}}
+            style={{border:`2px dashed ${dateiInfo?"rgba(33,150,201,0.2)":"var(--border2)"}`,borderRadius:12,padding:dateiInfo?"14px":"28px",textAlign:"center",cursor:"pointer",marginBottom:14,background:"var(--bg2)"}}>
+            {dateiInfo
+              ? <>
+                  <div style={{fontSize:36,marginBottom:4}}>{typIcon[dateiInfo.typ]||"📄"}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:"var(--text)"}}>{dateiInfo.name}</div>
+                  <div style={{fontSize:11,color:"var(--blue)",marginTop:4}}>Andere Datei wählen</div>
+                </>
+              : <>
+                  <div style={{fontSize:36,marginBottom:8}}>📂</div>
+                  <div style={{fontSize:14,color:"var(--text3)",fontWeight:600}}>Datei antippen oder reinziehen</div>
+                  <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginTop:8}}>
+                    {["📄 PDF","📊 Excel","📝 Word","📷 Foto"].map(t=>(
+                      <span key={t} style={{background:"var(--bg3)",border:"1px solid var(--border)",borderRadius:6,padding:"3px 8px",fontSize:11,color:"var(--text2)"}}>{t}</span>
+                    ))}
+                  </div>
+                </>
+            }
+            <input ref={inputRef} type="file" accept=".pdf,.xlsx,.xls,.docx,.doc,image/*" onChange={e=>handleFile(e.target.files[0])} style={{display:"none"}}/>
+          </div>
+          {dateiInfo&&phase!=="result"&&(
             <button onClick={analysiere} disabled={phase==="loading"}
               style={{...bPrimary,width:"100%",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:phase==="loading"?0.6:1}}>
               {phase==="loading"?<><span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⏳</span> Analysiere...</>:"🔍 Kabelliste analysieren"}
@@ -839,6 +1045,7 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
   const [showBeschriftung, setShowBeschriftung] = useState(false);
   const [showStueckliste, setShowStueckliste] = useState(false);
   const [showFoto, setShowFoto]   = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [projekte, setProjekte]   = useState(loadProjekte);
   const [showSave, setShowSave]   = useState(false);
   const [showLoad, setShowLoad]   = useState(false);
@@ -1275,6 +1482,7 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
     if(ersetzen) { setKabel(neueKabel); setSicherungen([]); }
     else setKabel(ks=>[...ks.filter(x=>x.bezeichnung||x.raum),...neueKabel]);
     setShowFoto(false);
+    setShowImport(false);
   };
 
   // Sicherungen vorbereiten für Verteilung
@@ -1736,6 +1944,10 @@ const stueckliste = (() => {
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
             onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>📷</button>
+          <button onClick={()=>setShowImport(true)} title="Kabelliste aus PDF/Excel/Word importieren"
+            style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
+            onMouseEnter={e=>{e.currentTarget.style.color="var(--text)";e.currentTarget.style.borderColor="var(--border2)";}}
+            onMouseLeave={e=>{e.currentTarget.style.color="var(--text3)";e.currentTarget.style.borderColor="var(--border)";}}>📂</button>
           <button onClick={()=>setShowSettings(true)} title="Einstellungen"
             className="header-settings-btn"
             style={{width:32,height:32,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--text3)",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
@@ -1872,11 +2084,16 @@ const stueckliste = (() => {
             </div>
           </Card>
 
-          <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:12}}>
+          <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
             <button onClick={()=>setShowFoto(true)} style={{display:"flex",alignItems:"center",gap:8,background:"var(--bg2)",border:"1px solid rgba(33,150,201,0.25)",borderRadius:10,padding:"12px 20px",color:"var(--blue)",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all 0.15s"}}
               onMouseEnter={e=>{e.currentTarget.style.background="rgba(33,150,201,0.07)";e.currentTarget.style.borderColor="rgba(33,150,201,0.4)";}}
               onMouseLeave={e=>{e.currentTarget.style.background="var(--bg2)";e.currentTarget.style.borderColor="rgba(33,150,201,0.25)";}}>
               📷 Kabelliste aus Foto / Scan importieren
+            </button>
+            <button onClick={()=>setShowImport(true)} style={{display:"flex",alignItems:"center",gap:8,background:"var(--bg2)",border:"1px solid rgba(33,150,201,0.25)",borderRadius:10,padding:"12px 20px",color:"var(--blue)",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(33,150,201,0.07)";e.currentTarget.style.borderColor="rgba(33,150,201,0.4)";}}
+              onMouseLeave={e=>{e.currentTarget.style.background="var(--bg2)";e.currentTarget.style.borderColor="rgba(33,150,201,0.25)";}}>
+              📂 PDF / Excel / Word importieren
             </button>
           </div>
           {/* Warnungen / Completion hint */}
@@ -3327,6 +3544,7 @@ const stueckliste = (() => {
 
       {/* ── MODALS ── */}
       {showFoto&&<FotoImportModal onClose={()=>setShowFoto(false)} onImport={handleFotoImport}/>}
+      {showImport&&<DateiImportModal onClose={()=>setShowImport(false)} onImport={handleFotoImport}/>}
       {showSettings&&<SettingsModal settings={settings} onSave={s=>{setSettings(s);saveSettings(s);setShowSettings(false);showToast("Einstellungen gespeichert ✓");}} onClose={()=>setShowSettings(false)}/>}
 
       {/* ── INFO MODAL ── */}
