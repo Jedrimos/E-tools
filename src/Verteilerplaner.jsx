@@ -1,5 +1,4 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { loadProjekteDB, saveProjektDB, deleteProjektDB } from "./lib/db.js";
 import Toast from "./components/Toast.jsx";
 import { uid } from "./lib/utils.js";
 
@@ -74,6 +73,9 @@ const mkSicherung = () => ({
 
 const mkFI = () => ({ id:uid(), bemessung:40, fiTyp:"A", fehlerstrom:30, pole:4, phasenschiene:true, phasenschieneN:false });
 
+// FILS-Phase: 4-polig (filsPole=4) = 3-phasig, 2-polig = 1-phasig (keine bestimmte Einzelphase wählbar in der UI)
+const filsAssignedPhase = s => (s.filsPole||4)===4 ? "3P" : "1P";
+
 // ── Planverteilung ──
 function verteile(sicherungen, fiKonfigs) {
   const normal  = sicherungen.filter(s => !s.istFILS && !s.istReserve);
@@ -81,7 +83,7 @@ function verteile(sicherungen, fiKonfigs) {
   const reserve = sicherungen.filter(s => !s.istFILS &&  s.istReserve);
   const warnungen = [];
   const gruppen = fiKonfigs.map(f => ({ ...f, stromkreise:[], belegteTE:0, lastA:0, phasen:{L1:0,L2:0,L3:0} }));
-  if (!fiKonfigs.length) return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
+  if (!fiKonfigs.length) return { gruppen, fils:fils.map(s=>({...s,assignedPhase:filsAssignedPhase(s)})), warnungen };
 
   const swFIs={}, raumFIs={};
   const sortiert = [...normal].sort((a,b) => {
@@ -109,9 +111,11 @@ function verteile(sicherungen, fiKonfigs) {
       ziel = gruppen.reduce((b,g,i)=>g.belegteTE<gruppen[b].belegteTE?i:b,0);
     }
     const is3p=(sInfo?.phase||1)===3;
-    const assignedPhase=sk.phase==="Auto"
-      ? (is3p?"3P":Object.entries(gruppen[ziel].phasen).reduce((a,b)=>a[1]<=b[1]?a:b)[0])
-      : sk.phase;
+    // 3-phasige Stromkreise belegen immer L1+L2+L3 — eine manuell gewählte Einzelphase
+    // würde das fälschlich als 1-phasig ausweisen (Beschriftungsplan/Stückliste).
+    const assignedPhase = is3p ? "3P" : (sk.phase==="Auto"
+      ? Object.entries(gruppen[ziel].phasen).reduce((a,b)=>a[1]<=b[1]?a:b)[0]
+      : sk.phase);
     gruppen[ziel].stromkreise.push({...sk, assignedPhase, is3p, overflow:kands.length===0});
     gruppen[ziel].belegteTE+=te; gruppen[ziel].lastA+=amp;
     if (is3p) { gruppen[ziel].phasen.L1+=amp; gruppen[ziel].phasen.L2+=amp; gruppen[ziel].phasen.L3+=amp; }
@@ -135,7 +139,7 @@ function verteile(sicherungen, fiKonfigs) {
       gruppen[ziel].belegteTE += te;
     });
   }
-  return { gruppen, fils:fils.map(s=>({...s,assignedPhase:"3P"})), warnungen };
+  return { gruppen, fils:fils.map(s=>({...s,assignedPhase:filsAssignedPhase(s)})), warnungen };
 }
 
 // ── Stückliste ──
@@ -279,17 +283,26 @@ function empfehleSicherung(kabelIds, alleKabel, dreipolig=false) {
   });
 })();
 function loadProjekte() { try { return JSON.parse(localStorage.getItem("vp_projekte")||"[]"); } catch { return []; } }
-function saveProjekte(p) { localStorage.setItem("vp_projekte", JSON.stringify(p)); }
+function saveProjekte(p) {
+  try { localStorage.setItem("vp_projekte", JSON.stringify(p)); return true; }
+  catch (e) { console.error("Projekt konnte nicht gespeichert werden:", e); return false; }
+}
 
 // ── Einstellungen ──
 const SETTINGS_DEFAULTS = { firmenname:"", defaultErsteller:"" };
 function loadSettings() { try { return {...SETTINGS_DEFAULTS,...JSON.parse(localStorage.getItem("vp_settings")||"{}")}; } catch { return {...SETTINGS_DEFAULTS}; } }
-function saveSettings(s) { localStorage.setItem("vp_settings",JSON.stringify(s)); }
+function saveSettings(s) {
+  try { localStorage.setItem("vp_settings",JSON.stringify(s)); return true; }
+  catch (e) { console.error("Einstellungen konnten nicht gespeichert werden:", e); return false; }
+}
 
 // ── API ──
 const API_DEFAULTS = { url:"https://api.anthropic.com/v1/messages", model:"claude-sonnet-4-20250514", apiKey:"", format:"openai" };
 function ladeApiConfig() { try { return { ...API_DEFAULTS, ...JSON.parse(localStorage.getItem("vp_api_config")||"{}") }; } catch { return {...API_DEFAULTS}; } }
-function speichereApiConfig(cfg) { localStorage.setItem("vp_api_config", JSON.stringify(cfg)); }
+function speichereApiConfig(cfg) {
+  try { localStorage.setItem("vp_api_config", JSON.stringify(cfg)); return true; }
+  catch (e) { console.error("API-Konfiguration konnte nicht gespeichert werden:", e); return false; }
+}
 
 async function callVisionAPI(base64, prompt) {
   const cfg = ladeApiConfig();
@@ -458,7 +471,7 @@ function ApiSettingsModal({ onClose }) {
         <div style={{background:"rgba(33,150,201,0.06)",border:"1px solid #1a7abf33",borderRadius:8,padding:"10px",marginBottom:16,fontSize:11,color:"var(--blue)"}}>
           💡 Für lokale Nutzung: <code style={{background:"#0a0a0a",padding:"1px 4px",borderRadius:3}}>OLLAMA_ORIGINS=* ollama serve</code> · dann <code style={{background:"#0a0a0a",padding:"1px 4px",borderRadius:3}}>ollama pull llava</code>
         </div>
-        <button onClick={()=>{speichereApiConfig(cfg);setOk(true);setTimeout(()=>setOk(false),2000);}}
+        <button onClick={()=>{if(speichereApiConfig(cfg)){setOk(true);setTimeout(()=>setOk(false),2000);}}}
           style={{...bPrimary,width:"100%"}}>{ok?"✓ Gespeichert!":"Speichern"}</button>
       </div>
     </div>
@@ -550,7 +563,7 @@ function DateiImportModal({ onClose, onImport }) {
       const bez = line.trim();
       if (!bez || bez.length < 3) return;
       // Versuche Kabel-Infos aus der Zeile zu extrahieren, z.B. "Küche Steckdosen 3x2,5"
-      const m = bez.match(/(\d+)\s*[x×*]\s*([\d,\.]+)/i);
+      const m = bez.match(/(\d+)\s*[x×*]\s*([\d,.]+)/i);
       const adern = m ? parseInt(m[1]) : 3;
       const qs    = m ? m[2].replace(",", ".") : "2.5";
       kabelListe.push({
@@ -626,7 +639,9 @@ function DateiImportModal({ onClose, onImport }) {
       setKiVerfuegbar(false);
     } catch(e) {
       setFehler("KI-Analyse fehlgeschlagen: " + e.message);
-      setPhase("result"); // Zurück zum manuellen Ergebnis falls vorhanden
+      // Bei Excel/Word gibt es ein vorheriges Offline-Ergebnis zum Zurückfallen ("result"),
+      // bei PDF/Foto (kein Offline-Parsing) sonst zur Fehleransicht mit Retry-Button ("error").
+      setPhase(ergebnis ? "result" : "error");
     }
   };
 
@@ -745,7 +760,6 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   const [phase, setPhase] = useState("start"); // "start" | "neu" | "laden"
   const [form, setForm] = useState({ name:"", adresse:"", ersteller:"", standort:"" });
   const [suche, setSuche] = useState("");
-  const dbOk = false;
   const gefilterteProjekte = suche.trim()
     ? projekte.filter(p => (p.name||"").toLowerCase().includes(suche.toLowerCase()) || (p.projekt?.adresse||"").toLowerCase().includes(suche.toLowerCase()))
     : projekte;
@@ -808,8 +822,7 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <div>
             <div style={{fontSize:17,fontWeight:800,color:"var(--text)"}}>📂 Projekt laden</div>
-            {dbOk && <div style={{fontSize:10,color:"var(--green)",marginTop:3}}>● Verbunden mit Datenbank</div>}
-            {!dbOk && <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>Lokale Projekte</div>}
+            <div style={{fontSize:10,color:"var(--text3)",marginTop:3}}>Lokale Projekte</div>
           </div>
           <button onClick={()=>setPhase("start")} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20}}>←</button>
         </div>
@@ -845,7 +858,13 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
   // Start-Phase
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{textAlign:"center",maxWidth:440,width:"100%",background:"var(--bg2)",borderRadius:18,padding:32,border:"1px solid var(--border)"}}>
+      <div style={{textAlign:"center",maxWidth:440,width:"100%",background:"var(--bg2)",borderRadius:18,padding:32,border:"1px solid var(--border)",position:"relative"}}>
+        {onBack && (
+          <button onClick={onBack} title="Zurück zum Dashboard"
+            style={{position:"absolute",top:14,left:14,background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",gap:4}}>
+            ←
+          </button>
+        )}
         {/* Logo */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginBottom:32}}>
           <div style={{width:56,height:56,borderRadius:14,background:"rgba(33,150,201,0.12)",border:"1px solid rgba(33,150,201,0.3)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -878,12 +897,9 @@ function StartScreen({ projekte, onNeu, onLaden, onLoescheProjekt, onBack }) {
           </button>
         </div>
 
-        {/* DB Status */}
+        {/* Speicher-Status */}
         <div style={{marginTop:24,fontSize:11,color:"var(--text3)"}}>
-          {dbOk
-            ? <span style={{color:"var(--green)"}}>● Datenbankverbindung aktiv</span>
-            : <span>💾 Lokale Speicherung · <a href="#" onClick={e=>{e.preventDefault();}} style={{color:"var(--blue)",textDecoration:"none"}}>Datenbank einrichten →</a></span>
-          }
+          💾 Daten werden lokal im Browser gespeichert
         </div>
       </div>
     </div>
@@ -900,9 +916,10 @@ function SettingsModal({ settings, onSave, onClose }) {
 
   const handleSave = () => {
     onSave(s);
-    speichereApiConfig(apiCfg);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (speichereApiConfig(apiCfg)) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
 
   const apiPresets = [
@@ -977,24 +994,29 @@ function SettingsModal({ settings, onSave, onClose }) {
 
 // ── Leitungsrechner (VDE 0100-520, Kupfer, cos φ=1, ΔU ≤ 3%) ──
 const LR_STROM = { "1.5":13.5, "2.5":18, "4":24, "6":31, "10":42, "16":56 };
-function berechneLeitungsQs(iA, laengeM) {
-  const aMin = (2 * iA * laengeM) / (56 * 6.9); // 56=κ(Cu), 6.9V=3%×230V
+const LR_UN     = { "1P": 230, "3P": 400 };
+const LR_FAKTOR = { "1P": 2,   "3P": Math.sqrt(3) };
+function berechneLeitungsQs(iA, laengeM, phasen="1P") {
+  const duZul = 0.03 * LR_UN[phasen];
+  const aMin = (LR_FAKTOR[phasen] * iA * laengeM) / (56 * duZul); // 56=κ(Cu)
   const auswahl = ["1.5","2.5","4","6","10","16"];
   return auswahl.find(q => parseFloat(q) >= aMin && LR_STROM[q] >= iA) || null;
 }
-function maxLaenge(iA, qs) {
-  return Math.floor((56 * 6.9 * parseFloat(qs)) / (2 * iA));
+function maxLaenge(iA, qs, phasen="1P") {
+  const duZul = 0.03 * LR_UN[phasen];
+  return Math.floor((56 * duZul * parseFloat(qs)) / (LR_FAKTOR[phasen] * iA));
 }
-function LeitungsRechner({ qs, laenge, onSelectQs }) {
+function LeitungsRechner({ qs, laenge, kabelAdern, onSelectQs }) {
   const [nenn, setNenn] = React.useState("16");
   const nennA = parseFloat(nenn) || 16;
   const lm = parseFloat(laenge) || 0;
-  const empfohlen = lm > 0 ? berechneLeitungsQs(nennA, lm) : null;
-  const maxL = maxLaenge(nennA, qs);
+  const phasen = (kabelAdern||3) >= 5 ? "3P" : "1P";
+  const empfohlen = lm > 0 ? berechneLeitungsQs(nennA, lm, phasen) : null;
+  const maxL = maxLaenge(nennA, qs, phasen);
   const lmOk = lm === 0 || lm <= maxL;
   return (
     <div style={{marginTop:8,padding:"12px 14px",background:"rgba(33,150,201,0.06)",border:"1px solid rgba(33,150,201,0.2)",borderRadius:8}}>
-      <div style={{fontSize:10,color:"var(--blue)",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",marginBottom:8}}>⚡ Leitungsrechner — VDE 0100-520 (Cu, ΔU ≤ 3 %)</div>
+      <div style={{fontSize:10,color:"var(--blue)",fontWeight:700,letterSpacing:"0.5px",textTransform:"uppercase",marginBottom:8}}>⚡ Leitungsrechner — VDE 0100-520 (Cu, ΔU ≤ 3 %, {phasen==="3P"?"400V 3~":"230V 1~"})</div>
       <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
         <div>
           <div style={{fontSize:10,color:"var(--text3)",marginBottom:4}}>Nennstrom (A)</div>
@@ -1039,7 +1061,7 @@ function LeitungsRechner({ qs, laenge, onSelectQs }) {
 // ══════════════════════════════════════════
 // ── Hauptkomponente ──
 // ══════════════════════════════════════════
-export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
+export default function Verteilerplaner({ onBack, theme, onToggleTheme, config = {} } = {}) {
   const [step, setStep] = useState(1);
   const [projekt, setProjekt]     = useState({ name:"", adresse:"", ersteller:"", standort:"" });
   const [kabel, setKabel]         = useState([]);          // Step 2: Kabel
@@ -1276,19 +1298,9 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
     planDragSK.current=null; planDragFI.current=null;
   };
 
-  // ── Hilfsfunktion: aktueller Zustand als Speicher-Objekt ──────────────────
-  const buildSavePayload = (name) => ({
-    db_id:    currentDbId,
-    projekt:  { ...projekt, name: name || projekt.name },
-    kabel, sicherungen, fiKonfigs, stockwerke, raeume, swColorMap,
-    plan,
-    uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
-  });
-
   // ── Speichern (lokal) ────────────────────────────────────────────────────
   const speichere = async () => {
     const nameToSave = saveName.trim() || projekt.name || `Projekt ${new Date().toLocaleDateString("de-DE")}`;
-    const payload = buildSavePayload(nameToSave);
 
     const newDbId = currentDbId;
     const entry = {
@@ -1301,8 +1313,13 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
       plan, uiState: { step, activeTab, planTyp, mitRK, mitQV, mitNBruecke, istKNX },
     };
     const neu = [entry, ...projekte.filter(p => p.name !== nameToSave && p.id !== entry.id)];
-    setProjekte(neu); saveProjekte(neu); setShowSave(false); setSaveName("");
-    showToast(`"${nameToSave}" gespeichert ✓`);
+    setProjekte(neu);
+    if (saveProjekte(neu)) {
+      setShowSave(false); setSaveName("");
+      showToast(`"${nameToSave}" gespeichert ✓`);
+    } else {
+      showToast("Speichern fehlgeschlagen — Speicher ggf. voll", "error");
+    }
   };
 
 
@@ -1382,7 +1399,7 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
       }
       txt += `  ${item.menge}× ${item.label}\n`;
     });
-    txt += `\n– ${settings.firmenname||""}`;
+    txt += `\n– ${settings.firmenname||config.firma||""}`;
     if(projekt.ersteller) txt += ` · ${projekt.ersteller}`;
     return txt;
   };
@@ -1418,15 +1435,17 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
         txt += `  ${qNr}F1  ${sInfo?.label||""}  ${bezeichnung}\n`;
       });
     }
-    txt += `\n– ${settings.firmenname||""}`;
+    txt += `\n– ${settings.firmenname||config.firma||""}`;
     if(projekt.ersteller) txt += ` · ${projekt.ersteller}`;
     return txt;
   };
   const loescheProjekt = async id => {
     const p = projekte.find(x => x.id === id || x.db_id === id);
     const neu = projekte.filter(x => x.id !== id && x.db_id !== id);
-    setProjekte(neu); saveProjekte(neu);
-    if (p) showToast(`"${p.name}" gelöscht`, "error");
+    setProjekte(neu);
+    const ok = saveProjekte(neu);
+    if (!ok) showToast("Löschen konnte nicht gespeichert werden", "error");
+    else if (p) showToast(`"${p.name}" gelöscht`, "error");
   };
 
   // Foto-Import
@@ -1476,7 +1495,10 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
   };
 
   const geheZuFIPlanung = () => {
-    setFiKonfigs(berechneOptimaleFIs());
+    // Nur beim allerersten Mal automatisch berechnen — sonst würden manuelle
+    // Anpassungen aus Schritt 4 (z.B. FI-Typ, Phasenschiene, zusätzliche Gruppen)
+    // bei jedem erneuten "Weiter" aus Schritt 3 stillschweigend überschrieben.
+    if (fiKonfigs.length === 0) setFiKonfigs(berechneOptimaleFIs());
     setStep(4);
   };
 
@@ -1496,7 +1518,8 @@ export default function Verteilerplaner({ onBack, theme, onToggleTheme } = {}) {
         uiState: { step: 5, activeTab: "plan", planTyp, mitRK: false, mitQV, mitNBruecke, istKNX },
       };
       const neu = [entry, ...projekte.filter(p => p.name !== projekt.name && p.id !== entry.id)];
-      setProjekte(neu); saveProjekte(neu);
+      setProjekte(neu);
+      if (!saveProjekte(neu)) showToast("Auto-Speichern fehlgeschlagen — Speicher ggf. voll", "error");
     }
   };
 
@@ -1713,23 +1736,26 @@ const stueckliste = (() => {
         base.push({label:`Querverbinder / Klemmbrücke ${ports}-fach`, menge:anzahl, kat:"Reihenklemmen"});
       });
     }
-    // N-Brücke: Länge = (alle Klemmen im Block + Abdeckkappen) × Rastermaß 6,2mm
-    // + 1× Abdeckung gleicher Länge je Block (identische Länge)
+    // N-Brücke: spannt von der N-Einspeiseklemme bis zur N-Endklemme (NICHT die separate
+    // PE-Einspeiseklemme, die nur PE führt) — Länge = Klemmen im Span × 6,2mm + Abdeckkappen × 2mm.
+    // Muss exakt mit der Klemmenleiste-Visualisierung (neIdx…nxIdx) übereinstimmen, siehe dort.
     if(mitNBruecke && plan.gruppen.length>0) {
       const laengenMap = {};
       plan.gruppen.forEach(fi => {
-        let klemmenAnzahl = 2; // PE-Einspeisung + N-Einspeisung
+        let klemmenAnzahl = 1; // N-Einspeisung
         let kappenAnzahl  = 0;
+        let hatKlemmen = 0;
         fi.stromkreise.forEach(sk => {
           (sk.kabelIds||[]).forEach(kid => {
             const k = kabel.find(x=>x.id===kid);
             if(!k) return;
             const {mitPE,ohnePE} = klemmenFuerKabel(k.kabelAdern);
             klemmenAnzahl += mitPE + ohnePE;
+            hatKlemmen++;
           });
         });
-        if(istKNX){ klemmenAnzahl+=1; kappenAnzahl+=1; }
-        if(klemmenAnzahl>2) kappenAnzahl+=1;
+        if(istKNX){ klemmenAnzahl+=1; kappenAnzahl+=1; } // KNX-Reserveklemme + eigene Abdeckkappe
+        if(hatKlemmen>0||istKNX) kappenAnzahl+=1; // Abschluss-Abdeckkappe vor N-Endklemme
         klemmenAnzahl+=1; // N-Endklemme
         const laengeMM = Math.ceil((klemmenAnzahl * 6.2) + (kappenAnzahl * 2));
         laengenMap[laengeMM] = (laengenMap[laengeMM]||0) + 1;
@@ -2184,7 +2210,7 @@ const stueckliste = (() => {
                   </div>
                 </div>
                 {/* Leitungsrechner-Panel */}
-                {showLeiRechner===k.id && <LeitungsRechner qs={k.kabelQs||"1.5"} laenge={k.kabelLaenge} onSelectQs={qs=>updKabel(k.id,"kabelQs",qs)} />}
+                {showLeiRechner===k.id && <LeitungsRechner qs={k.kabelQs||"1.5"} laenge={k.kabelLaenge} kabelAdern={k.kabelAdern} onSelectQs={qs=>updKabel(k.id,"kabelQs",qs)} />}
               </div>
             );
           })}
@@ -2365,10 +2391,17 @@ const stueckliste = (() => {
                         style={{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 8px",color:"var(--text)",fontSize:13,fontWeight:700,fontFamily:"var(--mono)",appearance:"none",WebkitAppearance:"none",minWidth:80}}>
                         {STD_SICHERUNGEN.filter(s=>is3p?s.phase===3:s.phase===1).map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
                       </select>
-                      <select value={si.phase} onChange={e=>updSicherung(si.id,"phase",e.target.value)}
-                        style={{background:"var(--bg)",border:`1px solid ${si.phase!=="Auto"?PH_COLOR[si.phase]:"var(--border)"}`,borderRadius:6,padding:"4px 8px",color:si.phase!=="Auto"?PH_COLOR[si.phase]:"var(--text2)",fontSize:13,fontWeight:700,appearance:"none",WebkitAppearance:"none",minWidth:65}}>
-                        {PHASEN.map(p=><option key={p} value={p}>{p}</option>)}
-                      </select>
+                      {is3p ? (
+                        <span title="3-polige Stromkreise belegen immer alle drei Phasen"
+                          style={{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,padding:"4px 8px",color:"var(--text2)",fontSize:13,fontWeight:700,minWidth:65,textAlign:"center"}}>
+                          3P
+                        </span>
+                      ) : (
+                        <select value={si.phase} onChange={e=>updSicherung(si.id,"phase",e.target.value)}
+                          style={{background:"var(--bg)",border:`1px solid ${si.phase!=="Auto"?PH_COLOR[si.phase]:"var(--border)"}`,borderRadius:6,padding:"4px 8px",color:si.phase!=="Auto"?PH_COLOR[si.phase]:"var(--text2)",fontSize:13,fontWeight:700,appearance:"none",WebkitAppearance:"none",minWidth:65}}>
+                          {PHASEN.map(p=><option key={p} value={p}>{p}</option>)}
+                        </select>
+                      )}
                       {/* 3-polig Toggle */}
                       <button onClick={()=>{
                         const neu=!si.dreipolig;
@@ -2613,7 +2646,7 @@ const stueckliste = (() => {
               {plan.warnungen?.length>0&&plan.warnungen.map((w,i)=><div key={i} style={{fontSize:11,color:"var(--red)",marginTop:4}}>⚠ {w}</div>)}
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:"1.5px",fontFamily:"var(--mono)"}}>{settings.firmenname||""}</div>
+              <div style={{fontSize:10,color:"var(--text3)",fontWeight:600,textTransform:"uppercase",letterSpacing:"1.5px",fontFamily:"var(--mono)"}}>{settings.firmenname||config.firma||""}</div>
               {projekt.ersteller&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1,fontFamily:"var(--mono)"}}>{projekt.ersteller}</div>}
               {projekt.standort&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1,fontFamily:"var(--mono)"}}>📍 {projekt.standort}</div>}
               <div style={{fontSize:11,color:"var(--blue)",marginTop:3,fontFamily:"var(--mono)",fontWeight:600}}>{new Date().toLocaleDateString("de-DE")}</div>
@@ -3474,18 +3507,22 @@ const stueckliste = (() => {
                   </div>
                 </F>
                 <F label="Phase">
-                  <div style={{display:"flex",gap:4}}>
-                    {PHASEN.map(p=>{
-                      const c=p!=="Auto"?PH_COLOR[p]:null;
-                      const aktiv=si.assignedPhase===p||(p==="Auto"&&(!si.assignedPhase||si.assignedPhase==="Auto"));
-                      return(
-                        <button key={p} onClick={()=>updPlanLS(fi.id,si.id,"assignedPhase",p)}
-                          style={{flex:1,padding:"6px 4px",borderRadius:6,border:`1px solid ${aktiv?(c||"var(--blue)")+"88":"var(--border)"}`,background:aktiv?(c||"var(--blue)")+"22":"transparent",color:aktiv?(c||"var(--blue)"):"var(--text3)",cursor:"pointer",fontSize:11,fontWeight:700}}>
-                          {p}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {si.is3p ? (
+                    <div style={{fontSize:11,color:"var(--text3)",padding:"6px 4px"}}>3-polige Stromkreise belegen immer L1+L2+L3</div>
+                  ) : (
+                    <div style={{display:"flex",gap:4}}>
+                      {PHASEN.map(p=>{
+                        const c=p!=="Auto"?PH_COLOR[p]:null;
+                        const aktiv=si.assignedPhase===p||(p==="Auto"&&(!si.assignedPhase||si.assignedPhase==="Auto"));
+                        return(
+                          <button key={p} onClick={()=>updPlanLS(fi.id,si.id,"assignedPhase",p)}
+                            style={{flex:1,padding:"6px 4px",borderRadius:6,border:`1px solid ${aktiv?(c||"var(--blue)")+"88":"var(--border)"}`,background:aktiv?(c||"var(--blue)")+"22":"transparent",color:aktiv?(c||"var(--blue)"):"var(--text3)",cursor:"pointer",fontSize:11,fontWeight:700}}>
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </F>
                 <F label="Verschieben nach">
                   <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
@@ -3507,7 +3544,12 @@ const stueckliste = (() => {
 
       {/* ── MODALS ── */}
       {showImport&&<DateiImportModal onClose={()=>setShowImport(false)} onImport={handleFotoImport}/>}
-      {showSettings&&<SettingsModal settings={settings} onSave={s=>{setSettings(s);saveSettings(s);setShowSettings(false);showToast("Einstellungen gespeichert ✓");}} onClose={()=>setShowSettings(false)}/>}
+      {showSettings&&<SettingsModal settings={settings} onSave={s=>{
+        setSettings(s);
+        setShowSettings(false);
+        const ok=saveSettings(s);
+        showToast(ok?"Einstellungen gespeichert ✓":"Speichern fehlgeschlagen",ok?undefined:"error");
+      }} onClose={()=>setShowSettings(false)}/>}
 
       {/* ── INFO MODAL ── */}
       {showInfo&&(

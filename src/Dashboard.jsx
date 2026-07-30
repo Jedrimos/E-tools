@@ -259,7 +259,7 @@ export default function Dashboard() {
     return (
       <div>
         {showConfig && <ConfigModal draft={configDraft} setDraft={setConfigDraft} onSave={saveConfigDraft} onClose={() => setShowConfig(false)} />}
-        <Verteilerplaner onBack={zurueck} theme={theme} onToggleTheme={toggleTheme} />
+        <Verteilerplaner onBack={zurueck} theme={theme} onToggleTheme={toggleTheme} config={config} />
       </div>
     );
   }
